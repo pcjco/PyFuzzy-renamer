@@ -1,0 +1,2 @@
+wxPython==4.1.0a1.dev4570+66551952
+fuzzywuzzy==0.17.0
