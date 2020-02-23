@@ -182,7 +182,8 @@ def getRenamePreview(input, match):
     match_clean = strip_extra_whitespace(strip_illegal_chars(match.stem))
     if Qkeep_match_ext:
         match_clean += match.suffix
-    return Path(os.path.join(str(input.parent), match_clean) + input.suffix)
+    f_masked = FileMasked(input)
+    return Path(os.path.join(str(input.parent), f_masked.masked[0] + match_clean + f_masked.masked[2]) + input.suffix)
 
 
 def RefreshCandidates():
@@ -224,6 +225,24 @@ def CompileMasks(config):
     return ret
 
 
+def ClipBoardFiles():
+    ret = []
+    try:
+        if wx.TheClipboard.Open():
+            if wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_TEXT)):
+                do = wx.TextDataObject()
+                wx.TheClipboard.GetData(do)
+                ret = do.GetText().splitlines()
+            elif wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_FILENAME)):
+                do = wx.FileDataObject()
+                wx.TheClipboard.GetData(do)
+                ret = do.GetFilenames()
+            wx.TheClipboard.Close()
+    except (OSError, IOError):
+        pass
+    return ret
+
+
 class FileMatch:
     def __init__(self, file, match_results):
         self.file = file
@@ -255,13 +274,16 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
         Qsources = self.SourcesOrChoices(self.window)
         files = []
         for f in filenames:
-            fp = Path(f)
-            if fp.is_file():
-                files.append(f)
-            elif fp.is_dir():
-                for fp2 in fp.resolve().glob('*'):
-                    if fp2.is_file():
-                        files.append(str(fp2))
+            try:
+                fp = Path(f)
+                if fp.is_file():
+                    files.append(f)
+                elif fp.is_dir():
+                    for fp2 in fp.resolve().glob('*'):
+                        if fp2.is_file():
+                            files.append(str(fp2))
+            except (OSError, IOError):
+                pass
         if Qsources:
             self.window.AddSourceFromFiles(files)
         else:
@@ -332,6 +354,29 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 pos = self.GetItemData(row_id)  # 0-based unsorted index
                 self.DeleteItem(row_id)
                 del self.listdata[pos]
+        elif keycode == wx.WXK_CONTROL_V:
+            files = []
+            filenames = ClipBoardFiles()
+            for f in filenames:
+                try:
+                    fp = Path(f)
+                    if fp.is_file():
+                        files.append(f)
+                    elif fp.is_dir():
+                        for fp2 in fp.resolve().glob('*'):
+                            if fp2.is_file():
+                                files.append(str(fp2))
+                except (OSError, IOError):
+                    pass
+            if files:
+                dlg = wx.MessageDialog(self.GetParent().GetParent(), "Add the files to source or choice list?", 'Paste question', wx.YES_NO | wx.ICON_QUESTION)
+                dlg.SetYesNoLabels('Sources', 'Choices')
+                Qsources = dlg.ShowModal() == wx.ID_YES
+                dlg.Destroy()
+                if Qsources:
+                    self.GetParent().GetParent().GetParent().AddSourceFromFiles(files)
+                else:
+                    self.GetParent().GetParent().GetParent().AddChoicesFromFiles(files)
 
         if keycode:
             event.Skip()
@@ -607,8 +652,11 @@ class MainPanel(wx.Panel):
         write_config(config_dict)
         newdata = []
         for f in Path(directory).resolve().glob('*'):
-            if f.is_file():
-                newdata.append([f, None, None, None, f])
+            try:
+                if f.is_file():
+                    newdata.append([f, None, None, None, f])
+            except (OSError, IOError):
+                pass
         self.list_ctrl.AddToList(newdata)
 
     def OnAddSourceFromFiles(self, evt):
@@ -624,28 +672,34 @@ class MainPanel(wx.Panel):
         newdata = []
         first = True
         for f in files:
-            fp = Path(f)
-            if fp.is_file():
-                if first:
-                    first = False
-                    config_dict['folder_sources'] = str(fp.parent)
-                    write_config(config_dict)
-                newdata.append([fp, None, None, None, fp])
+            try:
+                fp = Path(f)
+                if fp.is_file():
+                    if first:
+                        first = False
+                        config_dict['folder_sources'] = str(fp.parent)
+                        write_config(config_dict)
+                    newdata.append([fp, None, None, None, fp])
+            except (OSError, IOError):
+                pass
         self.list_ctrl.AddToList(newdata)
 
     def OnAddSourceFromClipboard(self, evt):
-        text_data = wx.TextDataObject()
-        if wx.TheClipboard.Open():
-            success = wx.TheClipboard.GetData(text_data)
-            wx.TheClipboard.Close()
-        if success:
-            newdata = []
-            lines = text_data.GetText().splitlines()
-            for line in lines:
-                f = Path(line)
-                if f.is_file():
-                    newdata.append([f, None, None, None, f])
-            self.list_ctrl.AddToList(newdata)
+        files = []
+        filenames = ClipBoardFiles()
+        for f in filenames:
+            try:
+                fp = Path(f)
+                if fp.is_file():
+                    files.append(f)
+                elif fp.is_dir():
+                    for fp2 in fp.resolve().glob('*'):
+                        if fp2.is_file():
+                            files.append(str(fp2))
+            except (OSError, IOError):
+                pass
+        if files:
+            self.AddSourceFromFiles(files)
 
     def OnAddChoicesFromDir(self, evt):
         with wx.DirDialog(self, "Choose choice directory", config_dict['folder_choices'], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
@@ -659,8 +713,11 @@ class MainPanel(wx.Panel):
         config_dict['folder_choices'] = directory
         write_config(config_dict)
         for f in Path(directory).resolve().glob('*'):
-            if f.is_file():
-                glob_choices.add(f)
+            try:
+                if f.is_file():
+                    glob_choices.add(f)
+            except (OSError, IOError):
+                pass
         RefreshCandidates()
 
     def OnAddChoicesFromFiles(self, evt):
@@ -674,27 +731,35 @@ class MainPanel(wx.Panel):
         global glob_choices, config_dict
         first = True
         for f in files:
-            fp = Path(f)
-            if first:
-                first = False
-                config_dict['folder_choices'] = str(fp.parent)
-                write_config(config_dict)
-            if fp.is_file():
-                glob_choices.add(fp)
+            try:
+                fp = Path(f)
+                if first:
+                    first = False
+                    config_dict['folder_choices'] = str(fp.parent)
+                    write_config(config_dict)
+                if fp.is_file():
+                    glob_choices.add(fp)
+            except (OSError, IOError):
+                pass
         RefreshCandidates()
 
     def OnAddChoicesFromClipboard(self, evt):
         global glob_choices
-        text_data = wx.TextDataObject()
-        if wx.TheClipboard.Open():
-            success = wx.TheClipboard.GetData(text_data)
-            wx.TheClipboard.Close()
-        if success:
-            for line in text_data.GetText().splitlines():
-                f = Path(line)
-                if f.is_file():
-                    glob_choices.add(f)
-            RefreshCandidates()
+        files = []
+        filenames = ClipBoardFiles()
+        for f in filenames:
+            try:
+                fp = Path(f)
+                if fp.is_file():
+                    files.append(f)
+                elif fp.is_dir():
+                    for fp2 in fp.resolve().glob('*'):
+                        if fp2.is_file():
+                            files.append(str(fp2))
+            except (OSError, IOError):
+                pass
+        if files:
+            self.AddChoicesFromFiles(files)
 
     def OnRun(self, evt):
         if not glob_choices:
@@ -864,18 +929,8 @@ class helpDialog(wx.Dialog):
 
         self.Bind(wx.EVT_CLOSE, self.OnClose)
 
-        help = wx.html.HtmlWindow(self, size=(400, 250))
-        help.SetPage(
-            "<font size=\"30\">PyFuzzy-renamer</font><br><br>"
-            "<u>Authors</u><br>"
-            "<ul><li>pcjco</li></ul>"
-            "<u>Credits</u><br>"
-            "<ul><li><a href =\"https://wxpython.org\">wxPython</a></li>"
-            "<li><a href =\"https://becrisdesign.com\">Becris Design</a> (icons)</li>"
-            "<li><a href =\"https://www.waste.org/~winkles/fuzzyRename/\">Fuzzy Rename</a> (original by jeff@silent.net)</li></ul>"
-            "<u>License</u><br>"
-            "<ul><li>MIT License</li>"
-            "<li>Copyright (c) 2020 pcjco</li></ul>")
+        help = wx.html.HtmlWindow(self, size=(1400, 500))
+        help.SetPage(getDoc())
 
         btns = self.CreateButtonSizer(wx.CLOSE)
         close = wx.FindWindowById(wx.ID_CLOSE, self)
@@ -928,7 +983,7 @@ class filtersPanel(wx.Panel):
         label1 = wx.StaticText(page_filters, label="Test String", size=(60, -1))
         self.preview_filters = wx.TextCtrl(page_filters, value='Hitchhiker\'s Guide to the Galaxy, The (AGA)', size=(300, -1))
         label2 = wx.StaticText(page_filters, label="Result", size=(60, -1))
-        self.result_preview_masks = wx.TextCtrl(page_filters, value='', size=(300, -1), style=wx.TE_READONLY)
+        self.result_preview_filters = wx.TextCtrl(page_filters, value='', size=(300, -1), style=wx.TE_READONLY)
 
         wx.FileSystem.AddHandler(wx.MemoryFSHandler())
         image_Info = wx.MemoryFSHandler()
@@ -948,7 +1003,7 @@ class filtersPanel(wx.Panel):
 
         sizer3 = wx.BoxSizer(wx.HORIZONTAL)
         sizer3.Add(label2, 0, wx.ALL, 5)
-        sizer3.Add(self.result_preview_masks, 1, wx.EXPAND | wx.ALL, 0)
+        sizer3.Add(self.result_preview_filters, 1, wx.EXPAND | wx.ALL, 0)
 
         sizer_filters = wx.BoxSizer(wx.VERTICAL)
         sizer_filters.Add(self.filters_list, 2, wx.ALL | wx.EXPAND, 1)
@@ -960,10 +1015,12 @@ class filtersPanel(wx.Panel):
         page_filters.SetSizer(sizer_filters)
 
         self.masks_list = MaskListCtrl(page_masks, self, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN)
-        label21 = wx.StaticText(page_masks, label="Test String", size=(60, -1))
+        label21 = wx.StaticText(page_masks, label="Test String", size=(80, -1))
         self.preview_masks = wx.TextCtrl(page_masks, value='(1986) Hitchhiker\'s Guide to the Galaxy, The (AGA) Disk1', size=(300, -1))
-        label22 = wx.StaticText(page_masks, label="Result", size=(60, -1))
-        self.result_preview_filters = wx.TextCtrl(page_masks, value='', size=(300, -1), style=wx.TE_READONLY)
+        self.result_preview_masks_lead = wx.TextCtrl(page_masks, value='', size=(40, -1), style=wx.TE_READONLY)
+        self.result_preview_masks_mid = wx.TextCtrl(page_masks, value='', size=(220, -1), style=wx.TE_READONLY)
+        self.result_preview_masks_trail = wx.TextCtrl(page_masks, value='', size=(40, -1), style=wx.TE_READONLY)
+        label22 = wx.StaticText(page_masks, label="Lead-Mid-Trail", size=(80, -1))
 
         html_desc_masks = wx.html.HtmlWindow(page_masks, size=(-1, 200))
         html_desc_masks.SetPage(
@@ -981,7 +1038,9 @@ class filtersPanel(wx.Panel):
 
         sizer32 = wx.BoxSizer(wx.HORIZONTAL)
         sizer32.Add(label22, 0, wx.ALL, 5)
-        sizer32.Add(self.result_preview_filters, 1, wx.EXPAND | wx.ALL, 0)
+        sizer32.Add(self.result_preview_masks_lead, 1, wx.EXPAND | wx.ALL, 0)
+        sizer32.Add(self.result_preview_masks_mid, 5, wx.EXPAND | wx.ALL, 0)
+        sizer32.Add(self.result_preview_masks_trail, 1, wx.EXPAND | wx.ALL, 0)
 
         sizer_masks = wx.BoxSizer(wx.VERTICAL)
         sizer_masks.Add(self.masks_list, 1, wx.ALL | wx.EXPAND, 1)
@@ -1014,13 +1073,15 @@ class filtersPanel(wx.Panel):
 
     def UpdateFilterPreview(self):
         filters = CompileFilters(self.filters_list.GetFilters())
-        self.result_preview_masks.SetValue(filter_processed(Path(self.preview_filters.GetValue() + '.txt'), filters))
+        self.result_preview_filters.SetValue(filter_processed(Path(self.preview_filters.GetValue() + '.txt'), filters))
 
     def UpdateMaskPreview(self):
         masks = CompileMasks(self.masks_list.GetMasks())
         filters = []
         pre, middle, post = mask_processed(Path(self.preview_masks.GetValue() + '.txt'), masks, filters, applyFilters=False)
-        self.result_preview_filters.SetValue('[' + pre + '][' + middle + '][' + post + ']')
+        self.result_preview_masks_lead.SetValue(pre)
+        self.result_preview_masks_mid.SetValue(middle)
+        self.result_preview_masks_trail.SetValue(post)
 
 
 class MaskListCtrlDropTarget(wx.DropTarget):
@@ -1064,7 +1125,7 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.OnBeginLabelEdit)
         self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnEndLabelEdit)
         self.Bind(wx.EVT_LIST_BEGIN_DRAG, self._startDrag)
-        self.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.RightClickCb)
+        self.Bind(wx.EVT_CONTEXT_MENU, self.RightClickCb)
         self.Bind(wx.EVT_LIST_ITEM_CHECKED, self.CheckCb)
         self.Bind(wx.EVT_LIST_ITEM_UNCHECKED, self.CheckCb)
 
@@ -1231,10 +1292,13 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
     def RightClickCb(self, event):
         menu = wx.Menu()
         for (id, title) in MaskListCtrl.ctxmenugui_title_by_id.items():
-            menu.Append(id.GetId(), title)
-            self.Bind(wx.EVT_MENU, self.MenuSelectionCb, id=id)
-        self.PopupMenu(menu, event.GetPoint())
+            if title != 'Delete' or self.GetSelectedItemCount():
+                menu.Append(id.GetId(), title)
+                self.Bind(wx.EVT_MENU, self.MenuSelectionCb, id=id)
+        pos = self.ScreenToClient(event.GetPosition())
+        self.PopupMenu(menu, pos)
         menu.Destroy()
+        event.Skip()
 
     def MenuSelectionCb(self, event):
         operation = MaskListCtrl.ctxmenugui_title_by_id[event.GetId()]
@@ -1316,7 +1380,7 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.OnBeginLabelEdit)
         self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnEndLabelEdit)
         self.Bind(wx.EVT_LIST_BEGIN_DRAG, self._startDrag)
-        self.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.RightClickCb)
+        self.Bind(wx.EVT_CONTEXT_MENU, self.RightClickCb)
         self.Bind(wx.EVT_LIST_ITEM_CHECKED, self.CheckCb)
         self.Bind(wx.EVT_LIST_ITEM_UNCHECKED, self.CheckCb)
 
@@ -1488,10 +1552,13 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
     def RightClickCb(self, event):
         menu = wx.Menu()
         for (id, title) in FilterListCtrl.ctxmenugui_title_by_id.items():
-            menu.Append(id.GetId(), title)
-            self.Bind(wx.EVT_MENU, self.MenuSelectionCb, id=id)
-        self.PopupMenu(menu, event.GetPoint())
+            if title != 'Delete' or self.GetSelectedItemCount():
+                menu.Append(id.GetId(), title)
+                self.Bind(wx.EVT_MENU, self.MenuSelectionCb, id=id)
+        pos = self.ScreenToClient(event.GetPosition())
+        self.PopupMenu(menu, pos)
         menu.Destroy()
+        event.Skip()
 
     def MenuSelectionCb(self, event):
         operation = FilterListCtrl.ctxmenugui_title_by_id[event.GetId()]
@@ -1556,7 +1623,7 @@ class MainFrame(wx.Frame):
         source_from_dir.SetBitmap(AddFolder_16_PNG.GetBitmap())
         sources.Append(source_from_dir)
 
-        source_from_clipboard = wx.MenuItem(sources, 103, 'Sources from &Clipboard\tCtrl+C', 'Select sources from clipboard')
+        source_from_clipboard = wx.MenuItem(sources, 103, 'Sources from &Clipboard', 'Select sources from clipboard')
         source_from_clipboard.SetBitmap(Clipboard_16_PNG.GetBitmap())
         sources.Append(source_from_clipboard)
 
@@ -1568,7 +1635,7 @@ class MainFrame(wx.Frame):
         target_from_dir.SetBitmap(AddFolder_16_PNG.GetBitmap())
         choices.Append(target_from_dir)
 
-        choices_from_clipboard = wx.MenuItem(choices, 106, 'Choices from &Clipboard\tCtrl+V', 'Select choices from clipboard')
+        choices_from_clipboard = wx.MenuItem(choices, 106, 'Choices from &Clipboard', 'Select choices from clipboard')
         choices_from_clipboard.SetBitmap(Clipboard_16_PNG.GetBitmap())
         choices.Append(choices_from_clipboard)
 
@@ -1627,6 +1694,7 @@ class MainFrame(wx.Frame):
     def OnAbout(self, event):
         dia = aboutDialog(None, -1, "About PyFuzzy-renamer")
         dia.ShowModal()
+        dia.Destroy()
 
     def OnHelp(self, event):
         self.help = helpDialog(None, -1, "Help")
@@ -1774,6 +1842,98 @@ def write_config(config_dict):
 
     with open(config_file, 'w') as configfile:
         config.write(configfile)
+
+
+def getDoc():
+    return (
+        "<p>This application uses a list of input files and will rename each one with the most similar file from another list of files.<p>"
+        "<h3>Terminology</h3>"
+        "The following terminology is used in the application, and in this document:"
+        "<ul>"
+        "<li>The input files to rename are called the <b>sources</b>;</li>"
+        "<li>The files used to search for similarity are called the <b>choices</b>;</li>"
+        "<li>The process to search the most similar <b>choice</b> for a given <b>source</b> is referred here as <b>matching</b> process;</li>"
+        "<li>A <b>file path</b> is composed of a <b>parent directory</b> and a <b>file name</b>;<br>e.g. <b>file path</b>=c:/foo/bar/setup.tar.gz, <b>parent directory</b>=c:/foo/bar, <b>file name</b>=setup.tar.gz</li>"
+        "<li>A <b>file name</b> is composed of a <b>stem</b> and a <b>suffix</b>;<br>e.g. <b>file name</b>=setup.tar.gz, <b>stem</b>=setup.tar, <b>suffix</b>=.gz</li>"
+        "</ul>"
+        "<h3>Principles</h3>"
+        "<p>Here is the process applied to match and rename each <b>source</b>:</p>"
+        "<pre>"
+        " <font color=\"red\">Choices</font>────┐<br>"
+        "            │<br>"
+        "        ┌───┴────┐                     ┌────────┐<br>"
+        " <font color=\"blue\">Source</font>─┤Matching├─<font color=\"red\">Most Similar Choice</font>─┤Renaming├─<font color=\"red\">Renamed</font> <font color=\"blue\">Source</font><br>"
+        "        └────────┘                     └────────┘"
+        "</pre>"
+        "<p>When searching for the most similar <b>choice</b>, only the stems of <b>choices</b> and stem of <b>source</b> are compared.</p>"
+        "<p>When renaming a <b>source</b> file path, only the stem is renamed with the most similar stem amongst <b>choices</b> file pathes.</p>"
+        "<p>E.g. if <b>source</b> is <font color=\"blue\">c:/foo/Amaryllis.png</font>, and <b>most similar choice</b> is <font color=\"red\">d:/bar/Amaryllidinae.jpg</font>, <b>renamed source</b> is <font color=\"blue\">c:/foo/</font><font color=\"red\">Amaryllidinae</font><font color=\"blue\">.png</font></p>"
+        "<p>If <b>masks</b> and <b>filters</b> are applied, the process applied to match and rename each <b>source</b> is the following:</p>"
+        "<pre>"
+        "                                ┌─────────┐<br>"
+        "                      <font color=\"red\">Choices</font>───┤Filtering├────<font color=\"red\">Filtered Choices</font>────────┐<br>"
+        "                                └─────────┘                            │<br>"
+        "        ┌───────┐               ┌─────────┐                        ┌───┴────┐                     ┌────────┐                       ┌─────────┐<br>"
+        " <font color=\"blue\">Source</font>─┤Masking├─<font color=\"blue\">Masked Source</font>─┤Filtering├─<font color=\"blue\">Masked&Filtered Source</font>─┤Matching├─<font color=\"red\">Most Similar Choice</font>─┤Renaming├─<font color=\"blue\">Masked</font> <font color=\"red\">Renamed</font> <font color=\"blue\">Source</font>─┤Unmasking├─<font color=\"green\">Unmasked</font> <font color=\"red\">Renamed</font> <font color=\"blue\">Source</font><br>"
+        "        └───┬───┘               └─────────┘                        └────────┘                     └────────┘                       └────┬────┘<br>"
+        "            │                                                                                                                           │<br>"
+        "            └────────────────────────────────────────── <font color=\"green\">Leading & Trailing Masks</font> ───────────────────────────────────────────────────────┘"
+        "</pre>"
+        "<h3>Sources</h3>"
+        "<p>Sources are entered in the following ways:"
+        "<ul><li>click on the \"Sources\" button to add a selection of files to the current <b>sources</b></li>"
+        "<li>Go to \"File->Sources->Sources from Directory\" menu to add files from a selected folder to the current <b>sources</b></li>"
+        "<li>Go to \"File->Sources->Sources from Clipboard\" menu to add files or folders from clipboard to the current <b>sources</b></li>"
+        "<li>Drag files or folders into application panel and choose \"Sources\" to add those to the current <b>sources</b></li>"
+        "<li>Paste (Ctrl+V) into application panel and choose \"Sources\" to add the files or folders in clipboard to the current <b>sources</b></li></ul>"
+        "<h3>Choices</h3>"
+        "<p>Choices are entered in the following ways:"
+        "<ul><li>click on the \"Choices\" button to add a selection of files to the current <b>choices</b></li>"
+        "<li>Go to \"File->Choices->Choices from Directory\" menu to add files from a selected folder to the current <b>choices</b></li>"
+        "<li>Go to \"File->Choices->Choices from Clipboard\" menu to add files or folders from clipboard to the current <b>choices</b></li>"
+        "<li>Drag files or folders into application panel and choose \"Choices\" to add those to the current <b>choices</b></li>"
+        "<li>Paste (Ctrl+V) into application panel and choose \"Choices\" to add the files or folders in clipboard to the current <b>choices</b></li></ul>"
+        "<h3>Filters</h3>"
+        "<p>To ease the <b>matching</b> process, filters can be applied to <b>sources</b> and <b>choices</b> before they are compared.</p>"
+        "<p>E.g. <b>source</b> is <font color=\"blue\">c:/foo/The Amaryllis.png</font> and <b>choice</b> is <font color=\"red\">d:/bar/Amaryllidinae, The.txt</font>. It would be smart to clean the <b>sources</b> and <b>choices</b> by ignoring all articles before trying to find the <b>most similar choice</b>.</p>"
+        "<p>To achieve this, the application uses <b>filters</b>.</p>"
+        "<p>The filters are using Python regular expression patterns with capture groups (). The captured groups are replaced by a given expression (usually empty to clean a string). This is applied to both <b>sources</b> and <b>choices</b> when <b>matching</b> occurs.</p>"
+        "<p>Filters are only applied for the <b>matching</b> process, original unfiltered files are used otherwise.</p>"
+        "<p>For example, to clean articles of <b>source</b> and <b>choice</b> file, a filter with the pattern '(^the\b|, the)' with an empty replacement ' ' could be used:<br>"
+        "<ol>"
+        "<li><b>Filtering source</b>: <font color=\"blue\">c:/foo/The Amaryllis.png</font> &#11106; <font color=\"blue\">Amaryllis</font></li>"
+        "<li><b>Filtering choice</b>: <font color=\"red\">d:/bar/Amaryllidinae, The.txt</font> &#11106; <font color=\"red\">Amaryllidinae</font></li>"
+        "<li><b>Matching</b>: <font color=\"blue\">The Amaryllis</font> &#11106; <font color=\"red\">Amaryllidinae, The</font></li>"
+        "<li><b>Renaming</b>: <font color=\"blue\">c:/foo/The Amaryllis.png</font> &#11106; <font color=\"blue\">c:/foo/</font><font color=\"red\">Amaryllidinae, The</font><font color=\"blue\">.png</font></li>"
+        "</ol>"
+        "<p>Filters creation, addition, deletion, re-ordering is available from \"Masks &amp; Filters\" button.</p>"
+        "<ul>"
+        "<li>Edition of the filter name, pattern and replace is done directly by cliking on the filter list cells</li>"
+        "<li>Deletion of filters is done by pressing the [DELETE] key on some selected filter items or from the context menu on selected filter items.</li>"
+        "<li>Addition of a filter is done from the context menu on filter list.</li>"
+        "<li>Re-ordering a filter is done by dragging and dropping the filter item across the filter list.</li>"
+        "</ul>"
+        "<h3>Masks</h3>"
+        "<p>Sometimes, it can be interesting to ignore some leading and/or trailing parts from a <b>source</b> in the <b>matching</b> process and restore them after the <b>renaming</b> process. It is particularly important in order to enhance <b>matching</b> when <b>choices</b> don't contain these parts.</p>"
+        "<p>E.g. <b>source</b> is <font color=\"blue\">c:/foo/(1983-06-22) Amaryllis [Russia].png</font>, and we want to ignore the date <font color=\"blue\">(1983-06-22)</font> and the country <font color=\"blue\">[Russia]</font> during <b>matching</b> but we need to restore them when <b>renaming</b>, "
+        " then if <b>most similar choice</b> is <font color=\"red\">d:/bar/Amaryllidinae.jpg</font>, the <b>renamed source</b> should be <font color=\"blue\">c:/foo/(1983-06-22) </font><font color=\"red\">Amaryllidinae</font><font color=\"blue\"> [Russia].png</font></p>"
+        "<p>To achieve this, the application uses <b>masks</b>.</p>"
+        "<p>The masks are using Python regular expression patterns. They are removed from <b>sources</b> strings before <b>filtering</b> and <b>matching</b> occur."
+        "It is used to remove leading and trailing expressions (year, disk#...) before <b>matching</b> and restore them after <b>renaming</b>.</p>"
+        "<p>For example, to preserve the Disk number at the end of a <b>source</b> file, a mask with the pattern '(\\s?disk\\d)$' could be used:<br>"
+        "<ol>"
+        "<li><b>Masking</b>: <font color=\"blue\">c:/foo/The Wiiire Disk1.rom</font> &#11106; <font color=\"blue\">The Wiiire</font> + Trailing mask = <font color=\"green\"> Disk1</font></li>"
+        "<li><b>Matching</b>: <font color=\"blue\">The Wiiire</font> &#11106; <font color=\"red\">The Wire</font></li>"
+        "<li><b>Renaming</b>: <font color=\"blue\">c:/foo/The Wiiire.rom</font> &#11106; <font color=\"blue\">c:/foo/</font><font color=\"red\">The Wire</font><font color=\"blue\">.rom</font></li>"
+        "<li><b>Unmkasking</b>: <font color=\"blue\">c:/foo/The Wiiire.rom</font> &#11106; <font color=\"blue\">c:/foo/The Wire<font color=\"green\"> Disk1</font>.rom</font></li>"
+        "</ol>"
+        "<p>Masks creation, addition, deletion, re-ordering is available from \"Masks &amp; Filters\" button.</p>"
+        "<ul>"
+        "<li>Edition of the mask name and pattern is done directly by cliking on the mask list cells</li>"
+        "<li>Deletion of masks is done by pressing the [DELETE] key on some selected mask items or from the context menu on selected mask items.</li>"
+        "<li>Addition of a mask is done from the context menu on mask list.</li>"
+        "<li>Re-ordering a mask is done by dragging and dropping the mask item across the mask list.</li>"
+        "</ul>")
 
 
 Quit_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAVklEQVQ4jWNgYGCoYGBgWEIkXsrAwBDKgAaWoAvgARoMDAw1owZQZoAAAwODEQMDQzYDA4MCIQPEGBgYAnDgNAYGhmswQ2hmAMVewAYGPhYGqQEUZWcALdEnU4lzkXYAAAAASUVORK5CYII=")
