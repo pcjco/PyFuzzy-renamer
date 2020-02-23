@@ -236,7 +236,18 @@ def ClipBoardFiles():
             elif wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_FILENAME)):
                 do = wx.FileDataObject()
                 wx.TheClipboard.GetData(do)
-                ret = do.GetFilenames()
+                filenames = do.GetFilenames()
+                for f in filenames:
+                    try:
+                        fp = Path(f)
+                        if fp.is_dir():
+                            for fp2 in fp.resolve().glob('*'):
+                                if fp2.is_file():
+                                    ret.append(str(fp2))
+                        else:
+                            ret.append(f)
+                    except (OSError, IOError):
+                        pass
             wx.TheClipboard.Close()
     except (OSError, IOError):
         pass
@@ -318,6 +329,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.itemDataMap = self.listdata
 
     def onKeyPress(self, event):
+        global glob_choices
         keycode = event.GetKeyCode()
         if keycode == wx.WXK_SPACE:
             index = self.GetFirstSelected()
@@ -355,19 +367,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.DeleteItem(row_id)
                 del self.listdata[pos]
         elif keycode == wx.WXK_CONTROL_V:
-            files = []
-            filenames = ClipBoardFiles()
-            for f in filenames:
-                try:
-                    fp = Path(f)
-                    if fp.is_file():
-                        files.append(f)
-                    elif fp.is_dir():
-                        for fp2 in fp.resolve().glob('*'):
-                            if fp2.is_file():
-                                files.append(str(fp2))
-                except (OSError, IOError):
-                    pass
+            files = ClipBoardFiles()
             if files:
                 dlg = wx.MessageDialog(self.GetParent().GetParent(), "Add the files to source or choice list?", 'Paste question', wx.YES_NO | wx.ICON_QUESTION)
                 dlg.SetYesNoLabels('Sources', 'Choices')
@@ -444,7 +444,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             new_path = Path(new_file)
 
             try:
-                os.rename(old_file, new_file)
+                if old_path.is_file():
+                    os.rename(old_file, new_file)
                 wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
 
                 Qview_fullpath = config_dict['show_fullpath']
@@ -668,36 +669,22 @@ class MainPanel(wx.Panel):
 
     def AddSourceFromFiles(self, files):
         global config_dict
-
         newdata = []
         first = True
         for f in files:
             try:
                 fp = Path(f)
-                if fp.is_file():
-                    if first:
-                        first = False
-                        config_dict['folder_sources'] = str(fp.parent)
-                        write_config(config_dict)
-                    newdata.append([fp, None, None, None, fp])
+                if first:
+                    first = False
+                    config_dict['folder_sources'] = str(fp.parent)
+                    write_config(config_dict)
+                newdata.append([fp, None, None, None, fp])
             except (OSError, IOError):
                 pass
         self.list_ctrl.AddToList(newdata)
 
     def OnAddSourceFromClipboard(self, evt):
-        files = []
-        filenames = ClipBoardFiles()
-        for f in filenames:
-            try:
-                fp = Path(f)
-                if fp.is_file():
-                    files.append(f)
-                elif fp.is_dir():
-                    for fp2 in fp.resolve().glob('*'):
-                        if fp2.is_file():
-                            files.append(str(fp2))
-            except (OSError, IOError):
-                pass
+        files = ClipBoardFiles()
         if files:
             self.AddSourceFromFiles(files)
 
@@ -737,27 +724,14 @@ class MainPanel(wx.Panel):
                     first = False
                     config_dict['folder_choices'] = str(fp.parent)
                     write_config(config_dict)
-                if fp.is_file():
-                    glob_choices.add(fp)
+                glob_choices.add(fp)
             except (OSError, IOError):
                 pass
         RefreshCandidates()
 
     def OnAddChoicesFromClipboard(self, evt):
         global glob_choices
-        files = []
-        filenames = ClipBoardFiles()
-        for f in filenames:
-            try:
-                fp = Path(f)
-                if fp.is_file():
-                    files.append(f)
-                elif fp.is_dir():
-                    for fp2 in fp.resolve().glob('*'):
-                        if fp2.is_file():
-                            files.append(str(fp2))
-            except (OSError, IOError):
-                pass
+        files = ClipBoardFiles()
         if files:
             self.AddChoicesFromFiles(files)
 
@@ -833,7 +807,8 @@ class MainPanel(wx.Panel):
                         old_file = str(old_path)
                         new_file = str(preview_path)
                         try:
-                            os.rename(old_file, new_file)
+                            if old_path.is_file():
+                                os.rename(old_file, new_file)
                             wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
                             new_path = Path(new_file)
                             new_match = get_match(new_path)
@@ -874,7 +849,8 @@ class MainPanel(wx.Panel):
                 old_file = str(currrent_path)
                 new_file = str(previous_path)
                 try:
-                    os.rename(old_file, new_file)
+                    if currrent_path.is_file():
+                        os.rename(old_file, new_file)
                     wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
                     new_path = Path(new_file)
                     new_match = get_match(new_path)
