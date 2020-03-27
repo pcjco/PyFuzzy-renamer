@@ -386,11 +386,15 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 check = not check
             font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
             while index != -1:
+                f = self.GetItemFont(index)
+                if not f.IsOk():
+                    f = self.GetFont()
                 self.CheckItem(index, check)
                 if check:
                     font.SetStyle(wx.FONTSTYLE_NORMAL)
                 else:
                     font.SetStyle(wx.FONTSTYLE_ITALIC)
+                font.SetWeight(f.GetWeight())
                 self.SetItemFont(index, font)
                 index = self.GetNextSelected(index)
         elif keycode == wx.WXK_F2:
@@ -449,14 +453,22 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
     def CheckedCb(self, event):
         index = event.GetIndex()
+        f = self.GetItemFont(index)
+        if not f.IsOk():
+            f = self.GetFont()
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         font.SetStyle(wx.FONTSTYLE_NORMAL)
+        font.SetWeight(f.GetWeight())
         self.SetItemFont(index, font)
 
     def UncheckedCb(self, event):
         index = event.GetIndex()
+        f = self.GetItemFont(index)
+        if not f.IsOk():
+            f = self.GetFont()
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         font.SetStyle(wx.FONTSTYLE_ITALIC)
+        font.SetWeight(f.GetWeight())
         self.SetItemFont(index, font)
 
     def SelectCb(self, event):
@@ -490,6 +502,14 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.PREVIEW])
         self.SetItem(row_id, data_struct.PREVIEW, str(self.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.PREVIEW].name))
 
+        f = self.GetItemFont(row_id)
+        if not f.IsOk():
+            f = self.GetFont()
+        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+        font.SetWeight(wx.FONTWEIGHT_BOLD)
+        font.SetStyle(f.GetStyle())
+        self.SetItemFont(row_id, font)
+
     def OnBeginLabelEdit(self, event):
         event.Allow()
         if config_dict['show_fullpath']:
@@ -520,27 +540,27 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             try:
                 if old_path.is_file():
                     os.rename(old_file, new_file)
-                wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
+                    wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
 
-                Qview_fullpath = config_dict['show_fullpath']
-                Qhide_extension = config_dict['hide_extension']
+                    Qview_fullpath = config_dict['show_fullpath']
+                    Qhide_extension = config_dict['hide_extension']
 
-                new_match = get_match(new_path)
-                if new_match:
-                    self.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), old_path]
-                    self.SetItem(row_id, data_struct.MATCH_SCORE, str(self.listdata[pos][data_struct.MATCH_SCORE]))
-                    stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.MATCHNAME])
-                    self.SetItem(row_id, data_struct.MATCHNAME, str(self.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.MATCHNAME].name))
-                    stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.PREVIEW])
-                    self.SetItem(row_id, data_struct.PREVIEW, str(self.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.PREVIEW].name))
-                else:
-                    self.listdata[pos] = [new_path, 0, '', '', old_path]
-                    self.SetItem(row_id, data_struct.MATCH_SCORE, '')
-                    self.SetItem(row_id, data_struct.MATCHNAME, '')
-                    self.SetItem(row_id, data_struct.PREVIEW, '')
+                    new_match = get_match(new_path)
+                    if new_match:
+                        self.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), old_path]
+                        self.SetItem(row_id, data_struct.MATCH_SCORE, str(self.listdata[pos][data_struct.MATCH_SCORE]))
+                        stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.MATCHNAME])
+                        self.SetItem(row_id, data_struct.MATCHNAME, str(self.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.MATCHNAME].name))
+                        stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.PREVIEW])
+                        self.SetItem(row_id, data_struct.PREVIEW, str(self.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.PREVIEW].name))
+                    else:
+                        self.listdata[pos] = [new_path, 0, '', '', old_path]
+                        self.SetItem(row_id, data_struct.MATCH_SCORE, '')
+                        self.SetItem(row_id, data_struct.MATCHNAME, '')
+                        self.SetItem(row_id, data_struct.PREVIEW, '')
 
-                stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.FILENAME])
-                self.SetItem(row_id, data_struct.FILENAME, str(self.listdata[pos][data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.FILENAME].name))
+                    stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.FILENAME])
+                    self.SetItem(row_id, data_struct.FILENAME, str(self.listdata[pos][data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.FILENAME].name))
 
             except (OSError, IOError):
                 wx.LogMessage('Error when renaming : %s --> %s' % (old_file, new_file))
@@ -904,24 +924,24 @@ class MainPanel(wx.Panel):
                         try:
                             if old_path.is_file():
                                 os.rename(old_file, new_file)
-                            wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
-                            new_path = Path(new_file)
-                            new_match = get_match(new_path)
-                            if new_match:
-                                self.list_ctrl.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), old_path]
-                                self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, str(self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE]))
-                                stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.MATCHNAME])
-                                self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, str(self.list_ctrl.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.MATCHNAME].name))
-                                stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.PREVIEW])
-                                self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, str(self.list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.PREVIEW].name))
-                            else:
-                                self.list_ctrl.listdata[pos] = [new_path, 0, '', '', old_path]
-                                self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, '')
-                                self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, '')
-                                self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, '')
+                                wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
+                                new_path = Path(new_file)
+                                new_match = get_match(new_path)
+                                if new_match:
+                                    self.list_ctrl.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), old_path]
+                                    self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, str(self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE]))
+                                    stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.MATCHNAME])
+                                    self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, str(self.list_ctrl.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.MATCHNAME].name))
+                                    stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.PREVIEW])
+                                    self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, str(self.list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.PREVIEW].name))
+                                else:
+                                    self.list_ctrl.listdata[pos] = [new_path, 0, '', '', old_path]
+                                    self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, '')
+                                    self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, '')
+                                    self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, '')
 
-                            stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.FILENAME])
-                            self.list_ctrl.SetItem(row_id, data_struct.FILENAME, str(self.list_ctrl.listdata[pos][data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.FILENAME].name))
+                                stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.FILENAME])
+                                self.list_ctrl.SetItem(row_id, data_struct.FILENAME, str(self.list_ctrl.listdata[pos][data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.FILENAME].name))
 
                         except (OSError, IOError):
                             wx.LogMessage('Error when renaming : %s --> %s' % (old_file, new_file))
