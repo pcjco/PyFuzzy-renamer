@@ -872,6 +872,14 @@ class MainPanel(wx.Panel):
             if row_id == -1:
                 break
             if self.list_ctrl.IsItemChecked(row_id):
+                f = self.list_ctrl.GetItemFont(row_id)
+                if not f.IsOk():
+                    f = self.list_ctrl.GetFont()
+                font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+                font.SetWeight(wx.FONTWEIGHT_NORMAL)
+                font.SetStyle(f.GetStyle())
+                self.list_ctrl.SetItemFont(row_id, font)
+
                 pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
                 if matches[count]:
                     self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = matches[count].match_results[0][1]
