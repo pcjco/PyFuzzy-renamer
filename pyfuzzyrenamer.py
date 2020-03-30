@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import shutil
 import re
 import sys
 import logging
@@ -199,7 +200,7 @@ def getRenamePreview(input, match):
         match_clean += suffix
     f_masked = FileMasked(input)
     stem, suffix = GetFileStemAndSuffix(input)
-    return Path(os.path.join(str(input.parent), f_masked.masked[0] + match_clean + f_masked.masked[2]) + suffix)
+    return Path(os.path.join(config_dict['folder_output'] if config_dict['folder_output'] else input.parent, f_masked.masked[0] + match_clean + f_masked.masked[2]) + suffix)
 
 
 def RefreshCandidates():
@@ -739,6 +740,12 @@ class MainPanel(wx.Panel):
             self.list_ctrl.listdata[index][data_struct.PREVIEW] = getRenamePreview(self.list_ctrl.listdata[index][data_struct.FILENAME], self.list_ctrl.listdata[index][data_struct.MATCHNAME])
         self.list_ctrl.RefreshList()
 
+    def OnKeepOriginal(self, evt):
+        global config_dict
+        item = self.parent.GetMenuBar().FindItemById(evt.GetId())
+        config_dict['keep_original'] = item.IsChecked()
+        write_config(config_dict)
+
     def OnMatchFirstLetter(self, evt):
         global config_dict
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
@@ -751,7 +758,6 @@ class MainPanel(wx.Panel):
 
             if dirDialog.ShowModal() == wx.ID_CANCEL:
                 return
-
             self.AddSourceFromDir(dirDialog.GetPath())
 
     def AddSourceFromDir(self, directory):
@@ -846,6 +852,26 @@ class MainPanel(wx.Panel):
         if files:
             self.AddChoicesFromFiles(files)
 
+    def OnOutputDirectory(self, evt):
+        global glob_choices
+        with wx.DirDialog(self, "Choose output directory", config_dict['folder_output'], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
+
+            if dirDialog.ShowModal() == wx.ID_CANCEL:
+                return
+            config_dict['folder_output'] = dirDialog.GetPath()
+            write_config(config_dict)
+            for index in self.list_ctrl.listdata.keys():
+                self.list_ctrl.listdata[index][data_struct.PREVIEW] = getRenamePreview(self.list_ctrl.listdata[index][data_struct.FILENAME], self.list_ctrl.listdata[index][data_struct.MATCHNAME])
+            self.list_ctrl.RefreshList()
+
+    def OnSameOutputDirectory(self, evt):
+        global glob_choices
+        config_dict['folder_output'] = ''
+        write_config(config_dict)
+        for index in self.list_ctrl.listdata.keys():
+            self.list_ctrl.listdata[index][data_struct.PREVIEW] = getRenamePreview(self.list_ctrl.listdata[index][data_struct.FILENAME], self.list_ctrl.listdata[index][data_struct.MATCHNAME])
+        self.list_ctrl.RefreshList()
+
     def OnRun(self, evt):
         if not glob_choices:
             return
@@ -860,7 +886,7 @@ class MainPanel(wx.Panel):
                 pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
                 sources.append(self.list_ctrl.listdata[pos][data_struct.FILENAME])
 
-        progress = wx.ProgressDialog("Match Progress", "", maximum=len(sources), parent=None, style=wx.PD_AUTO_HIDE | wx.PD_APP_MODAL | wx.PD_CAN_ABORT | wx.PD_ESTIMATED_TIME | wx.PD_REMAINING_TIME)
+        progress = wx.ProgressDialog("Match Progress", "", maximum=len(sources), parent=None, style=wx.PD_AUTO_HIDE | wx.PD_CAN_ABORT | wx.PD_ESTIMATED_TIME | wx.PD_REMAINING_TIME)
                       
         matches = get_matches(sources, progress)
         row_id = -1
@@ -915,6 +941,7 @@ class MainPanel(wx.Panel):
     def OnRename(self, evt):
         Qview_fullpath = config_dict['show_fullpath']
         Qhide_extension = config_dict['hide_extension']
+        Qkeep_original = config_dict['keep_original']
         row_id = -1
         while True:  # loop all the checked items
             row_id = self.list_ctrl.GetNextItem(row_id)
@@ -931,19 +958,23 @@ class MainPanel(wx.Panel):
                         new_file = str(preview_path)
                         try:
                             if old_path.is_file():
-                                os.rename(old_file, new_file)
-                                wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
+                                if Qkeep_original:
+                                    shutil.copy2(old_file, new_file)
+                                    wx.LogMessage('Copying : %s --> %s' % (old_file, new_file))
+                                else:
+                                    os.rename(old_file, new_file)
+                                    wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
                                 new_path = Path(new_file)
                                 new_match = get_match(new_path)
                                 if new_match:
-                                    self.list_ctrl.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), old_path]
+                                    self.list_ctrl.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), old_path if not Qkeep_original else None]
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, str(self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE]))
                                     stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.MATCHNAME])
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, str(self.list_ctrl.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.MATCHNAME].name))
                                     stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.PREVIEW])
                                     self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, str(self.list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.PREVIEW].name))
                                 else:
-                                    self.list_ctrl.listdata[pos] = [new_path, 0, '', '', old_path]
+                                    self.list_ctrl.listdata[pos] = [new_path, 0, '', '', old_path if not Qkeep_original else None]
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, '')
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, '')
                                     self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, '')
@@ -968,9 +999,11 @@ class MainPanel(wx.Panel):
                 break
             pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
 
-            currrent_path = self.list_ctrl.listdata[pos][data_struct.FILENAME]
             previous_path = self.list_ctrl.listdata[pos][data_struct.PREVIOUS_FILENAME]
+            if not previous_path:
+                continue
 
+            currrent_path = self.list_ctrl.listdata[pos][data_struct.FILENAME]
             if currrent_path != previous_path:
                 old_file = str(currrent_path)
                 new_file = str(previous_path)
@@ -1003,11 +1036,11 @@ class MainPanel(wx.Panel):
 
 
 class aboutDialog(wx.Dialog):
-    def __init__(self, parent, id, label):
-        wx.Dialog.__init__(self, parent, id, label, size=(600, 300))
-
-        about = wx.html.HtmlWindow(self, size=(400, 250))
-        about.SetPage(
+    def __init__(self, parent):
+        wx.Dialog.__init__(self, parent, wx.ID_ANY, title="About PyFuzzy-renamer", size=(600,300))
+        html = wxHTML(self)
+        
+        html.SetPage(
             "<font size=\"30\">PyFuzzy-renamer</font><br><br>"
             "<u>Authors</u><br>"
             "<ul><li>pcjco</li></ul>"
@@ -1017,15 +1050,24 @@ class aboutDialog(wx.Dialog):
             "<li><a href =\"https://www.waste.org/~winkles/fuzzyRename/\">Fuzzy Rename</a> (original by jeff@silent.net)</li></ul>"
             "<u>License</u><br>"
             "<ul><li>MIT License</li>"
-            "<li>Copyright (c) 2020 pcjco</li></ul>")
+            "<li>Copyright (c) 2020 pcjco</li></ul>"
+            )
 
         btns = self.CreateButtonSizer(wx.CLOSE)
 
         mainSizer = wx.BoxSizer(wx.VERTICAL)
-        mainSizer.Add(about, 1, wx.ALL | wx.EXPAND, 0)
+        mainSizer.Add(html, 1, wx.ALL | wx.EXPAND, 0)
         mainSizer.Add(btns, 0, wx.ALL | wx.EXPAND, 5)
         self.SetSizer(mainSizer)
         self.Fit()
+
+
+class wxHTML(wx.html.HtmlWindow):
+    def __init__(self, parent):
+        wx.html.HtmlWindow.__init__(self, parent, wx.ID_ANY, size=(400,250))
+
+    def OnLinkClicked(self, link):
+        wx.LaunchDefaultBrowser(link.GetHref())
 
 
 class helpDialog(wx.Dialog):
@@ -1732,22 +1774,39 @@ class MainFrame(wx.Frame):
         choices_from_clipboard.SetBitmap(Clipboard_16_PNG.GetBitmap())
         choices.Append(choices_from_clipboard)
 
+        output_dir = wx.Menu()
+        output_dir_ = wx.MenuItem(files, 107, '&Output Directory', 'Select output directory')
+        output_dir_.SetBitmap(Folder_16_PNG.GetBitmap())
+        output_dir_.SetSubMenu(output_dir)
+
+        same_as_input = output_dir.AppendRadioItem(108, '&Same as source', 'Same as source')
+        user_dir = output_dir.AppendRadioItem(109, '&User-defined directory', 'Select User-defined directory')
+
+        if config_dict['folder_output']:
+            user_dir.Check(True)
+        else:
+            same_as_input.Check(True)
+
         quit = wx.MenuItem(files, 104, '&Quit\tCtrl+Q', 'Quit the Application')
         quit.SetBitmap(Quit_16_PNG.GetBitmap())
 
         files.Append(sources_)
         files.Append(choices_)
+        files.Append(output_dir_)
         files.Append(quit)
 
         options = wx.Menu()
         view_fullpath = options.AppendCheckItem(202, '&View full path', 'View full path')
         view_fullpath.Check(config_dict['show_fullpath'])
 
-        self.hide_extension = options.AppendCheckItem(203, '&Hide extension', 'Hide extension')
+        self.hide_extension = options.AppendCheckItem(203, '&Hide suffix', 'Hide suffix')
         self.hide_extension.Check(config_dict['hide_extension'])
         self.hide_extension.Enable(not config_dict['show_fullpath'])
 
-        self.keep_match_ext = options.AppendCheckItem(201, '&Keep matched file extension', 'Keep matched file extension')
+        self.keep_original = options.AppendCheckItem(205, 'Keep &original on renaming', 'Keep original on renaming')
+        self.keep_original.Check(config_dict['keep_original'])
+
+        self.keep_match_ext = options.AppendCheckItem(201, '&Keep matched file suffix', 'Keep matched file suffix')
         self.keep_match_ext.Check(config_dict['keep_match_ext'])
 
         self.match_firstletter = options.AppendCheckItem(204, '&Always match first letter', 'Enforce choices that match the first letter of the source')
@@ -1775,17 +1834,20 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromClipboard, id=103)
         self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromDir, id=105)
         self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromClipboard, id=106)
+        self.Bind(wx.EVT_MENU, self.panel.OnOutputDirectory, id=109)
+        self.Bind(wx.EVT_MENU, self.panel.OnSameOutputDirectory, id=108)
         self.Bind(wx.EVT_MENU, self.panel.OnViewFullPath, id=202)
         self.Bind(wx.EVT_MENU, self.panel.OnHideExtension, id=203)
         self.Bind(wx.EVT_MENU, self.panel.OnKeepMatchExtension, id=201)
         self.Bind(wx.EVT_MENU, self.panel.OnMatchFirstLetter, id=204)
+        self.Bind(wx.EVT_MENU, self.panel.OnKeepOriginal, id=205)
         self.Bind(wx.EVT_MENU, self.OnHelp, id=300)
         self.Bind(wx.EVT_MENU, self.OnAbout, id=301)
 
         self.Show(True)
 
     def OnAbout(self, event):
-        dia = aboutDialog(None, -1, "About PyFuzzy-renamer")
+        dia = aboutDialog(None)
         dia.ShowModal()
         dia.Destroy()
 
@@ -1805,8 +1867,10 @@ def read_config():
                    'hide_extension': False,
                    'match_firstletter': False,
                    'keep_match_ext': False,
+                   'keep_original': False,
                    'folder_sources': os.getcwd(),
                    'folder_choices': os.getcwd(),
+                   'folder_output': os.getcwd(),
                    'filters': default_filters,
                    'masks': default_masks,
                    'masks_test': default_masks_teststring,
@@ -1816,9 +1880,11 @@ def read_config():
     INI_show_fullpath_val = config_dict['show_fullpath']
     INI_hide_extension_val = config_dict['hide_extension']
     INI_keep_match_ext_val = config_dict['keep_match_ext']
+    INI_keep_original_val = config_dict['keep_original']
     INI_match_firstletter_val = config_dict['match_firstletter']
     INI_folder_sources_val = config_dict['folder_sources']
     INI_folder_choices_val = config_dict['folder_choices']
+    INI_folder_output_val = config_dict['folder_output']
     INI_filters_val = config_dict['filters']
     INI_masks_val = config_dict['masks']
     INI_filters_test_val = config_dict['filters_test']
@@ -1857,6 +1923,10 @@ def read_config():
         except KeyError:
             pass
         try:
+            INI_keep_original_val = True if INI_global_cat['keep_original'] == 'True' else False
+        except KeyError:
+            pass
+        try:
             INI_match_firstletter_val = True if INI_global_cat['match_firstletter'] == 'True' else False
         except KeyError:
             pass
@@ -1866,6 +1936,10 @@ def read_config():
             pass
         try:
             INI_folder_choices_val = INI_recent_cat['folder_choices']
+        except KeyError:
+            pass
+        try:
+            INI_folder_output_val = INI_recent_cat['folder_output']
         except KeyError:
             pass
         try:
@@ -1893,9 +1967,11 @@ def read_config():
     config_dict['show_fullpath'] = INI_show_fullpath_val
     config_dict['hide_extension'] = INI_hide_extension_val
     config_dict['keep_match_ext'] = INI_keep_match_ext_val
+    config_dict['keep_original'] = INI_keep_original_val
     config_dict['match_firstletter'] = INI_match_firstletter_val
     config_dict['folder_sources'] = INI_folder_sources_val
     config_dict['folder_choices'] = INI_folder_choices_val
+    config_dict['folder_output'] = INI_folder_output_val
     config_dict['filters'] = INI_filters_val
     config_dict['masks'] = INI_masks_val
     config_dict['filters_test'] = INI_filters_test_val
@@ -1915,6 +1991,8 @@ def write_config(config_dict):
                         config_dict['hide_extension'],
                         'keep_match_ext':
                         config_dict['keep_match_ext'],
+                        'keep_original':
+                        config_dict['keep_original'],
                         'match_firstletter':
                         config_dict['match_firstletter']
                         }
@@ -1930,7 +2008,9 @@ def write_config(config_dict):
     config['recent'] = {'folder_sources':
                         config_dict['folder_sources'],
                         'folder_choices':
-                        config_dict['folder_choices']
+                        config_dict['folder_choices'],
+                        'folder_output':
+                        config_dict['folder_output']
                         }
 
     with open(config_file, 'w') as configfile:
@@ -1939,15 +2019,19 @@ def write_config(config_dict):
 
 def getDoc():
     return (
-        "<p>This application uses a list of input files and will rename each one with the most similar file from another list of files.<p>"
+        "<p>This application uses a list of input strings and will rename each one with the most similar string from another list of strings.<p>"
         "<h3>Terminology</h3>"
         "The following terminology is used in the application, and in this document:"
         "<ul>"
-        "<li>The input files to rename are called the <b>sources</b>;</li>"
-        "<li>The files used to search for similarity are called the <b>choices</b>;</li>"
+        "<li>The input strings to rename are called the <b>sources</b>;</li>"
+        "<li>The strings used to search for similarity are called the <b>choices</b>;</li>"
         "<li>The process to search the most similar <b>choice</b> for a given <b>source</b> is referred here as <b>matching</b> process;</li>"
-        "<li>A <b>file path</b> is composed of a <b>parent directory</b> and a <b>file name</b>;<br>e.g. <b>file path</b>=c:/foo/bar/setup.tar.gz, <b>parent directory</b>=c:/foo/bar, <b>file name</b>=setup.tar.gz</li>"
-        "<li>A <b>file name</b> is composed of a <b>stem</b> and a <b>suffix</b>;<br>e.g. <b>file name</b>=setup.tar.gz, <b>stem</b>=setup.tar, <b>suffix</b>=.gz</li>"
+        "<li>When strings are coming from file paths, the following terminology is used:"
+            "<ul>"
+            "<li>A <b>file path</b> is composed of a <b>parent directory</b> and a <b>file name</b>;<br>e.g. <b>file path</b>=<code>c:/foo/bar/setup.tar.gz</code>, <b>parent directory</b>=<code>c:/foo/bar</code>, <b>file name</b>=<code>setup.tar.gz</code></li>"
+            "<li>A <b>file name</b> is composed of a <b>stem</b> and a <b>suffix</b>;<br>e.g. <b>file name</b>=<code>setup.tar.gz</code>, <b>stem</b>=<code>setup.tar</code>, <b>suffix</b>=<code>.gz</code></li>"
+            "<li>A <b>suffix</b> can only contain alphanumeric characters after the dot, if it contains non-alphanumeric characters, the suffix is considered as part of the <b>stem</b>;<br>e.g. <b>file name</b>=<code>A.Train III</code>, <b>stem</b>=<code>A.Train III</code>, <b>suffix</b>=<code>None</code></li>"
+        "</ul></li>"
         "</ul>"
         "<h3>Principles</h3>"
         "<p>Here is the process applied to match and rename each <b>source</b>:</p>"
@@ -1958,9 +2042,9 @@ def getDoc():
         " <font color=\"blue\">Source</font>─┤Matching├─<font color=\"red\">Most Similar Choice</font>─┤Renaming├─<font color=\"red\">Renamed</font> <font color=\"blue\">Source</font><br>"
         "        └────────┘                     └────────┘"
         "</pre>"
-        "<p>When searching for the most similar <b>choice</b>, only the stems of <b>choices</b> and stem of <b>source</b> are compared.</p>"
-        "<p>When renaming a <b>source</b> file path, only the stem is renamed with the most similar stem amongst <b>choices</b> file pathes.</p>"
-        "<p>E.g. if <b>source</b> is <font color=\"blue\">c:/foo/Amaryllis.png</font>, and <b>most similar choice</b> is <font color=\"red\">d:/bar/Amaryllidinae.jpg</font>, <b>renamed source</b> is <font color=\"blue\">c:/foo/</font><font color=\"red\">Amaryllidinae</font><font color=\"blue\">.png</font></p>"
+        "<p>When searching for the most similar <b>choice</b>, only the <b>stems</b> of <b>choices</b> and <b>stem</b> of <b>source</b> are compared.</p>"
+        "<p>When renaming a <b>source</b> file path, only the <b>stem</b> is renamed with the most similar <b>stem</b> among <b>choices</b> file paths.</p>"
+        "<p>E.g. if <b>source</b> is <code><font color=\"blue\">c:/foo/Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color=\"red\">d:/bar/Amaryllidinae.jpg</font></code>, <b>renamed source</b> is <code><font color=\"blue\">c:/foo/</font><font color=\"red\">Amaryllidinae</font><font color=\"blue\">.png</font></code></p>"
         "<p>If <b>masks</b> and <b>filters</b> are applied, the process applied to match and rename each <b>source</b> is the following:</p>"
         "<pre>"
         "                                ┌─────────┐<br>"
@@ -1974,65 +2058,88 @@ def getDoc():
         "</pre>"
         "<h3>Sources</h3>"
         "<p>Sources are entered in the following ways:"
-        "<ul><li>click on the \"Sources\" button to add a selection of files to the current <b>sources</b></li>"
-        "<li>Go to \"File->Sources->Sources from Directory\" menu to add files from a selected folder to the current <b>sources</b></li>"
-        "<li>Go to \"File->Sources->Sources from Clipboard\" menu to add files or folders from clipboard to the current <b>sources</b></li>"
-        "<li>Drag files or folders into application panel and choose \"Sources\" to add those to the current <b>sources</b></li>"
-        "<li>Paste (Ctrl+V) into application panel and choose \"Sources\" to add the files or folders in clipboard to the current <b>sources</b></li></ul>"
+        "<ul><li>click on the <code><b>Sources</b></code> button to add a selection of file paths to the current <b>sources</b>;</li>"
+        "<li>Go to <code><b>File->Sources->Sources from Directory</b></code> menu to add file paths from a selected folder to the current <b>sources</b>;</li>"
+        "<li>Go to <code><b>File->Sources->Sources from Clipboard</b></code> menu to add file paths or folders from clipboard to the current <b>sources</b>. If clipboard contains a folder, then the file paths of the files inside this folder are added;</li>"
+        "<li>Drag files or folders into application panel and choose <code><b>Sources</b></code> to add file paths to the current <b>sources</b>. For folders, the file paths of the files inside folders are added;</li>"
+        "<li>Paste (Ctrl+V) into application panel and choose <code><b>Sources</b></code> to add file paths of the files or folders in clipboard to the current <b>sources</b>. For folders, the file paths of the files inside folders are added</li></ul>"
         "<h3>Choices</h3>"
         "<p>Choices are entered in the following ways:"
-        "<ul><li>click on the \"Choices\" button to add a selection of files to the current <b>choices</b></li>"
-        "<li>Go to \"File->Choices->Choices from Directory\" menu to add files from a selected folder to the current <b>choices</b></li>"
-        "<li>Go to \"File->Choices->Choices from Clipboard\" menu to add files or folders from clipboard to the current <b>choices</b></li>"
-        "<li>Drag files or folders into application panel and choose \"Choices\" to add those to the current <b>choices</b></li>"
-        "<li>Paste (Ctrl+V) into application panel and choose \"Choices\" to add the files or folders in clipboard to the current <b>choices</b></li></ul>"
+        "<ul><li>click on the <code><b>Choices</b></code> button to add a selection of files paths to the current <b>choices</b>;</li>"
+        "<li>Go to <code><b>File->Choices->Choices from Directory</b></code> menu to add files paths from a selected folder to the current <b>choices</b>;</li>"
+        "<li>Go to <code><b>File->Choices->Choices from Clipboard</b></code> menu to add files paths from clipboard to the current <b>choices</b>. If clipboard contains a folder, then the file paths of the files inside this folder are added;</li>"
+        "<li>Drag files or folders into application panel and choose <code><b>Choices</b></code> to add file paths to the current <b>choices</b>. For folders, the file paths of the files inside folders are added;</li>"
+        "<li>Paste (Ctrl+V) into application panel and choose <code><b>Choices</b></code> to add file paths of the files or folders in clipboard to the current <b>choices</b>. For folders, the file paths of the files inside folders are added</li></ul>"
         "<h3>Filters</h3>"
         "<p>To ease the <b>matching</b> process, filters can be applied to <b>sources</b> and <b>choices</b> before they are compared.</p>"
-        "<p>E.g. <b>source</b> is <font color=\"blue\">c:/foo/The Amaryllis.png</font> and <b>choice</b> is <font color=\"red\">d:/bar/Amaryllidinae, The.txt</font>. It would be smart to clean the <b>sources</b> and <b>choices</b> by ignoring all articles before trying to find the <b>most similar choice</b>.</p>"
+        "<p>E.g. <b>source</b> is <code><font color=\"blue\">c:/foo/The Amaryllis.png</font></code> and <b>choice</b> is <code><font color=\"red\">d:/bar/Amaryllidinae, The.txt</font></code>. It would be smart to clean the <b>sources</b> and <b>choices</b> by ignoring all articles before trying to find the <b>most similar choice</b>.</p>"
         "<p>To achieve this, the application uses <b>filters</b>.</p>"
         "<p>The filters are using Python regular expression patterns with capture groups (). The captured groups are replaced by a given expression (usually empty to clean a string). This is applied to both <b>sources</b> and <b>choices</b> when <b>matching</b> occurs.</p>"
         "<p>Filters are only applied for the <b>matching</b> process, original unfiltered files are used otherwise.</p>"
-        "<p>For example, to clean articles of <b>source</b> and <b>choice</b> file, a filter with the pattern '(^the\b|, the)' with an empty replacement ' ' could be used:<br>"
+        "<p>For example, to clean articles of <b>source</b> and <b>choice</b> file, a filter with the pattern <code>(^the\\b|, the)</code> with an empty replacement <code> </code> could be used:<br>"
         "<ol>"
-        "<li><b>Filtering source</b>: <font color=\"blue\">c:/foo/The Amaryllis.png</font> &#11106; <font color=\"blue\">Amaryllis</font></li>"
-        "<li><b>Filtering choice</b>: <font color=\"red\">d:/bar/Amaryllidinae, The.txt</font> &#11106; <font color=\"red\">Amaryllidinae</font></li>"
-        "<li><b>Matching</b>: <font color=\"blue\">The Amaryllis</font> &#11106; <font color=\"red\">Amaryllidinae, The</font></li>"
-        "<li><b>Renaming</b>: <font color=\"blue\">c:/foo/The Amaryllis.png</font> &#11106; <font color=\"blue\">c:/foo/</font><font color=\"red\">Amaryllidinae, The</font><font color=\"blue\">.png</font></li>"
+        "<li><b>Filtering source</b>: <code><font color=\"blue\">c:/foo/The Amaryllis.png</font></code> &#11106; <code><font color=\"blue\">Amaryllis</font></code></li>"
+        "<li><b>Filtering choice</b>: <code><font color=\"red\">d:/bar/Amaryllidinae, The.txt</font></code> &#11106; <code><font color=\"red\">Amaryllidinae</font></code></li>"
+        "<li><b>Matching</b>: <code><font color=\"blue\">The Amaryllis</font></code> &#11106; <code><font color=\"red\">Amaryllidinae, The</font></code></li>"
+        "<li><b>Renaming</b>: <code><font color=\"blue\">c:/foo/The Amaryllis.png</font></code> &#11106; <code><font color=\"blue\">c:/foo/</font><font color=\"red\">Amaryllidinae, The</font><font color=\"blue\">.png</font></code></li>"
         "</ol>"
-        "<p>Filters creation, addition, deletion, re-ordering is available from \"Masks &amp; Filters\" button.</p>"
+        "<p>Filters creation, addition, deletion, re-ordering is available from <code><b>Masks &amp; Filters</b></code> button.</p>"
         "<ul>"
-        "<li>Edition of the filter name, pattern and replace is done directly by cliking on the filter list cells</li>"
+        "<li>Edition of the filter name, pattern and replace is done directly by clicking on the filter list cells</li>"
         "<li>Deletion of filters is done by pressing the [DELETE] key on some selected filter items or from the context menu on selected filter items.</li>"
         "<li>Addition of a filter is done from the context menu on filter list.</li>"
         "<li>Re-ordering a filter is done by dragging and dropping the filter item across the filter list.</li>"
         "</ul>"
         "<h3>Masks</h3>"
         "<p>Sometimes, it can be interesting to ignore some leading and/or trailing parts from a <b>source</b> in the <b>matching</b> process and restore them after the <b>renaming</b> process. It is particularly important in order to enhance <b>matching</b> when <b>choices</b> don't contain these parts.</p>"
-        "<p>E.g. <b>source</b> is <font color=\"blue\">c:/foo/(1983-06-22) Amaryllis [Russia].png</font>, and we want to ignore the date <font color=\"blue\">(1983-06-22)</font> and the country <font color=\"blue\">[Russia]</font> during <b>matching</b> but we need to restore them when <b>renaming</b>, "
-        " then if <b>most similar choice</b> is <font color=\"red\">d:/bar/Amaryllidinae.jpg</font>, the <b>renamed source</b> should be <font color=\"blue\">c:/foo/(1983-06-22) </font><font color=\"red\">Amaryllidinae</font><font color=\"blue\"> [Russia].png</font></p>"
+        "<p>E.g. <b>source</b> is <code><font color=\"blue\">c:/foo/(1983-06-22) Amaryllis [Russia].png</font></code>, and we want to ignore the date <code><font color=\"blue\">(1983-06-22)</font></code> and the country <code><font color=\"blue\">[Russia]</font></code> during <b>matching</b> but we need to restore them when <b>renaming</b>, "
+        " then if <b>most similar choice</b> is <code><font color=\"red\">d:/bar/Amaryllidinae.jpg</font></code>, the <b>renamed source</b> should be <code><font color=\"blue\">c:/foo/(1983-06-22) </font><font color=\"red\">Amaryllidinae</font><font color=\"blue\"> [Russia].png</font></code></p>"
         "<p>To achieve this, the application uses <b>masks</b>.</p>"
         "<p>The masks are using Python regular expression patterns. They are removed from <b>sources</b> strings before <b>filtering</b> and <b>matching</b> occur."
         "It is used to remove leading and trailing expressions (year, disk#...) before <b>matching</b> and restore them after <b>renaming</b>.</p>"
-        "<p>For example, to preserve the Disk number at the end of a <b>source</b> file, a mask with the pattern '(\\s?disk\\d)$' could be used:<br>"
+        "<p>For example, to preserve the Disk number at the end of a <b>source</b> file, a mask with the pattern <code>(\\s?disk\\d)$</code> could be used:<br>"
         "<ol>"
-        "<li><b>Masking</b>: <font color=\"blue\">c:/foo/The Wiiire Disk1.rom</font> &#11106; <font color=\"blue\">The Wiiire</font> + Trailing mask = <font color=\"green\"> Disk1</font></li>"
-        "<li><b>Matching</b>: <font color=\"blue\">The Wiiire</font> &#11106; <font color=\"red\">The Wire</font></li>"
-        "<li><b>Renaming</b>: <font color=\"blue\">c:/foo/The Wiiire.rom</font> &#11106; <font color=\"blue\">c:/foo/</font><font color=\"red\">The Wire</font><font color=\"blue\">.rom</font></li>"
-        "<li><b>Unmkasking</b>: <font color=\"blue\">c:/foo/The Wiiire.rom</font> &#11106; <font color=\"blue\">c:/foo/The Wire<font color=\"green\"> Disk1</font>.rom</font></li>"
+        "<li><b>Masking</b>: <code><font color=\"blue\">c:/foo/The Wiiire Disk1.rom</font></code> &#11106; <code><font color=\"blue\">The Wiiire</font></code> + Trailing mask = <code><font color=\"green\"> Disk1</font></code></li>"
+        "<li><b>Matching</b>: <code><font color=\"blue\">The Wiiire</font></code> &#11106; <code><font color=\"red\">The Wire</font></code></li>"
+        "<li><b>Renaming</b>: <code><font color=\"blue\">c:/foo/The Wiiire.rom</font></code> &#11106; <code><font color=\"blue\">c:/foo/</font><font color=\"red\">The Wire</font><font color=\"blue\">.rom</font></code></li>"
+        "<li><b>Unmkasking</b>: <code><font color=\"blue\">c:/foo/The Wiiire.rom</font></code> &#11106; <code><font color=\"blue\">c:/foo/The Wire<font color=\"green\"> Disk1</font>.rom</font></code></li>"
         "</ol>"
-        "<p>Masks creation, addition, deletion, re-ordering is available from \"Masks &amp; Filters\" button.</p>"
+        "<p>Masks creation, addition, deletion, re-ordering is available from <code><b>Masks &amp; Filters</b></code> button.</p>"
         "<ul>"
-        "<li>Edition of the mask name and pattern is done directly by cliking on the mask list cells</li>"
+        "<li>Edition of the mask name and pattern is done directly by clicking on the mask list cells</li>"
         "<li>Deletion of masks is done by pressing the [DELETE] key on some selected mask items or from the context menu on selected mask items.</li>"
         "<li>Addition of a mask is done from the context menu on mask list.</li>"
         "<li>Re-ordering a mask is done by dragging and dropping the mask item across the mask list.</li>"
-        "</ul>")
+        "</ul>"
+        "<h3>Output directory</h3>"
+        "<p>When <b>source</b> strings are coming from file paths, the <b>renaming</b> process will modify the file paths.</p>"
+        "<p>There are two options available:"
+        "<ol>"
+        "<li>Renaming in place : the <b>source</b> file is renamed to the <b>most similar choice</b> in the same directory<br>This is done by selecting <code><b>Output Directory->Same as input</b></code></li>"
+        "<li>Renaming in another directory : the <b>source</b> file is kept and the renamed file is copied in another directory<br>This is done by selecting <code><b>Output Directory->User-defined directory</b></code></li>"
+        "</ol>"
+        "<h3>Options</h3>"
+        "<ul>"
+        "<li><b>View full path</b><br><br>"
+        "When <b>source</b> strings are coming from file paths, the full path of files are shown in the <code><b>Source Name</b></code> and <code><b>Renaming Preview</b></code> columns.<br>"
+        "When <b>choices</b> strings are coming from file paths, the full path of files are shown in the <code><b>Closest Match</b></code> columns.</li>"
+        "<br><li><b>Hide suffix</b><br><br>"
+        "When <b>source</b> strings are coming from file paths, the suffixes are hidden in the <code><b>Source Name</b></code> and <code><b>Renaming Preview</b></code> columns.<br>"
+        "When <b>choices</b> strings are coming from file paths, the suffixes are hidden in the <code><b>Closest Match</b></code> columns.</li>"
+        "<br><li><b>Keep matched file suffix</b><br><br>"
+        "During <b>renaming</b>, the suffix of the <b>most similar choice</b> is used before suffix of the <b>source</b>.<br>"
+        "E.g. if <b>source</b> is <code><font color=\"blue\">Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color=\"red\">Amaryllidinae.rom</font></code>, <b>renamed source</b> is <code><font color=\"red\">Amaryllidinae.rom</font></code><code><font color=\"blue\">.png</font></code>"
+        "<br><li><b>Always match first letter</b><br><br>"
+        "During <b>matching</b>, each <b>source</b> will search for the <b>most similar choice</b> among <b>choices</b> that start with the same letter only."
+        "</ul>"
+        )
 
 
 Quit_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAVklEQVQ4jWNgYGCoYGBgWEIkXsrAwBDKgAaWoAvgARoMDAw1owZQZoAAAwODEQMDQzYDA4MCIQPEGBgYAnDgNAYGhmswQ2hmAMVewAYGPhYGqQEUZWcALdEnU4lzkXYAAAAASUVORK5CYII=")
 Clipboard_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAtklEQVQ4jcXSLQoCURiF4SdYpk+1WLS4ATEKYtA2zQUYzTLRLGaNioILcQtux+AHyjB3dJIfvOXcw3t/uKQnwznIGnq1M8IRi+AYWeMUuMWOD8wwDGaRnaNT1AnWmKLEHfnHWh5ZGZ11SrDEHltcvd/gGtk+Oo2CsuGa5a+CPk4V+m0E/z9Bx+vlP+m0EfSwq9BrI8gwqJC1EXSxqdD9VXDAOMHhm2CC1RcmKcEcF+/vm+ISXfAEy/NDr/2o1MAAAAAASUVORK5CYII=")
 AddFile_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAv0lEQVQ4jeXTsUvCQRjG8Q+KYhFEUnuD4W90aHZtjf4dUxpyc3QQQTCTIGpJh/6KxD/JwfdHFL/qcvWB43mP5/i+d8cd1PCC+R9jiroCHWFUFHzTEm9FkFTAAkN84HAXQBOXmOB8F0Cu+z0GXOAGT/8FVDFGH9foxfpyKuAO7aivwtsYpAJm0S2zfUwZKnhOBcxxgFusw4/xgJII3/38iVY+L60bfoLHX5p+0Rle0YqjtGLeSAXkkF5su4PTPNgARiAq9du6DoYAAAAASUVORK5CYII=")
 AddFolder_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAArklEQVQ4je3SMQuBYRTF8Z9FMSgxG4zKKj6ChdikzD6CL2AXpQy2txSDUiZfzuAmKXles1N3uMP5n/M8XVgge5kDWnIoe9sruKD2KwCauL41e531N0Cu0D8gHVBED2Oc8gLaOGOOEY4YpAKKYS6hig4KWKGbAuhFchX9MDZQxzYFMI7anTDfMEMZO1j6fLKZx4cdo3YjzDDB9Ev4U0NsonY5zPuAJqvr8eZdJBfgDs5MKn5hEi99AAAAAElFTkSuQmCC")
+Folder_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAWUlEQVQ4je3ToQ2AQAxA0ScQl4BGMxFrsAOaCVAMgIIlsQS4XJogr8k3FS81hYTuVis4J7ZbB6YIsH/sVowYCvU5oMGMpdCRA0LXV6ACvwDPZ4p08n7nSOkCBygjcGZQPuwAAAAASUVORK5CYII=")
 ProcessMatch_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAApklEQVQ4je3RMQ4BURSF4S9BZwWjIlGpZDqFEoUtmMQuTDVEopmShkRiDzaoeAoS7w29vz33nntyLu9MUeGGErkv6eKCDYZoY4QDanSaDM4YR7QFdqnl6fNyiiMGMbESYqeYoYiJN7QaDPrYx8RSKCzFEquYmAttp7iilxqoMY9oa2wbDugIrzoJhfWF2Nfn8h1ZkwnhVYVQ2OoldvaLSYy/yWeTyQNeOBiZybXdVAAAAABJRU5ErkJggg==")
 Rename_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAQklEQVQ4jWNgoBPgYWBgWMLAwLABSouQa9ASSl2C1YBJUAli8D00/iRSnYWudsmoAVQygOJoJAXQJiUSA6iWmTAAAFKsJvUTORWWAAAAAElFTkSuQmCC")
 Rename_32_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAj0lEQVRYhe2XsQ2AIBBF3wq2dq7gAiziEI7jGC5jYmdpQ2JhQWtzBQ1BDYIk95JfEC7hBYrjQElLA4yBtDkEOmCVHMDprfscAj4TMOc+VAVeCRgpTJ0N2CM1BmAAnBinzCISoX0nZzMA9s5VPST2BFYFVEAFVEAFfiVQtBkVb8dfUc+PSAVSUnwwKT6a1ccFLuSbvR2v1tcAAAAASUVORK5CYII=")
