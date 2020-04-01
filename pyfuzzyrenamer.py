@@ -82,8 +82,6 @@ def filter_processed(file, filters):
     for filter in filters:
         ret = filter[0].sub(filter[1], ret)
     ret = ' '.join(ret.split())
-    if stem != ret:
-        wx.LogMessage('String filtered : %s --> %s' % (stem, ret))
     return ret
 
 
@@ -134,8 +132,6 @@ def mask_processed(file, masks, filters, applyFilters=True):
         for filter in filters:
             middle = filter[0].sub(filter[1], middle)
         middle = ' '.join(middle.split())
-    if stem != middle:
-        wx.LogMessage('String masked : %s --> [%s]%s[%s]' % (stem, pre, middle, post))
     return pre, middle, post
 
 
@@ -378,26 +374,13 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         global glob_choices
         keycode = event.GetKeyCode()
         if keycode == wx.WXK_SPACE:
-            index = self.GetFirstSelected()
-            check = True
-            if index != -1:
-                if self.IsItemChecked(index):
-                    check = False
-            if self.GetSelectedItemCount() == 1:
-                check = not check
-            font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-            while index != -1:
-                f = self.GetItemFont(index)
-                if not f.IsOk():
-                    f = self.GetFont()
-                self.CheckItem(index, check)
-                if check:
-                    font.SetStyle(wx.FONTSTYLE_NORMAL)
-                else:
-                    font.SetStyle(wx.FONTSTYLE_ITALIC)
-                font.SetWeight(f.GetWeight())
-                self.SetItemFont(index, font)
-                index = self.GetNextSelected(index)
+            if self.GetSelectedItemCount() > 1:
+                index = self.GetFirstSelected()
+                second = self.GetNextSelected(index)
+                check = not self.IsItemChecked(second)
+                while index != -1:
+                    self.CheckItem(index, check)
+                    index = self.GetNextSelected(index)
         elif keycode == wx.WXK_F2:
             if self.GetSelectedItemCount() == 1:
                 index = self.GetFirstSelected()
@@ -530,9 +513,6 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
         event.Veto()  # do not allow further process as we will edit ourself the item label
 
-        if new_name != new_name_clean:
-            wx.LogMessage('String cleaned : %s --> %s' % (new_name, new_name_clean))
-
         if new_name_clean != old_name:
             old_file = str(old_path)
             new_file = os.path.join(str(old_path.parent), new_name_clean)
@@ -565,8 +545,6 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
             except (OSError, IOError):
                 wx.LogMessage('Error when renaming : %s --> %s' % (old_file, new_file))
-        else:
-            wx.LogMessage('Not renaming %s (same name)' % (old_name))
 
     def GetListCtrl(self):
         return self
@@ -984,10 +962,6 @@ class MainPanel(wx.Panel):
 
                         except (OSError, IOError):
                             wx.LogMessage('Error when renaming : %s --> %s' % (old_file, new_file))
-                    else:
-                        wx.LogMessage('Not renaming %s (same name)' % (old_path.name))
-                else:
-                    wx.LogMessage('Not renaming %s (no match)' % (old_path.name))
 
     def OnUndo(self, evt):
         Qview_fullpath = config_dict['show_fullpath']
@@ -1003,36 +977,29 @@ class MainPanel(wx.Panel):
             if not previous_path:
                 continue
 
-            currrent_path = self.list_ctrl.listdata[pos][data_struct.FILENAME]
-            if currrent_path != previous_path:
-                old_file = str(currrent_path)
+            current_path = self.list_ctrl.listdata[pos][data_struct.FILENAME]
+            if current_path != previous_path:
+                old_file = str(current_path)
                 new_file = str(previous_path)
+                
                 try:
-                    if currrent_path.is_file():
+                    if current_path.is_file():
                         os.rename(old_file, new_file)
                     wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
                     new_path = Path(new_file)
-                    new_match = get_match(new_path)
-                    if new_match:
-                        self.list_ctrl.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), new_path]
-                        self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, str(self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE]))
-                        stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.MATCHNAME])
-                        self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, str(self.list_ctrl.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.MATCHNAME].name))
-                        stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.PREVIEW])
-                        self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, str(self.list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.PREVIEW].name))
-                    else:
-                        self.list_ctrl.listdata[pos] = [new_path, 0, '', '', new_path]
-                        self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, '')
-                        self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, '')
-                        self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, '')
-
+                    similarity = mySimilarityScorer(FileMasked(new_path).masked[1], FileFiltered(self.list_ctrl.listdata[pos][data_struct.MATCHNAME]).filtered)
+                    self.list_ctrl.listdata[pos][data_struct.FILENAME] = new_path
+                    self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = similarity
+                    self.list_ctrl.listdata[pos][data_struct.PREVIEW] = getRenamePreview(new_path, self.list_ctrl.listdata[pos][data_struct.MATCHNAME])
+                    self.list_ctrl.listdata[pos][data_struct.PREVIOUS_FILENAME] = new_path
                     stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.FILENAME])
                     self.list_ctrl.SetItem(row_id, data_struct.FILENAME, str(self.list_ctrl.listdata[pos][data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.FILENAME].name))
+                    self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, str(self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE]))
+                    stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.PREVIEW])
+                    self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, str(self.list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.PREVIEW].name))
 
                 except (OSError, IOError):
                     wx.LogMessage('Error when renaming : %s --> %s' % (old_file, new_file))
-            else:
-                wx.LogMessage('Not renaming %s (same name)' % (currrent_path.name))
 
 
 class aboutDialog(wx.Dialog):
