@@ -1323,7 +1323,9 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
             masks = CompileMasks(masks)
             filters = []
             pre, middle, post = mask_processed(Path(self.panel.preview_masks.GetValue() + '.txt'), masks, filters, applyFilters=False)
-            self.panel.result_preview_filters.SetValue('[' + pre + '][' + middle + '][' + post + ']')
+            self.panel.result_preview_masks_lead.SetValue(pre)
+            self.panel.result_preview_masks_mid.SetValue(middle)
+            self.panel.result_preview_masks_trail.SetValue(post)
 
     def getItemInfo(self, idx):
         """Collect all relevant data of a listitem, and put it in a list"""
@@ -1577,7 +1579,7 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                     filters += '"' + self.GetItemText(row_id0, 3) + '"\n'
 
             filters = CompileFilters(filters)
-            self.panel.result_preview_masks.SetValue(filter_processed(Path(self.panel.preview_filters.GetValue() + '.txt'), filters))
+            self.panel.result_preview_filters.SetValue(filter_processed(Path(self.panel.preview_filters.GetValue() + '.txt'), filters))
 
     def getItemInfo(self, idx):
         """Collect all relevant data of a listitem, and put it in a list"""
