@@ -347,6 +347,98 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
         return result
 
 
+class PickCandidate(wx.MiniFrame):
+    def __init__(self, parent, row_id, position):
+        wx.MiniFrame.__init__(self, parent, wx.ID_ANY, "", pos = position, style=wx.RESIZE_BORDER)
+        self.text = wx.TextCtrl(self, -1, size=(100,-1), style=wx.TE_PROCESS_ENTER)
+        self.text.SetMinSize((200,-1))
+        self.row_id = row_id
+        panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        panel_sizer.Add(self.text, 1, wx.EXPAND|wx.ALL, 0)
+        self.SetSizerAndFit(panel_sizer)
+        size = self.GetSize()
+        self.SetSizeHints(minW=size.GetWidth(), minH=size.GetHeight(), maxH=size.GetHeight())
+        self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
+        self.Bind(wx.EVT_CLOSE, self.OnCloseWindow)
+        self.text.Bind(wx.EVT_TEXT_ENTER, self.OnEnter)
+        self.text.AutoComplete(CandidateCompleter())
+        self.MakeModal()
+
+    def OnCloseWindow(self, event):
+        self.MakeModal(False) 
+        self.Destroy()
+
+    def OnKeyUP(self, event):
+        keycode = event.GetKeyCode()
+        if keycode == wx.WXK_ESCAPE:
+            self.Close(True)
+        if keycode:
+            event.Skip()
+
+    def OnEnter(self, event):
+        val = self.text.GetLineText(0).strip()
+        for item in candidates['all']:
+            if item.file.name == val:
+                list_ctrl = self.GetParent()
+                forced_match = item.file
+                pos = list_ctrl.GetItemData(self.row_id)  # 0-based unsorted index
+                similarity = mySimilarityScorer(FileMasked(list_ctrl.listdata[pos][data_struct.FILENAME]).masked[1], FileFiltered(forced_match).filtered)
+                list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = similarity
+                list_ctrl.listdata[pos][data_struct.MATCHNAME] = forced_match
+                list_ctrl.listdata[pos][data_struct.PREVIEW] = getRenamePreview(list_ctrl.listdata[pos][data_struct.FILENAME], forced_match)
+
+                Qview_fullpath = config_dict['show_fullpath']
+                Qhide_extension = config_dict['hide_extension']
+                list_ctrl.SetItem(self.row_id, data_struct.MATCH_SCORE, str(list_ctrl.listdata[pos][data_struct.MATCH_SCORE]))
+                stem, suffix = GetFileStemAndSuffix(list_ctrl.listdata[pos][data_struct.MATCHNAME])
+                list_ctrl.SetItem(self.row_id, data_struct.MATCHNAME, str(list_ctrl.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else list_ctrl.listdata[pos][data_struct.MATCHNAME].name))
+                stem, suffix = GetFileStemAndSuffix(list_ctrl.listdata[pos][data_struct.PREVIEW])
+                list_ctrl.SetItem(self.row_id, data_struct.PREVIEW, str(list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else list_ctrl.listdata[pos][data_struct.PREVIEW].name))
+
+                f = list_ctrl.GetItemFont(self.row_id)
+                if not f.IsOk():
+                    f = list_ctrl.GetFont()
+                font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+                font.SetWeight(wx.FONTWEIGHT_BOLD)
+                font.SetStyle(f.GetStyle())
+                list_ctrl.SetItemFont(self.row_id, font)
+
+        self.Close(True)
+
+    def MakeModal(self, modal=True):
+        if modal and not hasattr(self, '_disabler'):
+            self._disabler = wx.WindowDisabler(self)
+        if not modal and hasattr(self, '_disabler'):
+            del self._disabler
+
+
+class CandidateCompleter(wx.TextCompleter):
+    def __init__(self):
+        wx.TextCompleter.__init__(self)
+        self._iLastReturned = wx.NOT_FOUND
+        self._sPrefix = ''
+        self.possibleValues = candidates['all']
+        self.lcPossibleValues = [x.file.name.lower() for x in candidates['all']]
+
+    def Start(self, prefix):
+        self._sPrefix = prefix.lower()
+        self._iLastReturned = wx.NOT_FOUND
+        for index, item in enumerate(self.lcPossibleValues):
+            if item.startswith(self._sPrefix):
+                self._iLastReturned = index
+                return True
+        # Nothing found
+        return False
+
+    def GetNext(self):
+        for i in range(self._iLastReturned, len(self.lcPossibleValues)):
+            if self.lcPossibleValues[i].startswith(self._sPrefix):
+                self._iLastReturned = i+1
+                return self.possibleValues[i].file.name
+        # No more corresponding item
+        return ''
+
+
 class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
     def __init__(self, parent, ID=wx.ID_ANY, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
@@ -410,6 +502,19 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     self.GetParent().GetParent().GetParent().AddSourceFromFiles(files)
                 else:
                     self.GetParent().GetParent().GetParent().AddChoicesFromFiles(files)
+        elif keycode == 112: # p
+            if self.GetSelectedItemCount() == 1:
+                row_id = self.GetFirstSelected()
+                pos_column_match = 0
+                for i in self.GetColumnsOrder():
+                    if i == 2:
+                        break;
+                    pos_column_match += self.GetColumnWidth(i)
+                rect = self.GetItemRect(row_id)
+                position = self.ClientToScreen(rect.GetPosition())
+                dia = PickCandidate(self, row_id, wx.Point(position.x + pos_column_match, position.y))
+                dia.Show()
+                dia.text.SetFocus()
 
         if keycode:
             event.Skip()
@@ -425,6 +530,12 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         matches = get_match(self.listdata[pos][data_struct.FILENAME])
         if matches:
             menu = wx.Menu()
+            id = wx.NewIdRef()
+            search = wx.MenuItem(menu, id.GetValue(), '&Pick a match\tP', 'Pick a match')
+            search.SetBitmap(ProcessMatch_16_PNG.GetBitmap())
+            menu.Append(search)
+            self.Bind(wx.EVT_MENU, self.SearchSelectionCb, id=id)
+            forced_match_id[id] = (event.GetIndex(), self.ClientToScreen(event.GetPoint()))
             for match in matches:
                 id = wx.NewIdRef()
                 stem, suffix = GetFileStemAndSuffix(match[0].file)
@@ -468,6 +579,13 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText('%d item(s) selected' % self.GetSelectedItemCount(), 1)
         else:
             self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText('', 1)
+
+    def SearchSelectionCb(self, event):
+        row_id, position = forced_match_id[event.GetId()]
+        forced_match_id.clear()
+        dia = PickCandidate(self, row_id, position)
+        dia.Show()
+        dia.text.SetFocus()
 
     def MenuSelectionCb(self, event):
         row_id, forced_match = forced_match_id[event.GetId()]
