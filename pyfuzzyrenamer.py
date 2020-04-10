@@ -6,6 +6,7 @@ import re
 import sys
 import logging
 import os.path
+import copy
 import wx
 import wx.adv
 import wx.aui
@@ -24,7 +25,9 @@ class data_struct(object):
     MATCH_SCORE = 1
     MATCHNAME = 2
     PREVIEW = 3
-    PREVIOUS_FILENAME = 4
+    STATUS = 4
+    CHECKED = 5
+    PREVIOUS_FILENAME = 6
 
 
 glob_choices = set()
@@ -48,6 +51,12 @@ default_filters = '+Strip brackets\n' + \
                   r'"(?ui)\W"' + '\n' + \
                   r'" "'
 
+default_columns = [[0, 300, 'Source Name'],
+                   [1, 80, 'Similarity(%)'],
+                   [2, 300, 'Closest Match'],
+                   [3, 300, 'Renaming Preview'],
+                   [4, 100, 'Status'],
+                   [5, 60, 'Checked']]
 
 def strip_illegal_chars(s):
     s = re.sub(r'(?<=\S)[' + illegal_chars + r'](?=\S)', '-', s)
@@ -386,6 +395,7 @@ class PickCandidate(wx.MiniFrame):
                 list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = similarity
                 list_ctrl.listdata[pos][data_struct.MATCHNAME] = forced_match
                 list_ctrl.listdata[pos][data_struct.PREVIEW] = getRenamePreview(list_ctrl.listdata[pos][data_struct.FILENAME], forced_match)
+                list_ctrl.listdata[pos][data_struct.STATUS] = 'User choice'
 
                 Qview_fullpath = config_dict['show_fullpath']
                 Qhide_extension = config_dict['hide_extension']
@@ -394,6 +404,7 @@ class PickCandidate(wx.MiniFrame):
                 list_ctrl.SetItem(self.row_id, data_struct.MATCHNAME, str(list_ctrl.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else list_ctrl.listdata[pos][data_struct.MATCHNAME].name))
                 stem, suffix = GetFileStemAndSuffix(list_ctrl.listdata[pos][data_struct.PREVIEW])
                 list_ctrl.SetItem(self.row_id, data_struct.PREVIEW, str(list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else list_ctrl.listdata[pos][data_struct.PREVIEW].name))
+                list_ctrl.SetItem(self.row_id, data_struct.STATUS, str(list_ctrl.listdata[pos][data_struct.STATUS]))
 
                 f = list_ctrl.GetItemFont(self.row_id)
                 if not f.IsOk():
@@ -443,21 +454,23 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
     def __init__(self, parent, ID=wx.ID_ANY, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
         wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
-        listmix.ColumnSorterMixin.__init__(self, 4)
+        listmix.ColumnSorterMixin.__init__(self, 6)
         self.EnableCheckBoxes()
         self.Bind(wx.EVT_CHAR, self.onKeyPress)
         self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.OnBeginLabelEdit)
         self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnEndLabelEdit)
-        self.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.RightClickCb)
+        self.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.ItemRightClickCb)
+        self.Bind(wx.EVT_LIST_COL_RIGHT_CLICK, self.ColRightClickCb)
         self.Bind(wx.EVT_LIST_ITEM_CHECKED, self.CheckedCb)
         self.Bind(wx.EVT_LIST_ITEM_UNCHECKED, self.UncheckedCb)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.SelectCb)
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.UnselectCb)
 
-        self.InsertColumn(0, 'Source Name', width=300)
-        self.InsertColumn(1, 'Similarity(%)', width=80)
-        self.InsertColumn(2, 'Closest Match', width=300)
-        self.InsertColumn(3, 'Renaming Preview', width=300)
+        for col in range(0, len(default_columns)):
+            self.InsertColumn(col, default_columns[col][2], width=config_dict['col%d_size' % (col + 1)])
+
+        order = [config_dict['col%d_order' % (col + 1)] for col in range(0, len(default_columns))]
+        self.SetColumnsOrder(order)
 
         self.listdata = {}
         self.itemDataMap = self.listdata
@@ -519,7 +532,23 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         if keycode:
             event.Skip()
 
-    def RightClickCb(self, event):
+    def ColRightClickCb(self, event):
+        menu = wx.Menu()
+        for col in range(0, self.GetColumnCount()):
+            t = menu.AppendCheckItem(col, self.GetColumn(col).GetText())
+            t.Check(self.GetColumnWidth(col) > 0)
+            self.Bind(wx.EVT_MENU, self.MenuColumnCb, id=col)
+        self.PopupMenu(menu, event.GetPoint())
+        menu.Destroy()
+
+    def MenuColumnCb(self, event):
+        col = event.GetId()
+        if event.IsChecked():
+            self.SetColumnWidth(col, default_columns[col][1])
+        else:
+            self.SetColumnWidth(col, 0)
+
+    def ItemRightClickCb(self, event):
         global forced_match_id
         forced_match_id.clear()
         if not self.GetSelectedItemCount() or self.GetSelectedItemCount() > 1:
@@ -540,31 +569,37 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 id = wx.NewIdRef()
                 stem, suffix = GetFileStemAndSuffix(match[0].file)
                 menu.Append(id.GetValue(), "[%d%%] %s" % (match[1], stem))
-                self.Bind(wx.EVT_MENU, self.MenuSelectionCb, id=id)
+                self.Bind(wx.EVT_MENU, self.MenuForceMatchCb, id=id)
                 forced_match_id[id] = (event.GetIndex(), match[0].file)
 
             self.PopupMenu(menu, event.GetPoint())
             menu.Destroy()
 
     def CheckedCb(self, event):
-        index = event.GetIndex()
-        f = self.GetItemFont(index)
+        row_id = event.GetIndex()
+        f = self.GetItemFont(row_id)
         if not f.IsOk():
             f = self.GetFont()
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         font.SetStyle(wx.FONTSTYLE_NORMAL)
         font.SetWeight(f.GetWeight())
-        self.SetItemFont(index, font)
+        self.SetItemFont(row_id, font)
+        pos = self.GetItemData(row_id)  # 0-based unsorted index
+        self.listdata[pos][data_struct.CHECKED] = 'True'
+        self.SetItem(row_id, data_struct.CHECKED, self.listdata[pos][data_struct.CHECKED])
 
     def UncheckedCb(self, event):
-        index = event.GetIndex()
-        f = self.GetItemFont(index)
+        row_id = event.GetIndex()
+        f = self.GetItemFont(row_id)
         if not f.IsOk():
             f = self.GetFont()
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         font.SetStyle(wx.FONTSTYLE_ITALIC)
         font.SetWeight(f.GetWeight())
-        self.SetItemFont(index, font)
+        self.SetItemFont(row_id, font)
+        pos = self.GetItemData(row_id)  # 0-based unsorted index
+        self.listdata[pos][data_struct.CHECKED] = 'False'
+        self.SetItem(row_id, data_struct.CHECKED, self.listdata[pos][data_struct.CHECKED])
 
     def SelectCb(self, event):
         nb = self.GetSelectedItemCount()
@@ -587,7 +622,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         dia.Show()
         dia.text.SetFocus()
 
-    def MenuSelectionCb(self, event):
+    def MenuForceMatchCb(self, event):
         row_id, forced_match = forced_match_id[event.GetId()]
         forced_match_id.clear()
         pos = self.GetItemData(row_id)  # 0-based unsorted index
@@ -595,6 +630,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.listdata[pos][data_struct.MATCH_SCORE] = similarity
         self.listdata[pos][data_struct.MATCHNAME] = forced_match
         self.listdata[pos][data_struct.PREVIEW] = getRenamePreview(self.listdata[pos][data_struct.FILENAME], forced_match)
+        self.listdata[pos][data_struct.STATUS] = 'User choice'
 
         Qview_fullpath = config_dict['show_fullpath']
         Qhide_extension = config_dict['hide_extension']
@@ -603,6 +639,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.SetItem(row_id, data_struct.MATCHNAME, str(self.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.MATCHNAME].name))
         stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.PREVIEW])
         self.SetItem(row_id, data_struct.PREVIEW, str(self.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.PREVIEW].name))
+        self.SetItem(row_id, data_struct.STATUS, str(self.listdata[pos][data_struct.STATUS]))
 
         f = self.GetItemFont(row_id)
         if not f.IsOk():
@@ -646,20 +683,21 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
                     new_match = get_match(new_path)
                     if new_match:
-                        self.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), old_path]
+                        self.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), 'Matched', self.listdata[pos][data_struct.CHECKED], old_path]
                         self.SetItem(row_id, data_struct.MATCH_SCORE, str(self.listdata[pos][data_struct.MATCH_SCORE]))
                         stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.MATCHNAME])
                         self.SetItem(row_id, data_struct.MATCHNAME, str(self.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.MATCHNAME].name))
                         stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.PREVIEW])
                         self.SetItem(row_id, data_struct.PREVIEW, str(self.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.PREVIEW].name))
                     else:
-                        self.listdata[pos] = [new_path, 0, '', '', old_path]
+                        self.listdata[pos] = [new_path, 0, '', '', 'No match', self.listdata[pos][data_struct.CHECKED], old_path]
                         self.SetItem(row_id, data_struct.MATCH_SCORE, '')
                         self.SetItem(row_id, data_struct.MATCHNAME, '')
                         self.SetItem(row_id, data_struct.PREVIEW, '')
 
                     stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.FILENAME])
                     self.SetItem(row_id, data_struct.FILENAME, str(self.listdata[pos][data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.FILENAME].name))
+                    self.SetItem(row_id, data_struct.STATUS, self.listdata[pos][data_struct.STATUS])
 
             except (OSError, IOError):
                 wx.LogMessage('Error when renaming : %s --> %s' % (old_file, new_file))
@@ -681,6 +719,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             filepath = str(data[data_struct.FILENAME])
             stem, suffix = GetFileStemAndSuffix(data[data_struct.FILENAME])
             self.SetItem(row_id, data_struct.FILENAME, filepath if Qview_fullpath else (stem if Qhide_extension else data[data_struct.FILENAME].name))
+            self.SetItem(row_id, data_struct.STATUS, str(data[data_struct.STATUS]))
             if data[data_struct.MATCHNAME]:
                 self.SetItem(row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE]))
                 stem, suffix = GetFileStemAndSuffix(data[data_struct.MATCHNAME])
@@ -708,16 +747,12 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             if found != -1:
                 continue
 
+            self.listdata[index] = data
             self.InsertItem(row_id, item_name)
-            if data[data_struct.MATCHNAME]:
-                self.SetItem(row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE]))
-                stem, suffix = GetFileStemAndSuffix(data[data_struct.MATCHNAME])
-                self.SetItem(row_id, data_struct.MATCHNAME, str(data[data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.MATCHNAME].name))
-                stem, suffix = GetFileStemAndSuffix(data[data_struct.PREVIEW])
-                self.SetItem(row_id, data_struct.PREVIEW, str(data[data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.PREVIEW].name))
+            self.SetItem(row_id, data_struct.STATUS, data[data_struct.STATUS])
+            self.SetItem(row_id, data_struct.CHECKED, data[data_struct.CHECKED])
             self.SetItemData(row_id, index)
             self.CheckItem(row_id, True)
-            self.listdata[index] = data
             row_id += 1
             index += 1
 
@@ -864,7 +899,7 @@ class MainPanel(wx.Panel):
         for f in Path(directory).resolve().glob('*'):
             try:
                 if f.is_file():
-                    newdata.append([f, 0, '', '', f])
+                    newdata.append([f, 0, '', '', 'Not processed', 'True', f])
             except (OSError, IOError):
                 pass
         self.list_ctrl.AddToList(newdata)
@@ -889,7 +924,7 @@ class MainPanel(wx.Panel):
                     first = False
                     config_dict['folder_sources'] = str(fp.parent)
                     write_config(config_dict)
-                newdata.append([fp, 0, '', '', fp])
+                newdata.append([fp, 0, '', '', 'Not processed', 'True', fp])
             except (OSError, IOError):
                 pass
         self.list_ctrl.AddToList(newdata)
@@ -1007,10 +1042,12 @@ class MainPanel(wx.Panel):
                     self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = matches[count].match_results[0][1]
                     self.list_ctrl.listdata[pos][data_struct.MATCHNAME] = matches[count].match_results[0][0].file
                     self.list_ctrl.listdata[pos][data_struct.PREVIEW] = getRenamePreview(self.list_ctrl.listdata[pos][data_struct.FILENAME], self.list_ctrl.listdata[pos][data_struct.MATCHNAME])
+                    self.list_ctrl.listdata[pos][data_struct.STATUS] = 'Matched'
                 else:
-                    self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = None
-                    self.list_ctrl.listdata[pos][data_struct.MATCHNAME] = None
-                    self.list_ctrl.listdata[pos][data_struct.PREVIEW] = None
+                    self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = 0
+                    self.list_ctrl.listdata[pos][data_struct.MATCHNAME] = ''
+                    self.list_ctrl.listdata[pos][data_struct.PREVIEW] = ''
+                    self.list_ctrl.listdata[pos][data_struct.STATUS] = 'No match'
                 count += 1
         self.list_ctrl.RefreshList()
 
@@ -1063,20 +1100,21 @@ class MainPanel(wx.Panel):
                                 new_path = Path(new_file)
                                 new_match = get_match(new_path)
                                 if new_match:
-                                    self.list_ctrl.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), old_path if not Qkeep_original else None]
+                                    self.list_ctrl.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), 'Matched', self.listdata[pos][data_struct.CHECKED], old_path if not Qkeep_original else None]
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, str(self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE]))
                                     stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.MATCHNAME])
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, str(self.list_ctrl.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.MATCHNAME].name))
                                     stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.PREVIEW])
                                     self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, str(self.list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.PREVIEW].name))
                                 else:
-                                    self.list_ctrl.listdata[pos] = [new_path, 0, '', '', old_path if not Qkeep_original else None]
+                                    self.list_ctrl.listdata[pos] = [new_path, 0, '', '', 'No match', self.listdata[pos][data_struct.CHECKED], old_path if not Qkeep_original else None]
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, '')
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, '')
                                     self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, '')
 
                                 stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.FILENAME])
                                 self.list_ctrl.SetItem(row_id, data_struct.FILENAME, str(self.list_ctrl.listdata[pos][data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.FILENAME].name))
+                                self.list_ctrl.SetItem(row_id, data_struct.STATUS, self.list_ctrl.listdata[pos][data_struct.STATUS])
 
                         except (OSError, IOError):
                             wx.LogMessage('Error when renaming : %s --> %s' % (old_file, new_file))
@@ -1825,7 +1863,7 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
 class MainFrame(wx.Frame):
     def __init__(self):
         wx.Frame.__init__(self, None, wx.ID_ANY, "PyFuzzy-renamer",
-                          pos=wx.Point(-10, 0), size=wx.Size(1000, 800))
+                          pos=wx.Point(config_dict['window'][2], config_dict['window'][3]), size=wx.Size(config_dict['window'][0], config_dict['window'][1]))
 
         bundle = wx.IconBundle()
         bundle.AddIcon(wx.Icon(Rename_16_PNG.GetBitmap()))
@@ -1911,7 +1949,7 @@ class MainFrame(wx.Frame):
         menubar.Append(options, '&Options')
         menubar.Append(help, '&Help')
         self.SetMenuBar(menubar)
-        self.Centre()
+        #self.Centre()
 
         # Add a panel so it looks the correct on all platforms
         self.panel = MainPanel(self)
@@ -1943,11 +1981,19 @@ class MainFrame(wx.Frame):
         self.help.Show()
 
     def OnQuit(self, event):
+        self.SaveUI()
         if self.help:
             self.help.Destroy()
         self.panel.mgr.UnInit()
         self.Destroy()
 
+    def SaveUI(self):
+        global config_dict
+        list = self.panel.list_ctrl
+        for col in range(0, len(default_columns)):
+            config_dict['col%d_order' % (col + 1)] = list.GetColumnOrder(col)
+            config_dict['col%d_size' % (col + 1)] = list.GetColumnWidth(col)
+        config_dict['window'] = [self.GetSize().x, self.GetSize().y, self.GetPosition().x, self.GetPosition().y]
 
 def read_config():
     config_dict = {'show_fullpath': False,
@@ -1962,7 +2008,11 @@ def read_config():
                    'masks': default_masks,
                    'masks_test': default_masks_teststring,
                    'filters_test': default_filters_teststring,
+                   'window': [1000, 800, -10, 0],
                    }
+    for i in range(0, len(default_columns)):
+        config_dict['col%d_order' % (i + 1)] = default_columns[i][0]
+        config_dict['col%d_size' % (i + 1)] = default_columns[i][1]
 
     INI_show_fullpath_val = config_dict['show_fullpath']
     INI_hide_extension_val = config_dict['hide_extension']
@@ -1976,8 +2026,14 @@ def read_config():
     INI_masks_val = config_dict['masks']
     INI_filters_test_val = config_dict['filters_test']
     INI_masks_test_val = config_dict['masks_test']
+    INI_window_val = config_dict['window'].copy()
+    INI_col_val = copy.deepcopy(default_columns)
 
     # read config file
+    INI_global_cat = {}
+    INI_recent_cat = {}
+    INI_matching_cat = {}
+    INI_ui_cat = {}
     try:
         config_file = os.sep.join([os.getcwd(), 'config.ini'])
         config = configparser.ConfigParser()
@@ -1994,6 +2050,10 @@ def read_config():
             pass
         try:
             INI_matching_cat = config['matching']
+        except KeyError:
+            pass
+        try:
+            INI_ui_cat = config['ui']
         except KeyError:
             pass
 
@@ -2045,6 +2105,19 @@ def read_config():
             INI_filters_test_val = INI_matching_cat['filters_test']
         except KeyError:
             pass
+        for i in range(0, len(default_columns)):
+            try:
+                INI_col_val[i][0] = int(INI_ui_cat['col%d_order' % (i + 1)])
+                INI_col_val[i][1] = int(INI_ui_cat['col%d_size' % (i + 1)])
+            except KeyError:
+                pass
+        try:
+            INI_window_val[0] = int(INI_ui_cat['width'])
+            INI_window_val[1] = int(INI_ui_cat['height'])
+            INI_window_val[2] = int(INI_ui_cat['left'])
+            INI_window_val[3] = int(INI_ui_cat['top'])
+        except KeyError:
+            pass
 
     except configparser.Error as e:
         logging.error("%s when reading config file '%s'" %
@@ -2063,6 +2136,10 @@ def read_config():
     config_dict['masks'] = INI_masks_val
     config_dict['filters_test'] = INI_filters_test_val
     config_dict['masks_test'] = INI_masks_test_val
+    for i in range(0, len(default_columns)):
+        config_dict['col%d_order' % (i + 1)] = INI_col_val[i][0]
+        config_dict['col%d_size' % (i + 1)] = INI_col_val[i][1]
+    config_dict['window'] = INI_window_val
     FileMasked.masks = CompileMasks(config_dict['masks'])
     FileFiltered.filters = CompileFilters(config_dict['filters'])
 
@@ -2099,6 +2176,15 @@ def write_config(config_dict):
                         'folder_output':
                         config_dict['folder_output']
                         }
+    ui = {}
+    ui['width'] = config_dict['window'][0]
+    ui['height'] = config_dict['window'][1]
+    ui['left'] = config_dict['window'][2]
+    ui['top'] = config_dict['window'][3]
+    for i in range(0, len(default_columns)):
+        ui['col%d_order' % (i + 1)] = config_dict['col%d_order' % (i + 1)]
+        ui['col%d_size' % (i + 1)] = config_dict['col%d_size' % (i + 1)]
+    config['ui'] = ui
 
     with open(config_file, 'w') as configfile:
         config.write(configfile)
@@ -2246,3 +2332,5 @@ if __name__ == '__main__':
     app.SetTopWindow(frame)
 
     app.MainLoop()
+    
+    write_config(config_dict)
