@@ -515,7 +515,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     self.GetParent().GetParent().GetParent().AddSourceFromFiles(files)
                 else:
                     self.GetParent().GetParent().GetParent().AddChoicesFromFiles(files)
-        elif keycode == 112: # p
+        elif keycode == wx.WXK_CONTROL_P:
             if self.GetSelectedItemCount() == 1:
                 row_id = self.GetFirstSelected()
                 pos_column_match = 0
@@ -528,6 +528,21 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 dia = PickCandidate(self, row_id, wx.Point(position.x + pos_column_match, position.y))
                 dia.Show()
                 dia.text.SetFocus()
+        elif keycode == wx.WXK_CONTROL_D:
+            selected = get_selected_items(self)
+
+            selected.reverse()  # Delete all the items + source file, starting with the last item
+            for row_id in selected:
+                pos = self.GetItemData(row_id)  # 0-based unsorted index
+                if self.listdata[pos][data_struct.FILENAME].is_file():
+                    fpath = str(self.listdata[pos][data_struct.FILENAME])
+                    try:
+                        os.remove(fpath)
+                        wx.LogMessage('Deleting : %s' % (fpath))
+                    except (OSError, IOError):
+                        wx.LogMessage('Error when deleting : %s' % (fpath))
+                self.DeleteItem(row_id)
+                del self.listdata[pos]
 
         if keycode:
             event.Skip()
@@ -551,29 +566,36 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
     def ItemRightClickCb(self, event):
         global forced_match_id
         forced_match_id.clear()
-        if not self.GetSelectedItemCount() or self.GetSelectedItemCount() > 1:
+        if not self.GetSelectedItemCount():
             return
-        if not candidates:
-            return
-        pos = event.GetItem().GetData()
-        matches = get_match(self.listdata[pos][data_struct.FILENAME])
-        if matches:
-            menu = wx.Menu()
+        menu = wx.Menu()
+        id = wx.NewIdRef()
+        delete = wx.MenuItem(menu, id.GetValue(), '&Delete source file(s)\tCtrl+D', 'Delete source file(s)')
+        delete.SetBitmap(Delete_16_PNG.GetBitmap())
+        menu.Append(delete)
+        self.Bind(wx.EVT_MENU, self.DeleteSelectionCb)
+
+        if self.GetSelectedItemCount() == 1 and candidates:
+            row_id = event.GetIndex()
             id = wx.NewIdRef()
-            search = wx.MenuItem(menu, id.GetValue(), '&Pick a match\tP', 'Pick a match')
+            search = wx.MenuItem(menu, id.GetValue(), '&Pick a match\tCtrl+P', 'Pick a match')
             search.SetBitmap(ProcessMatch_16_PNG.GetBitmap())
             menu.Append(search)
             self.Bind(wx.EVT_MENU, self.SearchSelectionCb, id=id)
-            forced_match_id[id] = (event.GetIndex(), self.ClientToScreen(event.GetPoint()))
-            for match in matches:
-                id = wx.NewIdRef()
-                stem, suffix = GetFileStemAndSuffix(match[0].file)
-                menu.Append(id.GetValue(), "[%d%%] %s" % (match[1], stem))
-                self.Bind(wx.EVT_MENU, self.MenuForceMatchCb, id=id)
-                forced_match_id[id] = (event.GetIndex(), match[0].file)
+            forced_match_id[id] = (row_id, self.ClientToScreen(event.GetPoint()))
+            
+            pos = self.GetItemData(row_id)  # 0-based unsorted index
+            matches = get_match(self.listdata[pos][data_struct.FILENAME])
+            if matches:
+                for match in matches:
+                    id = wx.NewIdRef()
+                    stem, suffix = GetFileStemAndSuffix(match[0].file)
+                    menu.Append(id.GetValue(), "[%d%%] %s" % (match[1], stem))
+                    self.Bind(wx.EVT_MENU, self.MenuForceMatchCb, id=id)
+                    forced_match_id[id] = (row_id, match[0].file)
 
-            self.PopupMenu(menu, event.GetPoint())
-            menu.Destroy()
+        self.PopupMenu(menu, event.GetPoint())
+        menu.Destroy()
 
     def CheckedCb(self, event):
         row_id = event.GetIndex()
@@ -621,6 +643,22 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         dia = PickCandidate(self, row_id, position)
         dia.Show()
         dia.text.SetFocus()
+
+    def DeleteSelectionCb(self, event):
+        selected = get_selected_items(self)
+
+        selected.reverse()  # Delete all the items + source file, starting with the last item
+        for row_id in selected:
+            pos = self.GetItemData(row_id)  # 0-based unsorted index
+            if self.listdata[pos][data_struct.FILENAME].is_file():
+                fpath = str(self.listdata[pos][data_struct.FILENAME])
+                try:
+                    os.remove(fpath)
+                    wx.LogMessage('Deleting : %s' % (fpath))
+                except (OSError, IOError):
+                    wx.LogMessage('Error when deleting : %s' % (fpath))
+            self.DeleteItem(row_id)
+            del self.listdata[pos]
 
     def MenuForceMatchCb(self, event):
         row_id, forced_match = forced_match_id[event.GetId()]
@@ -760,6 +798,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         row_id = self.GetFirstSelected()
         if row_id != -1:
             self.EnsureVisible(row_id)
+
 
 class MainPanel(wx.Panel):
 
@@ -1912,12 +1951,20 @@ class MainFrame(wx.Frame):
         else:
             same_as_input.Check(True)
 
+        open = wx.MenuItem(files, 111, '&Open\tCtrl+O', 'Open')
+        open.SetBitmap(Open_16_PNG.GetBitmap())
+        
+        save = wx.MenuItem(files, 110, '&Save\tCtrl+S', 'Save')
+        save.SetBitmap(Save_16_PNG.GetBitmap())
+
         quit = wx.MenuItem(files, 104, '&Quit\tCtrl+Q', 'Quit the Application')
         quit.SetBitmap(Quit_16_PNG.GetBitmap())
 
+        files.Append(open)
         files.Append(sources_)
         files.Append(choices_)
         files.Append(output_dir_)
+        files.Append(save)
         files.Append(quit)
 
         options = wx.Menu()
@@ -1954,7 +2001,6 @@ class MainFrame(wx.Frame):
         # Add a panel so it looks the correct on all platforms
         self.panel = MainPanel(self)
         self.Bind(wx.EVT_CLOSE, self.OnQuit)
-        self.Bind(wx.EVT_MENU, self.OnQuit, id=104)
         self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromDir, id=102)
         self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromClipboard, id=103)
         self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromDir, id=105)
@@ -1966,6 +2012,9 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.panel.OnKeepMatchExtension, id=201)
         self.Bind(wx.EVT_MENU, self.panel.OnMatchFirstLetter, id=204)
         self.Bind(wx.EVT_MENU, self.panel.OnKeepOriginal, id=205)
+        self.Bind(wx.EVT_MENU, self.OnOpen, id=111)
+        self.Bind(wx.EVT_MENU, self.OnSaveAs, id=110)
+        self.Bind(wx.EVT_MENU, self.OnQuit, id=104)
         self.Bind(wx.EVT_MENU, self.OnHelp, id=300)
         self.Bind(wx.EVT_MENU, self.OnAbout, id=301)
 
@@ -1986,6 +2035,75 @@ class MainFrame(wx.Frame):
             self.help.Destroy()
         self.panel.mgr.UnInit()
         self.Destroy()
+
+    def OnSaveAs(self, event):
+        with wx.FileDialog(self, "Save file", wildcard="SAVE files (*.sav)|*.sav",
+                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return
+
+            # save the current contents in the file
+            pathname = fileDialog.GetPath()
+            try:
+                with open(pathname, 'wb') as file:
+                    pickle.dump([glob_choices, self.panel.list_ctrl.listdata], file)
+            except IOError:
+                wx.LogError("Cannot save current data in file '%s'." % pathname)
+
+    def OnOpen(self, event):
+        global glob_choices
+        with wx.FileDialog(self, "Open SAVE file", wildcard="SAVE files (*.sav)|*.sav",
+                           style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return
+
+            list = self.panel.list_ctrl
+            # Proceed loading the file chosen by the user
+            pathname = fileDialog.GetPath()
+            try:
+                with open(pathname, 'rb') as file:
+                    glob_choices, list.listdata = pickle.load(file)
+            except IOError:
+                wx.LogError("Cannot open file '%s'." % pathname)
+
+            RefreshCandidates()
+            list.DeleteAllItems()
+            row_id = 0
+            Qview_fullpath = config_dict['show_fullpath']
+            Qhide_extension = config_dict['hide_extension']
+            for key, data in list.listdata.items():
+                stem, suffix = GetFileStemAndSuffix(data[data_struct.FILENAME])
+                item_name = str(data[data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.FILENAME].name)
+                list.InsertItem(row_id, item_name)
+                list.SetItem(row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE]))
+                stem, suffix = GetFileStemAndSuffix(data[data_struct.MATCHNAME])
+                list.SetItem(row_id, data_struct.MATCHNAME, str(data[data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.MATCHNAME].name))
+                stem, suffix = GetFileStemAndSuffix(data[data_struct.PREVIEW])
+                list.SetItem(row_id, data_struct.PREVIEW, str(data[data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.PREVIEW].name))
+                list.SetItem(row_id, data_struct.STATUS, data[data_struct.STATUS])
+                list.SetItem(row_id, data_struct.CHECKED, data[data_struct.CHECKED])
+                list.SetItemData(row_id, row_id)
+                list.CheckItem(row_id, True if data[data_struct.CHECKED] == 'True' else False)
+                if data[data_struct.CHECKED] == 'False':
+                    f = list.GetItemFont(row_id)
+                    if not f.IsOk():
+                        f = list.GetFont()
+                    font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+                    font.SetStyle(wx.FONTSTYLE_ITALIC)
+                    font.SetWeight(f.GetWeight())
+                    list.SetItemFont(row_id, font)
+                if data[data_struct.STATUS] == 'User choice':
+                    f = list.GetItemFont(row_id)
+                    if not f.IsOk():
+                        f = list.GetFont()
+                    font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+                    font.SetWeight(wx.FONTWEIGHT_BOLD)
+                    font.SetStyle(f.GetStyle())
+                    list.SetItemFont(row_id, font)
+                row_id += 1
+            list.itemDataMap = list.listdata
 
     def SaveUI(self):
         global config_dict
@@ -2316,12 +2434,15 @@ Folder_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAA
 ProcessMatch_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAApklEQVQ4je3RMQ4BURSF4S9BZwWjIlGpZDqFEoUtmMQuTDVEopmShkRiDzaoeAoS7w29vz33nntyLu9MUeGGErkv6eKCDYZoY4QDanSaDM4YR7QFdqnl6fNyiiMGMbESYqeYoYiJN7QaDPrYx8RSKCzFEquYmAttp7iilxqoMY9oa2wbDugIrzoJhfWF2Nfn8h1ZkwnhVYVQ2OoldvaLSYy/yWeTyQNeOBiZybXdVAAAAABJRU5ErkJggg==")
 Rename_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAQklEQVQ4jWNgoBPgYWBgWMLAwLABSouQa9ASSl2C1YBJUAli8D00/iRSnYWudsmoAVQygOJoJAXQJiUSA6iWmTAAAFKsJvUTORWWAAAAAElFTkSuQmCC")
 Rename_32_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAj0lEQVRYhe2XsQ2AIBBF3wq2dq7gAiziEI7jGC5jYmdpQ2JhQWtzBQ1BDYIk95JfEC7hBYrjQElLA4yBtDkEOmCVHMDprfscAj4TMOc+VAVeCRgpTJ0N2CM1BmAAnBinzCISoX0nZzMA9s5VPST2BFYFVEAFVEAFfiVQtBkVb8dfUc+PSAVSUnwwKT6a1ccFLuSbvR2v1tcAAAAASUVORK5CYII=")
-Reset_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAUklEQVQ4jaWTyREAIAgDtw5KsW0b9ONDxzOEd7IDAQAKEOgV3UsAVYQsHgVy1P5Anpqb4LvLnVDOaTRkQp4gKbMNsEawQrTWaB2Sdcr2M1nv3AAJSRotv+t5dgAAAABJRU5ErkJggg==")
+Delete_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAUklEQVQ4jaWTyREAIAgDtw5KsW0b9ONDxzOEd7IDAQAKEOgV3UsAVYQsHgVy1P5Anpqb4LvLnVDOaTRkQp4gKbMNsEawQrTWaB2Sdcr2M1nv3AAJSRotv+t5dgAAAABJRU5ErkJggg==")
+Reset_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA3klEQVQ4jZ3TMU7DUBCE4c8okVxQcAMkCisNBQUSSrhFbkBFn4IKCckHoHYazAUirpVbpNhNCMFEfvzVs+wdz+7sI5jgIs8VHvCGD/Rosch3gzzjEff4wgtmmKZ4gxU2+c2gwDvWuPzrL6jRYTkksMUrns4I7OlOnVyl5RmuRwjUop0K7nA7ouiUFebEhG/+IdBkrU/fEZYwERHr86GU6V6gTTulHFpYiIGUchhiJSKpC4p/xEgsRVcgsDaw0ssUOeekzuJfq3zsZCP6a0Q6oy7TMZUYTiti6vM8N3Cddx5tH3Yo4PYdAAAAAElFTkSuQmCC")
 Filters_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAnElEQVQ4jc3OPQ4BURTF8R/xlZDYinJKdDQS6tkGk1gDralohkYvszyFJxERzIvCSU7y3rn3f3IhQxHpTHjEqvhJQYY0Ak6xun+2mFeAF9g8BjXsMPkCnobd2vOgjgOGb+AR9mH3pZo4IXkxS3BE49OJHZwxeMgGIWt/gu/qokQruAxZJeXoBedV4f8p6GOJdWzBBbMYGMZu57/VFRydH90nhFjmAAAAAElFTkSuQmCC")
-Undo_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAxElEQVQ4jaXSsUpCcRiG8V9J0eFEoEcIb6BNcLJBSAgOnCCdwkWn8BLcdHFqcDBwaWmpwcWKLqx7aDgNYh06+H/gXT54H74PPrhCAylq6CHGHUYYoo8LBbSQoI0zdHCCa2Q/GWCOD1wWicoQYYFZiAQm8rP25hAbVEMkGcYhghhPIQJ4DSmfYxkiuJc/3V7U8IbK9vCgZPkIL3ZeO8W0RLmJd3S3h218YYXHgjxjjQec7lojfOIG9T+S4Pi/1SLcljjhF9+1HBfjit47pQAAAABJRU5ErkJggg==")
+Undo_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA20lEQVQ4jaXRr0sDQBiH8Y+bMhUUTMIMYjCIYFtSWLQMg1sTDSaL2ETUJM7gsBk2RPwB/goGBf+/hTtk4G2T29Pe9+4e+N6Xvywkdv9iDC2c5zweRwen+MIWVqN0KNN4RRWT2EAjyt5wbUisG+wPOF/GnRCtmLpQwjM2MYUKlmKsXmp4wUxKUsQtLvGDJh7xgd0YDVbwmZD/coGznnkCdXxjO+7Whbb6Mp/YFXCC4zi3sDZI0o+a0M6s8G9Z7OAIbczlSu5xGGVZLAptXeUK4AkPowj28D6KoIyDLrNQHV7K7UHqAAAAAElFTkSuQmCC")
 Preview_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAApklEQVQ4jd3STQrCMBAF4A8KihfSVXVlQV31CAXdCbrXY+gRRMVLunBCQ9EiuHPgkeQlbzJ//K0NUWEbqIL7SnjEFQ3GgSa4Y5+jKR6xwgaXwKbzpuyKV7hhlIl32f0O69iPcMcyXdY4ocgElzcR5lwRmvoXB+fkQITTl8L+TQqL7g+lV4FmcV5ri5jEMx+KmGyIg7aNk0Bq48GX8zDAXDtI8+D+0Z4L/CAYjFzsAAAAAABJRU5ErkJggg==")
 Info_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAvUlEQVQ4jaWTMQ7CMAxFX6QideEaGdlY2gGxMCP1KByhp0inniAj52PIL2pTp0D50l8S/2/HsWENB7RAD4xirzNnxC9wBiLwADxQiV5nUTEmOiAA9UaCWjGdlTkYgquYI8wrcSrNynwUrUqitLSk9+U4AU/gZtwhTQOpw74QdBcteGkZSZ3+1aCSdrfBYTL4+wmlJn4yeDdx6xtLBotvhPIgXcQcA8ZIfzvKA8YozyvZvUwTHKk5+To3GOv8AnPjI1AbZiwoAAAAAElFTkSuQmCC")
 Help_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA+klEQVQ4ja3TMVLDQAwF0OeCVHTgMfcgjD2h4wq5TVzmCmYwpVvT5RbuciQKy5PFLJkUaGaLlf5fSX8lfluBVxwxxDmGr8jgf9gLTphQ4z5OHb5TYLK2x4gSn6iS2FP4ysDsc5nH1f2ARzygxXMSH9NKiiitTABvOKOLcw7fYmVwCmZxpihxG8APbBLCBn3EtoGdsGNWuI6eD5Htbt1jPHIOTIUmuAaz0qLnLkNerDNrIjjDvzyQttBGmZsMeWmhXbewiNi7iNi7LmIvEfHaN7674Ru5bZC2SfxLZqSvjXIVZf85ymnmZZkal2Vq3LBMixVmcdbrvJNZ52/umT0spYP52gAAAABJRU5ErkJggg==")
+Save_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAp0lEQVQ4jc3TsQ3CMBCF4T9lSMsA0KXIIHRZgDIlRcpIoWQAJkAKCg2T0LESzXMUTM4GV5z05OLOn1ycATpgBO46rdw00+LVCKyBs9+Y1RbYACfgAPS/AtcZgI+kAA5pvwUeC4C7OwFPIVYuISATEsvKAlLrA6iAfSRVCDgCDbAz0mgmCJSBJ5f/CxRAreaAvQuDZmrdeduDAsiJ70Ku2cwB7junpHsBwvZEMcVfbJ0AAAAASUVORK5CYII=")
+Open_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAuklEQVQ4ja3TvWoCQRSG4QcstBCLqPdgl94qdxAsBcuUghCE1OksbUwpgruGSAixE8zFWbgDk8WfHfCDj5lzhvPOYX64g1roRH5IBewwj7zGNAWQncm94rNYK/sHz7cA1/SEl3OAN2wu7Br7G7/FOIsB28ROBhgGQBeLRMAH2gEwUjqYCvoKkwxLNBOKe3gPQR7TKmqCfggOTjeQohy1EPzhMaG4gVWc2Pv/lG85xzgGlD9TFdcTOr6uI0ftKryCmkZ/AAAAAElFTkSuQmCC")
 
 if __name__ == '__main__':
 
