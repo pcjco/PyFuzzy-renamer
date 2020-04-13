@@ -58,6 +58,17 @@ default_columns = [[0, 300, 'Source Name'],
                    [4, 100, 'Status'],
                    [5, 60, 'Checked']]
 
+def shorten_path(file_path, length):
+    parts = Path(file_path).parts
+    if len(parts[-1]) >= length:
+        return parts[-1]
+    if len(parts) > 2:
+        for i in range(1, len(parts) - 1):
+            ret = parts[0] + '...' + os.sep + os.sep.join(parts[i:])
+            if len(ret) <= length:
+                return ret
+    return ret
+
 def strip_illegal_chars(s):
     s = re.sub(r'(?<=\S)[' + illegal_chars + r'](?=\S)', '-', s)
     s = re.sub(r'\s?[' + illegal_chars + r']\s?', ' ', s)
@@ -578,7 +589,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         if self.GetSelectedItemCount() == 1 and candidates:
             row_id = event.GetIndex()
             id = wx.NewIdRef()
-            search = wx.MenuItem(menu, id.GetValue(), '&Pick a match\tCtrl+P', 'Pick a match')
+            search = wx.MenuItem(menu, id.GetValue(), '&Pick a match...\tCtrl+P', 'Pick a match')
             search.SetBitmap(ProcessMatch_16_PNG.GetBitmap())
             menu.Append(search)
             self.Bind(wx.EVT_MENU, self.SearchSelectionCb, id=id)
@@ -818,11 +829,11 @@ class MainPanel(wx.Panel):
         top_sizer.Add(panel_list, 1, wx.EXPAND)
         panel_top.SetSizer(top_sizer)
 
-        btn_add_source_from_files = wx.Button(panel_listbutton, label="Sources")
+        btn_add_source_from_files = wx.Button(panel_listbutton, label="Sources...")
         btn_add_source_from_files.SetBitmap(AddFile_16_PNG.GetBitmap(), wx.LEFT)
         btn_add_source_from_files.SetToolTip("Add sources from files")
 
-        btn_add_choice_from_file = wx.Button(panel_listbutton, label="Choices")
+        btn_add_choice_from_file = wx.Button(panel_listbutton, label="Choices...")
         btn_add_choice_from_file.SetBitmap(AddFile_16_PNG.GetBitmap(), wx.LEFT)
         btn_add_choice_from_file.SetToolTip("Add choices from files")
 
@@ -834,7 +845,7 @@ class MainPanel(wx.Panel):
         btn_reset.SetBitmap(Reset_16_PNG.GetBitmap(), wx.LEFT)
         btn_reset.SetToolTip("Reset source and choice lists")
 
-        btn_filters = wx.Button(panel_listbutton, label="Masks && Filters")
+        btn_filters = wx.Button(panel_listbutton, label="Masks && Filters...")
         btn_filters.SetBitmap(Filters_16_PNG.GetBitmap(), wx.LEFT)
         btn_filters.SetToolTip("Edit list of masks and filters")
 
@@ -1913,12 +1924,12 @@ class MainFrame(wx.Frame):
 
         menubar = wx.MenuBar()
         self.statusbar = self.CreateStatusBar(2)
-        files = wx.Menu()
+        self.files = wx.Menu()
         sources = wx.Menu()
-        sources_ = wx.MenuItem(files, 100, '&Sources', 'Select sources (to rename)')
+        sources_ = wx.MenuItem(self.files, 100, '&Sources', 'Select sources (to rename)')
         sources_.SetSubMenu(sources)
 
-        source_from_dir = wx.MenuItem(sources, 102, '&Sources from Directory\tCtrl+S', 'Select sources from directory')
+        source_from_dir = wx.MenuItem(sources, 102, 'Sources from &Directory...\tCtrl+D', 'Select sources from directory')
         source_from_dir.SetBitmap(AddFolder_16_PNG.GetBitmap())
         sources.Append(source_from_dir)
 
@@ -1927,10 +1938,10 @@ class MainFrame(wx.Frame):
         sources.Append(source_from_clipboard)
 
         choices = wx.Menu()
-        choices_ = wx.MenuItem(files, 101, '&Choices', 'Select choices (to match)')
+        choices_ = wx.MenuItem(self.files, 101, '&Choices', 'Select choices (to match)')
         choices_.SetSubMenu(choices)
 
-        target_from_dir = wx.MenuItem(choices, 105, '&Choices from Directory\tCtrl+T', 'Select choices from directory')
+        target_from_dir = wx.MenuItem(choices, 105, 'Choices from &Directory...\tCtrl+T', 'Select choices from directory')
         target_from_dir.SetBitmap(AddFolder_16_PNG.GetBitmap())
         choices.Append(target_from_dir)
 
@@ -1939,33 +1950,40 @@ class MainFrame(wx.Frame):
         choices.Append(choices_from_clipboard)
 
         output_dir = wx.Menu()
-        output_dir_ = wx.MenuItem(files, 107, '&Output Directory', 'Select output directory')
+        output_dir_ = wx.MenuItem(self.files, 107, '&Output Directory', 'Select output directory')
         output_dir_.SetBitmap(Folder_16_PNG.GetBitmap())
         output_dir_.SetSubMenu(output_dir)
 
         same_as_input = output_dir.AppendRadioItem(108, '&Same as source', 'Same as source')
-        user_dir = output_dir.AppendRadioItem(109, '&User-defined directory', 'Select User-defined directory')
+        user_dir = output_dir.AppendRadioItem(109, '&User-defined directory...', 'Select User-defined directory')
 
         if config_dict['folder_output']:
             user_dir.Check(True)
         else:
             same_as_input.Check(True)
 
-        open = wx.MenuItem(files, 111, '&Open\tCtrl+O', 'Open')
+        open = wx.MenuItem(self.files, 111, '&Load Session...\tCtrl+O', 'Open...')
         open.SetBitmap(Open_16_PNG.GetBitmap())
         
-        save = wx.MenuItem(files, 110, '&Save\tCtrl+S', 'Save')
+        save = wx.MenuItem(self.files, 110, '&Save Session\tCtrl+S', 'Save...')
         save.SetBitmap(Save_16_PNG.GetBitmap())
 
-        quit = wx.MenuItem(files, 104, '&Quit\tCtrl+Q', 'Quit the Application')
+        quit = wx.MenuItem(self.files, 104, '&Exit\tAlt+F4', 'Exit the Application')
         quit.SetBitmap(Quit_16_PNG.GetBitmap())
 
-        files.Append(open)
-        files.Append(sources_)
-        files.Append(choices_)
-        files.Append(output_dir_)
-        files.Append(save)
-        files.Append(quit)
+        self.files.Append(sources_)
+        self.files.Append(choices_)
+        self.files.Append(output_dir_)
+        self.files.AppendSeparator()
+        self.files.Append(open)
+        self.files.Append(save)
+        self.files.AppendSeparator()
+        if config_dict['recent_session']:
+            for i in range(0, len(config_dict['recent_session'])):
+                new_recent = wx.MenuItem(self.files, 150+i, '&' + str(i + 1) + ': ' +shorten_path(config_dict['recent_session'][i], 64), '')
+                self.files.Append(new_recent)
+            self.files.AppendSeparator()
+        self.files.Append(quit)
 
         options = wx.Menu()
         view_fullpath = options.AppendCheckItem(202, '&View full path', 'View full path')
@@ -1985,14 +2003,14 @@ class MainFrame(wx.Frame):
         self.match_firstletter.Check(config_dict['match_firstletter'])
 
         help = wx.Menu()
-        doc = wx.MenuItem(help, 300, '&Help', 'Help')
+        doc = wx.MenuItem(help, 300, '&Help...', 'Help')
         doc.SetBitmap(Help_16_PNG.GetBitmap())
         help.Append(doc)
-        about = wx.MenuItem(help, 301, '&About', 'About the application')
+        about = wx.MenuItem(help, 301, '&About...', 'About the application')
         about.SetBitmap(Info_16_PNG.GetBitmap())
         help.Append(about)
 
-        menubar.Append(files, '&File')
+        menubar.Append(self.files, '&File')
         menubar.Append(options, '&Options')
         menubar.Append(help, '&Help')
         self.SetMenuBar(menubar)
@@ -2017,6 +2035,9 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.OnQuit, id=104)
         self.Bind(wx.EVT_MENU, self.OnHelp, id=300)
         self.Bind(wx.EVT_MENU, self.OnAbout, id=301)
+        
+        for i in range(0, len(config_dict['recent_session'])):
+            self.Bind(wx.EVT_MENU, self.OnOpenRecent, id=150+i)
 
         self.Show(True)
 
@@ -2048,62 +2069,109 @@ class MainFrame(wx.Frame):
             try:
                 with open(pathname, 'wb') as file:
                     pickle.dump([glob_choices, self.panel.list_ctrl.listdata], file)
+
+                self.UpdateRecentSession(pathname)
+
             except IOError:
                 wx.LogError("Cannot save current data in file '%s'." % pathname)
 
+    def OnOpenRecent(self, event):
+        pathname = config_dict['recent_session'][event.GetId()-150]
+        self.UpdateRecentSession(pathname)
+        self.LoadSession(pathname)
+
     def OnOpen(self, event):
-        global glob_choices
         with wx.FileDialog(self, "Open SAVE file", wildcard="SAVE files (*.sav)|*.sav",
                            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
 
             if fileDialog.ShowModal() == wx.ID_CANCEL:
                 return
 
-            list = self.panel.list_ctrl
             # Proceed loading the file chosen by the user
             pathname = fileDialog.GetPath()
-            try:
-                with open(pathname, 'rb') as file:
-                    glob_choices, list.listdata = pickle.load(file)
-            except IOError:
-                wx.LogError("Cannot open file '%s'." % pathname)
 
-            RefreshCandidates()
-            list.DeleteAllItems()
-            row_id = 0
-            Qview_fullpath = config_dict['show_fullpath']
-            Qhide_extension = config_dict['hide_extension']
-            for key, data in list.listdata.items():
-                stem, suffix = GetFileStemAndSuffix(data[data_struct.FILENAME])
-                item_name = str(data[data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.FILENAME].name)
-                list.InsertItem(row_id, item_name)
-                list.SetItem(row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE]))
-                stem, suffix = GetFileStemAndSuffix(data[data_struct.MATCHNAME])
-                list.SetItem(row_id, data_struct.MATCHNAME, str(data[data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.MATCHNAME].name))
-                stem, suffix = GetFileStemAndSuffix(data[data_struct.PREVIEW])
-                list.SetItem(row_id, data_struct.PREVIEW, str(data[data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.PREVIEW].name))
-                list.SetItem(row_id, data_struct.STATUS, data[data_struct.STATUS])
-                list.SetItem(row_id, data_struct.CHECKED, data[data_struct.CHECKED])
-                list.SetItemData(row_id, row_id)
-                list.CheckItem(row_id, True if data[data_struct.CHECKED] == 'True' else False)
-                if data[data_struct.CHECKED] == 'False':
-                    f = list.GetItemFont(row_id)
-                    if not f.IsOk():
-                        f = list.GetFont()
-                    font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-                    font.SetStyle(wx.FONTSTYLE_ITALIC)
-                    font.SetWeight(f.GetWeight())
-                    list.SetItemFont(row_id, font)
-                if data[data_struct.STATUS] == 'User choice':
-                    f = list.GetItemFont(row_id)
-                    if not f.IsOk():
-                        f = list.GetFont()
-                    font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-                    font.SetWeight(wx.FONTWEIGHT_BOLD)
-                    font.SetStyle(f.GetStyle())
-                    list.SetItemFont(row_id, font)
-                row_id += 1
-            list.itemDataMap = list.listdata
+            self.UpdateRecentSession(pathname)
+
+            self.LoadSession(pathname)
+
+    def UpdateRecentSession(self, pathname):
+        global config_dict
+
+        if pathname in config_dict['recent_session']:
+            idx = config_dict['recent_session'].index(pathname)
+            if idx:
+                config_dict['recent_session'].insert(0, config_dict['recent_session'].pop(idx))
+        else:
+            config_dict['recent_session'].insert(0, pathname)
+            config_dict['recent_session'] = config_dict['recent_session'][:8]
+            
+        # update file menu
+        # - Remove all recent
+        found_recent = False
+        for i in range(0, 8):
+            item = self.files.FindItemById(150+i)
+            if item:
+                found_recent = True
+                self.files.Delete(150+i)
+            else:
+                break
+        if not found_recent:
+            item, pos = self.files.FindChildItem(104) # Searh Exit button
+            self.files.InsertSeparator(pos)
+
+        # - Refresh recents
+        for i in range(0, len(config_dict['recent_session'])):
+            new_recent = wx.MenuItem(self.files, 150+i, '&' + str(i + 1) + ': ' +shorten_path(config_dict['recent_session'][i], 64), '')
+            item, pos = self.files.FindChildItem(104) # Searh Exit button
+            self.files.Insert(pos - 1, new_recent)
+            self.Bind(wx.EVT_MENU, self.OnOpenRecent, id=150+i)
+
+    def LoadSession(self, pathname):
+        global glob_choices
+
+        list = self.panel.list_ctrl
+        try:
+            with open(pathname, 'rb') as file:
+                glob_choices, list.listdata = pickle.load(file)
+        except IOError:
+            wx.LogError("Cannot open file '%s'." % pathname)
+
+        RefreshCandidates()
+        list.DeleteAllItems()
+        row_id = 0
+        Qview_fullpath = config_dict['show_fullpath']
+        Qhide_extension = config_dict['hide_extension']
+        for key, data in list.listdata.items():
+            stem, suffix = GetFileStemAndSuffix(data[data_struct.FILENAME])
+            item_name = str(data[data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.FILENAME].name)
+            list.InsertItem(row_id, item_name)
+            list.SetItem(row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE]))
+            stem, suffix = GetFileStemAndSuffix(data[data_struct.MATCHNAME])
+            list.SetItem(row_id, data_struct.MATCHNAME, str(data[data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.MATCHNAME].name))
+            stem, suffix = GetFileStemAndSuffix(data[data_struct.PREVIEW])
+            list.SetItem(row_id, data_struct.PREVIEW, str(data[data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.PREVIEW].name))
+            list.SetItem(row_id, data_struct.STATUS, data[data_struct.STATUS])
+            list.SetItem(row_id, data_struct.CHECKED, data[data_struct.CHECKED])
+            list.SetItemData(row_id, row_id)
+            list.CheckItem(row_id, True if data[data_struct.CHECKED] == 'True' else False)
+            if data[data_struct.CHECKED] == 'False':
+                f = list.GetItemFont(row_id)
+                if not f.IsOk():
+                    f = list.GetFont()
+                font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+                font.SetStyle(wx.FONTSTYLE_ITALIC)
+                font.SetWeight(f.GetWeight())
+                list.SetItemFont(row_id, font)
+            if data[data_struct.STATUS] == 'User choice':
+                f = list.GetItemFont(row_id)
+                if not f.IsOk():
+                    f = list.GetFont()
+                font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+                font.SetWeight(wx.FONTWEIGHT_BOLD)
+                font.SetStyle(f.GetStyle())
+                list.SetItemFont(row_id, font)
+            row_id += 1
+        list.itemDataMap = list.listdata
 
     def SaveUI(self):
         global config_dict
@@ -2127,6 +2195,7 @@ def read_config():
                    'masks_test': default_masks_teststring,
                    'filters_test': default_filters_teststring,
                    'window': [1000, 800, -10, 0],
+                   'recent_session': []
                    }
     for i in range(0, len(default_columns)):
         config_dict['col%d_order' % (i + 1)] = default_columns[i][0]
@@ -2146,6 +2215,7 @@ def read_config():
     INI_masks_test_val = config_dict['masks_test']
     INI_window_val = config_dict['window'].copy()
     INI_col_val = copy.deepcopy(default_columns)
+    INI_recent_session_val = config_dict['recent_session'].copy()
 
     # read config file
     INI_global_cat = {}
@@ -2207,6 +2277,13 @@ def read_config():
             INI_folder_output_val = INI_recent_cat['folder_output']
         except KeyError:
             pass
+        for i in range(1, 9):
+            try:
+                f = INI_recent_cat['recent_session%d' % i]
+                if Path(f).is_file():
+                    INI_recent_session_val.append(f)
+            except KeyError:
+                pass
         try:
             INI_filters_val = INI_matching_cat['filters']
         except KeyError:
@@ -2258,6 +2335,7 @@ def read_config():
         config_dict['col%d_order' % (i + 1)] = INI_col_val[i][0]
         config_dict['col%d_size' % (i + 1)] = INI_col_val[i][1]
     config_dict['window'] = INI_window_val
+    config_dict['recent_session'] = INI_recent_session_val
     FileMasked.masks = CompileMasks(config_dict['masks'])
     FileFiltered.filters = CompileFilters(config_dict['filters'])
 
@@ -2294,6 +2372,9 @@ def write_config(config_dict):
                         'folder_output':
                         config_dict['folder_output']
                         }
+    for i in range(0, len(config_dict['recent_session'])):
+        config['recent']['recent_session%d' % (i + 1)] = config_dict['recent_session'][i]
+
     ui = {}
     ui['width'] = config_dict['window'][0]
     ui['height'] = config_dict['window'][1]
