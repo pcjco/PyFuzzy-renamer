@@ -1,3 +1,5 @@
+![Screenshot](screenshot.png?raw=true "Screenshot")
+
 This application uses a list of input strings and will rename each one with the most similar string from another list of strings.
 
 ### Terminology
