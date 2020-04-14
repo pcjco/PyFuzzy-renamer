@@ -598,6 +598,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             pos = self.GetItemData(row_id)  # 0-based unsorted index
             matches = get_match(self.listdata[pos][data_struct.FILENAME])
             if matches:
+                menu.AppendSeparator()
                 for match in matches:
                     id = wx.NewIdRef()
                     stem, suffix = GetFileStemAndSuffix(match[0].file)
@@ -2498,12 +2499,29 @@ def getDoc():
         "<br><li><b>Hide suffix</b><br><br>"
         "When <b>source</b> strings are coming from file paths, the suffixes are hidden in the <code><b>Source Name</b></code> and <code><b>Renaming Preview</b></code> columns.<br>"
         "When <b>choices</b> strings are coming from file paths, the suffixes are hidden in the <code><b>Closest Match</b></code> columns.</li>"
+        "<br><li><b>Keep original on renaming</b><br><br>"
+        "During <b>renaming</b>, the original file is kept."
         "<br><li><b>Keep matched file suffix</b><br><br>"
         "During <b>renaming</b>, the suffix of the <b>most similar choice</b> is used before suffix of the <b>source</b>.<br>"
         "E.g. if <b>source</b> is <code><font color=\"blue\">Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color=\"red\">Amaryllidinae.rom</font></code>, <b>renamed source</b> is <code><font color=\"red\">Amaryllidinae.rom</font></code><code><font color=\"blue\">.png</font></code>"
         "<br><li><b>Always match first letter</b><br><br>"
-        "During <b>matching</b>, each <b>source</b> will search for the <b>most similar choice</b> among <b>choices</b> that start with the same letter only."
+        "During <b>matching</b>, each <b>source</b> will search for the <b>most similar choice</b> among <b>choices</b> that start with the same letter only. This decreases greatly the processing time during <b>matching</b>."
         "</ul>"
+        "<h3>Available actions on <b>source</b> items</h3>"
+        "<p>From the context menu on each <b>source</b> item in the main list, the following actions are available:"
+        "<ul>"
+        "<li><b>Delete source file(s)</b><br><br>"
+        "Delete the file associated with the selected <b>source</b> string."
+        "<br><li><b>Pick a match...</b><br><br>"
+        "Change the <b>choice</b> by typing your own from the available <b>choices</b>."
+        "<br><li><b>Alternate match</b><br><br>"
+        "Change the <b>choice</b> by chosing one of the 10 best <b>choices</b> sorted by similarity score."
+        "</ul>"
+        "<h3>Sessions management</h3>"
+        "<p>The current list of <b>sources</b> and <b>choices</b> as well as the current <b>most similar choice</b> can be saved to a file by using <code><b>File->Save Session</b></code>.</p>"
+        "<p>A saved session is restored by using <code><b>File->Load Session</b></code>. When restoring a session, the current list of sources and choices is resetted first.</p>"
+        "<p>The list of the 8 most recent saved session files can be loaded directly from the <code><b>File</b></code> menu.</p>"
+
         )
 
 

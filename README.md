@@ -135,19 +135,48 @@ There are two options available:
 
 *   **View full path**
 
-    When **source** strings are coming from file paths, the full path of files are shown in the **`Source Name`** and **`Renaming Preview`** columns.  
+    When **source** strings are coming from file paths, the full path of files are shown in the **`Source Name`** and **`Renaming Preview`** columns.
     When **choices** strings are coming from file paths, the full path of files are shown in the **`Closest Match`** columns.
 
 *   **Hide suffix**
 
-    When **source** strings are coming from file paths, the suffixes are hidden in the **`Source Name`** and **`Renaming Preview`** columns.  
+    When **source** strings are coming from file paths, the suffixes are hidden in the **`Source Name`** and **`Renaming Preview`** columns.
     When **choices** strings are coming from file paths, the suffixes are hidden in the **`Closest Match`** columns.
+
+*   **Keep original on renaming**
+
+    During **renaming**, the original file is kept.
 
 *   **Keep matched file suffix**
 
-    During **renaming**, the suffix of the **most similar choice** is used before suffix of the **source**.  
+    During **renaming**, the suffix of the **most similar choice** is used before suffix of the **source**.
     E.g. if **source** is `Amaryllis.png`, and **most similar choice** is `Amaryllidinae.rom`, **renamed source** is `Amaryllidinae.rom.png`
 
 *   **Always match first letter**
     
     During **matching**, each **source** will search for the **most similar choice** among **choices** that start with the same letter only.
+    This decreases greatly the processing time during **matching**.
+
+### Available actions on source items
+
+From the context menu on each **source** item in the main list, the following actions are available:
+
+*   **Delete source file(s)**
+
+    Delete the file associated with the selected **source* string.
+
+*   **Pick a match...**
+
+    Change the **choice** by typing your own from the available **choices**.
+
+*   **Alternate match**
+
+    Change the **choice** by chosing one of the 10 best **choices** sorted by similarity score.
+
+### Sessions management
+
+The current list of **sources** and **choices** as well as the current **most similar choice** can be saved to a file by using **`File->Save Session`**.
+
+A saved session is restored by using **`File->Load Session`**. When restoring a session, the current list of sources and choices is resetted first.
+
+The list of the 8 most recent saved session files can be loaded directly from the **`File`** menu.
