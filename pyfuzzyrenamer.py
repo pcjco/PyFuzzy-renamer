@@ -232,9 +232,9 @@ def RefreshCandidates():
                 candidates[first_letter] = [word]
 
 
-def CompileFilters(config):
+def CompileFilters(filters):
     ret = []
-    lines = config.splitlines()
+    lines = filters.splitlines()
     it = iter(lines)
     for l1, l2, l3 in zip(it, it, it):
         if l1.startswith('+'):
@@ -245,9 +245,9 @@ def CompileFilters(config):
     return ret
 
 
-def CompileMasks(config):
+def CompileMasks(filters):
     ret = []
-    lines = config.splitlines()
+    lines = filters.splitlines()
     it = iter(lines)
     for l1, l2 in zip(it, it):
         if l1.startswith('+'):
@@ -1476,6 +1476,11 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                 self.CheckItem(row_id, True)
             else:
                 self.CheckItem(row_id, False)
+            try:
+                re.compile(data[1])
+                self.SetItemBackgroundColour(row_id, wx.Colour(153, 255, 153))
+            except re.error:
+                self.SetItemBackgroundColour(row_id, wx.Colour(255, 153, 153))
 
             row_id += 1
             index += 1
@@ -1522,10 +1527,15 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                     break
                 masks += '+' if self.IsItemChecked(row_id0) else '-'
                 masks += self.GetItemText(row_id0, 1) + '\n'
-                if row_id == row_id0 and col_id == 2:
+                if row_id == row_id0:
                     masks += '"' + event.GetText() + '"\n'
+                    try:
+                        re.compile(event.GetText())
+                        self.SetItemBackgroundColour(row_id0, wx.Colour(153, 255, 153))
+                    except re.error:
+                        self.SetItemBackgroundColour(row_id0, wx.Colour(255, 153, 153))
                 else:
-                    masks += '"' + self.GetItemText(row_id0, 2) + '"\n'
+                    masks += '"' + self.GetItemText(row_id0, col_id) + '"\n'
 
             masks = CompileMasks(masks)
             filters = []
@@ -1610,6 +1620,11 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
             self.CheckItem(idx, i[1])
             for j in range(1, self.GetColumnCount()):
                 self.SetItem(idx, j, i[2 + j])
+            try:
+                re.compile(self.GetItemText(idx, 2))
+                self.SetItemBackgroundColour(idx, wx.Colour(153, 255, 153))
+            except re.error:
+                self.SetItemBackgroundColour(idx, wx.Colour(255, 153, 153))
             index += 1
 
     def RightClickCb(self, event):
@@ -1632,6 +1647,7 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
             self.SetItem(row_id, 1, data[0])
             self.SetItem(row_id, 2, data[1])
             self.CheckItem(row_id, True)
+            self.SetItemBackgroundColour(row_id, wx.Colour(153, 255, 153))
         elif operation == 'Delete':
             self.DeleteSelected()
 
@@ -1729,6 +1745,11 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                 self.CheckItem(row_id, True)
             else:
                 self.CheckItem(row_id, False)
+            try:
+                re.compile(data[1])
+                self.SetItemBackgroundColour(row_id, wx.Colour(153, 255, 153))
+            except re.error:
+                self.SetItemBackgroundColour(row_id, wx.Colour(255, 153, 153))
 
             row_id += 1
             index += 1
@@ -1776,14 +1797,16 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                     break
                 filters += '+' if self.IsItemChecked(row_id0) else '-'
                 filters += self.GetItemText(row_id0, 1) + '\n'
-                if row_id == row_id0 and col_id == 2:
+                if row_id == row_id0:
                     filters += '"' + event.GetText() + '"\n'
+                    if col_id == 2:
+                        try:
+                            re.compile(event.GetText())
+                            self.SetItemBackgroundColour(row_id0, wx.Colour(153, 255, 153))
+                        except re.error:
+                            self.SetItemBackgroundColour(row_id0, wx.Colour(255, 153, 153))
                 else:
-                    filters += '"' + self.GetItemText(row_id0, 2) + '"\n'
-                if row_id == row_id0 and col_id == 3:
-                    filters += '"' + event.GetText() + '"\n'
-                else:
-                    filters += '"' + self.GetItemText(row_id0, 3) + '"\n'
+                    filters += '"' + self.GetItemText(row_id0, col_id) + '"\n'
 
             filters = CompileFilters(filters)
             self.panel.result_preview_filters.SetValue(filter_processed(Path(self.panel.preview_filters.GetValue() + '.txt'), filters))
@@ -1864,6 +1887,11 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
             self.CheckItem(idx, i[1])
             for j in range(1, self.GetColumnCount()):
                 self.SetItem(idx, j, i[2 + j])
+            try:
+                re.compile(self.GetItemText(idx, 2))
+                self.SetItemBackgroundColour(idx, wx.Colour(153, 255, 153))
+            except re.error:
+                self.SetItemBackgroundColour(idx, wx.Colour(255, 153, 153))
             index += 1
 
     def RightClickCb(self, event):
@@ -1887,6 +1915,7 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
             self.SetItem(row_id, 2, data[1])
             self.SetItem(row_id, 3, data[2])
             self.CheckItem(row_id, True)
+            self.SetItemBackgroundColour(row_id, wx.Colour(153, 255, 153))
         elif operation == 'Delete':
             self.DeleteSelected()
 
