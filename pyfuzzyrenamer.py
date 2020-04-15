@@ -700,10 +700,27 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.SetItemFont(row_id, font)
 
     def OnBeginLabelEdit(self, event):
-        event.Allow()
-        if config_dict['show_fullpath']:
-            d = Path(event.GetLabel())
-            (self.GetEditControl()).SetValue(d.name)
+        start_match_col = 0
+        end_match_col = 0
+        for col in self.GetColumnsOrder():
+            end_match_col += self.GetColumnWidth(col)
+            if col == 2:
+                break
+            start_match_col = end_match_col
+        
+        mouse_pos = wx.GetMousePosition()
+        position = self.ScreenToClient(mouse_pos)
+        if position.x >= start_match_col and position.x <= end_match_col:
+            event.Veto()
+            row_id = event.GetIndex()
+            dia = PickCandidate(self, row_id, wx.Point(mouse_pos.x -10, mouse_pos.y - 20))
+            dia.Show()
+            dia.text.SetFocus()
+        else:
+            event.Allow()
+            if config_dict['show_fullpath']:
+                d = Path(event.GetLabel())
+                (self.GetEditControl()).SetValue(d.name)
 
     def OnEndLabelEdit(self, event):
         if event.IsEditCancelled() or not event.GetLabel():
@@ -2182,7 +2199,7 @@ class MainFrame(wx.Frame):
             list.SetItem(row_id, data_struct.PREVIEW, str(data[data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.PREVIEW].name))
             list.SetItem(row_id, data_struct.STATUS, data[data_struct.STATUS])
             list.SetItem(row_id, data_struct.CHECKED, data[data_struct.CHECKED])
-            list.SetItemData(row_id, row_id)
+            list.SetItemData(row_id, key)
             list.CheckItem(row_id, True if data[data_struct.CHECKED] == 'True' else False)
             if data[data_struct.CHECKED] == 'False':
                 f = list.GetItemFont(row_id)
