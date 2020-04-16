@@ -554,6 +554,19 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                         wx.LogMessage('Error when deleting : %s' % (fpath))
                 self.DeleteItem(row_id)
                 del self.listdata[pos]
+        elif keycode == wx.WXK_CONTROL_N:
+            selected = get_selected_items(self)
+
+            for row_id in selected:
+                pos = self.GetItemData(row_id)  # 0-based unsorted index
+                self.listdata[pos][data_struct.MATCH_SCORE] = 0
+                self.listdata[pos][data_struct.MATCHNAME] = Path()
+                self.listdata[pos][data_struct.PREVIEW] = Path()
+                self.listdata[pos][data_struct.STATUS] = 'No match'
+                self.SetItem(row_id, data_struct.MATCH_SCORE, '')
+                self.SetItem(row_id, data_struct.MATCHNAME, '')
+                self.SetItem(row_id, data_struct.PREVIEW, '')
+                self.SetItem(row_id, data_struct.STATUS, str(self.listdata[pos][data_struct.STATUS]))
 
         if keycode:
             event.Skip()
@@ -583,8 +596,13 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         id = wx.NewIdRef()
         delete = wx.MenuItem(menu, id.GetValue(), '&Delete source file(s)\tCtrl+D', 'Delete source file(s)')
         delete.SetBitmap(Delete_16_PNG.GetBitmap())
+        id = wx.NewIdRef()
+        nomatch = wx.MenuItem(menu, id.GetValue(), '&Reset choice\tCtrl+R', 'Reset choice')
+        nomatch.SetBitmap(NoMatch_16_PNG.GetBitmap())
         menu.Append(delete)
+        menu.Append(nomatch)
         self.Bind(wx.EVT_MENU, self.DeleteSelectionCb)
+        self.Bind(wx.EVT_MENU, self.NoMatchSelectionCb)
 
         if self.GetSelectedItemCount() == 1 and candidates:
             row_id = event.GetIndex()
@@ -672,6 +690,20 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.DeleteItem(row_id)
             del self.listdata[pos]
 
+    def NoMatchSelectionCb(self, event):
+        selected = get_selected_items(self)
+
+        for row_id in selected:
+            pos = self.GetItemData(row_id)  # 0-based unsorted index
+            self.listdata[pos][data_struct.MATCH_SCORE] = 0
+            self.listdata[pos][data_struct.MATCHNAME] = Path()
+            self.listdata[pos][data_struct.PREVIEW] = Path()
+            self.listdata[pos][data_struct.STATUS] = 'No match'
+            self.SetItem(row_id, data_struct.MATCH_SCORE, '')
+            self.SetItem(row_id, data_struct.MATCHNAME, '')
+            self.SetItem(row_id, data_struct.PREVIEW, '')
+            self.SetItem(row_id, data_struct.STATUS, str(self.listdata[pos][data_struct.STATUS]))
+
     def MenuForceMatchCb(self, event):
         row_id, forced_match = forced_match_id[event.GetId()]
         forced_match_id.clear()
@@ -757,7 +789,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                         stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.PREVIEW])
                         self.SetItem(row_id, data_struct.PREVIEW, str(self.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.PREVIEW].name))
                     else:
-                        self.listdata[pos] = [new_path, 0, '', '', 'No match', self.listdata[pos][data_struct.CHECKED], old_path]
+                        self.listdata[pos] = [new_path, 0, Path(), Path(), 'No match', self.listdata[pos][data_struct.CHECKED], old_path]
                         self.SetItem(row_id, data_struct.MATCH_SCORE, '')
                         self.SetItem(row_id, data_struct.MATCHNAME, '')
                         self.SetItem(row_id, data_struct.PREVIEW, '')
@@ -967,7 +999,7 @@ class MainPanel(wx.Panel):
         for f in Path(directory).resolve().glob('*'):
             try:
                 if f.is_file():
-                    newdata.append([f, 0, '', '', 'Not processed', 'True', f])
+                    newdata.append([f, 0, Path(), Path(), 'Not processed', 'True', f])
             except (OSError, IOError):
                 pass
         self.list_ctrl.AddToList(newdata)
@@ -992,7 +1024,7 @@ class MainPanel(wx.Panel):
                     first = False
                     config_dict['folder_sources'] = str(fp.parent)
                     write_config(config_dict)
-                newdata.append([fp, 0, '', '', 'Not processed', 'True', fp])
+                newdata.append([fp, 0, Path(), Path(), 'Not processed', 'True', fp])
             except (OSError, IOError):
                 pass
         self.list_ctrl.AddToList(newdata)
@@ -1113,8 +1145,8 @@ class MainPanel(wx.Panel):
                     self.list_ctrl.listdata[pos][data_struct.STATUS] = 'Matched'
                 else:
                     self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = 0
-                    self.list_ctrl.listdata[pos][data_struct.MATCHNAME] = ''
-                    self.list_ctrl.listdata[pos][data_struct.PREVIEW] = ''
+                    self.list_ctrl.listdata[pos][data_struct.MATCHNAME] = Path()
+                    self.list_ctrl.listdata[pos][data_struct.PREVIEW] = Path()
                     self.list_ctrl.listdata[pos][data_struct.STATUS] = 'No match'
                 count += 1
         self.list_ctrl.RefreshList()
@@ -1175,7 +1207,7 @@ class MainPanel(wx.Panel):
                                     stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.PREVIEW])
                                     self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, str(self.list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.PREVIEW].name))
                                 else:
-                                    self.list_ctrl.listdata[pos] = [new_path, 0, '', '', 'No match', self.listdata[pos][data_struct.CHECKED], old_path if not Qkeep_original else None]
+                                    self.list_ctrl.listdata[pos] = [new_path, 0, Path(), Path(), 'No match', self.listdata[pos][data_struct.CHECKED], old_path if not Qkeep_original else None]
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, '')
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, '')
                                     self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, '')
@@ -2192,11 +2224,16 @@ class MainFrame(wx.Frame):
             stem, suffix = GetFileStemAndSuffix(data[data_struct.FILENAME])
             item_name = str(data[data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.FILENAME].name)
             list.InsertItem(row_id, item_name)
-            list.SetItem(row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE]))
-            stem, suffix = GetFileStemAndSuffix(data[data_struct.MATCHNAME])
-            list.SetItem(row_id, data_struct.MATCHNAME, str(data[data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.MATCHNAME].name))
-            stem, suffix = GetFileStemAndSuffix(data[data_struct.PREVIEW])
-            list.SetItem(row_id, data_struct.PREVIEW, str(data[data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.PREVIEW].name))
+            if data[data_struct.MATCHNAME]:
+                list.SetItem(row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE]))
+                stem, suffix = GetFileStemAndSuffix(data[data_struct.MATCHNAME])
+                list.SetItem(row_id, data_struct.MATCHNAME, str(data[data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.MATCHNAME].name))
+                stem, suffix = GetFileStemAndSuffix(data[data_struct.PREVIEW])
+                list.SetItem(row_id, data_struct.PREVIEW, str(data[data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.PREVIEW].name))
+            else:
+                list.SetItem(row_id, data_struct.MATCH_SCORE, '')
+                list.SetItem(row_id, data_struct.MATCHNAME, '')
+                list.SetItem(row_id, data_struct.PREVIEW, '')
             list.SetItem(row_id, data_struct.STATUS, data[data_struct.STATUS])
             list.SetItem(row_id, data_struct.CHECKED, data[data_struct.CHECKED])
             list.SetItemData(row_id, key)
@@ -2558,6 +2595,8 @@ def getDoc():
         "<ul>"
         "<li><b>Delete source file(s)</b><br><br>"
         "Delete the file associated with the selected <b>source</b> string."
+        "<br><li><b>Reset choice</b><br><br>"
+        "Reset the <b>choice</b>."
         "<br><li><b>Pick a match...</b><br><br>"
         "Change the <b>choice</b> by typing your own from the available <b>choices</b>."
         "<br><li><b>Alternate match</b><br><br>"
@@ -2588,6 +2627,7 @@ Info_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAv
 Help_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA+klEQVQ4ja3TMVLDQAwF0OeCVHTgMfcgjD2h4wq5TVzmCmYwpVvT5RbuciQKy5PFLJkUaGaLlf5fSX8lfluBVxwxxDmGr8jgf9gLTphQ4z5OHb5TYLK2x4gSn6iS2FP4ysDsc5nH1f2ARzygxXMSH9NKiiitTABvOKOLcw7fYmVwCmZxpihxG8APbBLCBn3EtoGdsGNWuI6eD5Htbt1jPHIOTIUmuAaz0qLnLkNerDNrIjjDvzyQttBGmZsMeWmhXbewiNi7iNi7LmIvEfHaN7674Ru5bZC2SfxLZqSvjXIVZf85ymnmZZkal2Vq3LBMixVmcdbrvJNZ52/umT0spYP52gAAAABJRU5ErkJggg==")
 Save_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAp0lEQVQ4jc3TsQ3CMBCF4T9lSMsA0KXIIHRZgDIlRcpIoWQAJkAKCg2T0LESzXMUTM4GV5z05OLOn1ycATpgBO46rdw00+LVCKyBs9+Y1RbYACfgAPS/AtcZgI+kAA5pvwUeC4C7OwFPIVYuISATEsvKAlLrA6iAfSRVCDgCDbAz0mgmCJSBJ5f/CxRAreaAvQuDZmrdeduDAsiJ70Ku2cwB7junpHsBwvZEMcVfbJ0AAAAASUVORK5CYII=")
 Open_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAuklEQVQ4ja3TvWoCQRSG4QcstBCLqPdgl94qdxAsBcuUghCE1OksbUwpgruGSAixE8zFWbgDk8WfHfCDj5lzhvPOYX64g1roRH5IBewwj7zGNAWQncm94rNYK/sHz7cA1/SEl3OAN2wu7Br7G7/FOIsB28ROBhgGQBeLRMAH2gEwUjqYCvoKkwxLNBOKe3gPQR7TKmqCfggOTjeQohy1EPzhMaG4gVWc2Pv/lG85xzgGlD9TFdcTOr6uI0ftKryCmkZ/AAAAAElFTkSuQmCC")
+NoMatch_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABAklEQVQ4jbXRTSuEURjG8d8oLJSFMoWNohQrZG9lMRYYeclkwVLKhi3WSsO8UIRiFtbie1j4QBbPOfV0eoTiqlN393X+1326D3+oaZzhEccYSvwDPKGJuRTeQx3DKGESz5gP/hhaoS7jFvsRngqpqWpYCvU1RhO/GVinYUKqB/ShH+84TPxxnMA9ugsCXtEI9Q1GEr8Hd3CEmYKABeyGF3zEaTnNBlZZtrBScqGONwzgBb05ryswg7FRwVVBSEf2dRO5Xkm21Er65BW0k5AOdhK4jeUUjlqVfU8MWUzgFqpfwVHruCzoN7D2HRy1KVti1AU2fgpH1XAeztZv4ajtcP5PnyUZJk/LAkldAAAAAElFTkSuQmCC")
 
 if __name__ == '__main__':
 

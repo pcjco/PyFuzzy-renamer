@@ -167,6 +167,10 @@ From the context menu on each **source** item in the main list, the following ac
 
     Delete the file associated with the selected **source* string.
 
+*   **Reset choice**
+
+    Reset the **choice**.
+
 *   **Pick a match...**
 
     Change the **choice** by typing your own from the available **choices**.
