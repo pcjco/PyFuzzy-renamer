@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 import os
 import shutil
@@ -207,8 +208,8 @@ def get_match(source):
 
 
 def getRenamePreview(input, match):
-    if not match:
-        return None
+    if not match.name:
+        return Path()
     Qkeep_match_ext = config_dict['keep_match_ext']
     stem, suffix = GetFileStemAndSuffix(match)
     match_clean = strip_extra_whitespace(strip_illegal_chars(stem))
@@ -360,7 +361,7 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
         return True
 
     def SourcesOrChoices(self, parent, question="Add the files to source or choice list?", caption='Drag&Drop question'):
-        dlg = wx.MessageDialog(parent, question, caption, wx.YES_NO | wx.ICON_QUESTION)
+        dlg = wx.GenericMessageDialog(parent, question, caption, wx.YES_NO | wx.ICON_QUESTION)
         dlg.SetYesNoLabels('Sources', 'Choices')
         result = dlg.ShowModal() == wx.ID_YES
         dlg.Destroy()
@@ -487,7 +488,6 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.itemDataMap = self.listdata
 
     def onKeyPress(self, event):
-        global glob_choices
         keycode = event.GetKeyCode()
         if keycode == wx.WXK_SPACE:
             if self.GetSelectedItemCount() > 1:
@@ -518,7 +518,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         elif keycode == wx.WXK_CONTROL_V:
             files = ClipBoardFiles()
             if files:
-                dlg = wx.MessageDialog(self.GetParent().GetParent(), "Add the files to source or choice list?", 'Paste question', wx.YES_NO | wx.ICON_QUESTION)
+                dlg = wx.GenericMessageDialog(self.GetParent().GetParent(), "Add the files to source or choice list?", 'Paste question', wx.YES_NO | wx.ICON_QUESTION)
                 dlg.SetYesNoLabels('Sources', 'Choices')
                 Qsources = dlg.ShowModal() == wx.ID_YES
                 dlg.Destroy()
@@ -554,7 +554,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                         wx.LogMessage('Error when deleting : %s' % (fpath))
                 self.DeleteItem(row_id)
                 del self.listdata[pos]
-        elif keycode == wx.WXK_CONTROL_N:
+        elif keycode == wx.WXK_CONTROL_R:
             selected = get_selected_items(self)
 
             for row_id in selected:
@@ -819,7 +819,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             stem, suffix = GetFileStemAndSuffix(data[data_struct.FILENAME])
             self.SetItem(row_id, data_struct.FILENAME, filepath if Qview_fullpath else (stem if Qhide_extension else data[data_struct.FILENAME].name))
             self.SetItem(row_id, data_struct.STATUS, str(data[data_struct.STATUS]))
-            if data[data_struct.MATCHNAME]:
+            if data[data_struct.MATCHNAME].name:
                 self.SetItem(row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE]))
                 stem, suffix = GetFileStemAndSuffix(data[data_struct.MATCHNAME])
                 self.SetItem(row_id, data_struct.MATCHNAME, str(data[data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.MATCHNAME].name))
@@ -948,40 +948,30 @@ class MainPanel(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.OnAddChoicesFromFiles, btn_add_choice_from_file)
 
     def OnViewFullPath(self, evt):
-        global config_dict
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
         config_dict['show_fullpath'] = item.IsChecked()
-        write_config(config_dict)
         self.parent.hide_extension.Enable(not config_dict['show_fullpath'])
         self.list_ctrl.RefreshList()
 
     def OnHideExtension(self, evt):
-        global config_dict
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
         config_dict['hide_extension'] = item.IsChecked()
-        write_config(config_dict)
         self.list_ctrl.RefreshList()
 
     def OnKeepMatchExtension(self, evt):
-        global config_dict
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
         config_dict['keep_match_ext'] = item.IsChecked()
-        write_config(config_dict)
         for index in self.list_ctrl.listdata.keys():
             self.list_ctrl.listdata[index][data_struct.PREVIEW] = getRenamePreview(self.list_ctrl.listdata[index][data_struct.FILENAME], self.list_ctrl.listdata[index][data_struct.MATCHNAME])
         self.list_ctrl.RefreshList()
 
     def OnKeepOriginal(self, evt):
-        global config_dict
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
         config_dict['keep_original'] = item.IsChecked()
-        write_config(config_dict)
 
     def OnMatchFirstLetter(self, evt):
-        global config_dict
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
         config_dict['match_firstletter'] = item.IsChecked()
-        write_config(config_dict)
         RefreshCandidates()
 
     def OnAddSourceFromDir(self, evt):
@@ -992,9 +982,7 @@ class MainPanel(wx.Panel):
             self.AddSourceFromDir(dirDialog.GetPath())
 
     def AddSourceFromDir(self, directory):
-        global config_dict
         config_dict['folder_sources'] = directory
-        write_config(config_dict)
         newdata = []
         for f in Path(directory).resolve().glob('*'):
             try:
@@ -1005,14 +993,13 @@ class MainPanel(wx.Panel):
         self.list_ctrl.AddToList(newdata)
 
     def OnAddSourceFromFiles(self, evt):
-        with wx.FileDialog(self, "Choose source files", config_dict['folder_sources'], style=wx.FD_DEFAULT_STYLE | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE) as fileDialog:
+        with wx.FileDialog(self, "Choose source files", config_dict['folder_sources'], style=wx.FD_DEFAULT_STYLE | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE) as self.fileDialog:
 
-            if fileDialog.ShowModal() == wx.ID_CANCEL:
+            if self.fileDialog.ShowModal() == wx.ID_CANCEL:
                 return
-            self.AddSourceFromFiles(fileDialog.GetPaths())
+            self.AddSourceFromFiles(self.fileDialog.GetPaths())
 
     def AddSourceFromFiles(self, files):
-        global config_dict
         newdata = []
         first = True
         for f in files:
@@ -1023,7 +1010,6 @@ class MainPanel(wx.Panel):
                 if first:
                     first = False
                     config_dict['folder_sources'] = str(fp.parent)
-                    write_config(config_dict)
                 newdata.append([fp, 0, Path(), Path(), 'Not processed', 'True', fp])
             except (OSError, IOError):
                 pass
@@ -1042,9 +1028,8 @@ class MainPanel(wx.Panel):
             self.AddChoicesFromDir(dirDialog.GetPath())
 
     def AddChoicesFromDir(self, directory):
-        global glob_choices, config_dict
+        global glob_choices
         config_dict['folder_choices'] = directory
-        write_config(config_dict)
         for f in Path(directory).resolve().glob('*'):
             try:
                 if f.is_file():
@@ -1061,7 +1046,7 @@ class MainPanel(wx.Panel):
             self.AddChoicesFromFiles(fileDialog.GetPaths())
 
     def AddChoicesFromFiles(self, files):
-        global glob_choices, config_dict
+        global glob_choices
         first = True
         for f in files:
             if not f:
@@ -1071,34 +1056,40 @@ class MainPanel(wx.Panel):
                 if first:
                     first = False
                     config_dict['folder_choices'] = str(fp.parent)
-                    write_config(config_dict)
                 glob_choices.add(fp)
             except (OSError, IOError):
                 pass
         RefreshCandidates()
 
     def OnAddChoicesFromClipboard(self, evt):
-        global glob_choices
         files = ClipBoardFiles()
         if files:
             self.AddChoicesFromFiles(files)
 
     def OnOutputDirectory(self, evt):
-        global glob_choices
-        with wx.DirDialog(self, "Choose output directory", config_dict['folder_output'], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
+        item = self.parent.GetMenuBar().FindItemById(evt.GetId())
+        if item.IsChecked():
+            item = self.parent.GetMenuBar().FindItemById(108)
+            item.Check(False)
+            with wx.DirDialog(self, "Choose output directory", config_dict['folder_output'], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
 
-            if dirDialog.ShowModal() == wx.ID_CANCEL:
-                return
-            config_dict['folder_output'] = dirDialog.GetPath()
-            write_config(config_dict)
-            for index in self.list_ctrl.listdata.keys():
-                self.list_ctrl.listdata[index][data_struct.PREVIEW] = getRenamePreview(self.list_ctrl.listdata[index][data_struct.FILENAME], self.list_ctrl.listdata[index][data_struct.MATCHNAME])
-            self.list_ctrl.RefreshList()
+                if dirDialog.ShowModal() == wx.ID_CANCEL:
+                    return
+                self.SetOutputDirectory(dirDialog.GetPath())
+        else:
+            item.Check(True)
 
     def OnSameOutputDirectory(self, evt):
-        global glob_choices
-        config_dict['folder_output'] = ''
-        write_config(config_dict)
+        item = self.parent.GetMenuBar().FindItemById(evt.GetId())
+        if item.IsChecked():
+            item = self.parent.GetMenuBar().FindItemById(109)
+            item.Check(False)
+            self.SetOutputDirectory('')
+        else:
+            item.Check(True)
+
+    def SetOutputDirectory(self, outdir):
+        config_dict['folder_output'] = outdir
         for index in self.list_ctrl.listdata.keys():
             self.list_ctrl.listdata[index][data_struct.PREVIEW] = getRenamePreview(self.list_ctrl.listdata[index][data_struct.FILENAME], self.list_ctrl.listdata[index][data_struct.MATCHNAME])
         self.list_ctrl.RefreshList()
@@ -1152,12 +1143,12 @@ class MainPanel(wx.Panel):
         self.list_ctrl.RefreshList()
 
     def OnReset(self, evt):
+        global glob_choices
         glob_choices.clear()
         self.list_ctrl.listdata.clear()
         self.list_ctrl.DeleteAllItems()
 
     def OnFilters(self, evt):
-        global config_dict
         dia = filtersDialog(None, -1, "Masks & Filters")
         res = dia.ShowModal()
         if res == wx.ID_OK:
@@ -1167,7 +1158,6 @@ class MainPanel(wx.Panel):
             FileMasked.masks = CompileMasks(config_dict['masks'])
             config_dict['filters_test'] = dia.panel.preview_filters.GetValue()
             config_dict['masks_test'] = dia.panel.preview_masks.GetValue()
-            write_config(config_dict)
 
         dia.Destroy()
 
@@ -1200,7 +1190,7 @@ class MainPanel(wx.Panel):
                                 new_path = Path(new_file)
                                 new_match = get_match(new_path)
                                 if new_match:
-                                    self.list_ctrl.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), 'Matched', self.listdata[pos][data_struct.CHECKED], old_path if not Qkeep_original else None]
+                                    self.list_ctrl.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), 'Matched', self.list_ctrl.listdata[pos][data_struct.CHECKED], old_path if not Qkeep_original else None]
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, str(self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE]))
                                     stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.MATCHNAME])
                                     self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, str(self.list_ctrl.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.MATCHNAME].name))
@@ -2033,8 +2023,8 @@ class MainFrame(wx.Frame):
         output_dir_.SetBitmap(Folder_16_PNG.GetBitmap())
         output_dir_.SetSubMenu(output_dir)
 
-        same_as_input = output_dir.AppendRadioItem(108, '&Same as source', 'Same as source')
-        user_dir = output_dir.AppendRadioItem(109, '&User-defined directory...', 'Select User-defined directory')
+        same_as_input = output_dir.AppendCheckItem(108, '&Same as source', 'Same as source')
+        user_dir = output_dir.AppendCheckItem(109, '&User-defined directory...', 'Select User-defined directory')
 
         if config_dict['folder_output']:
             user_dir.Check(True)
@@ -2131,6 +2121,7 @@ class MainFrame(wx.Frame):
 
     def OnQuit(self, event):
         self.SaveUI()
+        write_config()
         if self.help:
             self.help.Destroy()
         self.panel.mgr.UnInit()
@@ -2174,8 +2165,6 @@ class MainFrame(wx.Frame):
             self.LoadSession(pathname)
 
     def UpdateRecentSession(self, pathname):
-        global config_dict
-
         if pathname in config_dict['recent_session']:
             idx = config_dict['recent_session'].index(pathname)
             if idx:
@@ -2224,7 +2213,7 @@ class MainFrame(wx.Frame):
             stem, suffix = GetFileStemAndSuffix(data[data_struct.FILENAME])
             item_name = str(data[data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.FILENAME].name)
             list.InsertItem(row_id, item_name)
-            if data[data_struct.MATCHNAME]:
+            if data[data_struct.MATCHNAME].name:
                 list.SetItem(row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE]))
                 stem, suffix = GetFileStemAndSuffix(data[data_struct.MATCHNAME])
                 list.SetItem(row_id, data_struct.MATCHNAME, str(data[data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.MATCHNAME].name))
@@ -2258,14 +2247,15 @@ class MainFrame(wx.Frame):
         list.itemDataMap = list.listdata
 
     def SaveUI(self):
-        global config_dict
         list = self.panel.list_ctrl
         for col in range(0, len(default_columns)):
             config_dict['col%d_order' % (col + 1)] = list.GetColumnOrder(col)
             config_dict['col%d_size' % (col + 1)] = list.GetColumnWidth(col)
         config_dict['window'] = [self.GetSize().x, self.GetSize().y, self.GetPosition().x, self.GetPosition().y]
 
-def read_config():
+
+def default_config():
+    global config_dict
     config_dict = {'show_fullpath': False,
                    'hide_extension': False,
                    'match_firstletter': False,
@@ -2285,6 +2275,9 @@ def read_config():
         config_dict['col%d_order' % (i + 1)] = default_columns[i][0]
         config_dict['col%d_size' % (i + 1)] = default_columns[i][1]
 
+def read_config():
+    default_config()
+    
     INI_show_fullpath_val = config_dict['show_fullpath']
     INI_hide_extension_val = config_dict['hide_extension']
     INI_keep_match_ext_val = config_dict['keep_match_ext']
@@ -2423,10 +2416,8 @@ def read_config():
     FileMasked.masks = CompileMasks(config_dict['masks'])
     FileFiltered.filters = CompileFilters(config_dict['filters'])
 
-    return config_dict
 
-
-def write_config(config_dict):
+def write_config():
     config_file = os.sep.join([os.getcwd(), 'config.ini'])
     config = configparser.ConfigParser()
     config['global'] = {'show_fullpath':
@@ -2631,12 +2622,9 @@ NoMatch_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAA
 
 if __name__ == '__main__':
 
-    config_dict = read_config()
-
+    read_config()
     app = wx.App(False)
     frame = MainFrame()
     app.SetTopWindow(frame)
 
     app.MainLoop()
-    
-    write_config(config_dict)
