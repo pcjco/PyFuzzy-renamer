@@ -19,6 +19,7 @@ import configparser
 import fuzzywuzzy.fuzz
 import fuzzywuzzy.process
 import pickle as pickle
+from functools import partial
 
 
 class data_struct(object):
@@ -106,7 +107,7 @@ def filter_processed(file, filters):
     return ret
 
 
-def group(L):
+def group(L):
     first = last = L[0]
     for n in L[1:]:
         if n - 1 == last:  # Part of the group, bump the end
@@ -370,8 +371,8 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
 
 class PickCandidate(wx.MiniFrame):
     def __init__(self, parent, row_id, position):
-        wx.MiniFrame.__init__(self, parent, wx.ID_ANY, "", pos = position, style=wx.RESIZE_BORDER)
-        self.text = wx.TextCtrl(self, -1, size=(100,-1), style=wx.TE_PROCESS_ENTER)
+        wx.MiniFrame.__init__(self, parent, title="", pos=position, style=wx.RESIZE_BORDER)
+        self.text = wx.TextCtrl(self, size=(100,-1), style=wx.TE_PROCESS_ENTER)
         self.text.SetMinSize((200,-1))
         self.row_id = row_id
         panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -464,8 +465,8 @@ class CandidateCompleter(wx.TextCompleter):
 
 class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
-    def __init__(self, parent, ID=wx.ID_ANY, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
-        wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
+    def __init__(self, parent, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
+        wx.ListCtrl.__init__(self, parent, pos=pos, size=size, style=style)
         listmix.ColumnSorterMixin.__init__(self, 6)
         self.EnableCheckBoxes()
         self.Bind(wx.EVT_CHAR, self.onKeyPress)
@@ -574,55 +575,46 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
     def ColRightClickCb(self, event):
         menu = wx.Menu()
         for col in range(0, self.GetColumnCount()):
-            t = menu.AppendCheckItem(col, self.GetColumn(col).GetText())
-            t.Check(self.GetColumnWidth(col) > 0)
-            self.Bind(wx.EVT_MENU, self.MenuColumnCb, id=col)
+            mnu_col = menu.AppendCheckItem(col, self.GetColumn(col).GetText())
+            mnu_col.Check(self.GetColumnWidth(col) > 0)
+            self.Bind(wx.EVT_MENU, partial(self.MenuColumnCb, col), mnu_col)
         self.PopupMenu(menu, event.GetPoint())
         menu.Destroy()
 
-    def MenuColumnCb(self, event):
-        col = event.GetId()
+    def MenuColumnCb(self, col, event):
         if event.IsChecked():
             self.SetColumnWidth(col, default_columns[col][1])
         else:
             self.SetColumnWidth(col, 0)
 
     def ItemRightClickCb(self, event):
-        global forced_match_id
-        forced_match_id.clear()
         if not self.GetSelectedItemCount():
             return
         menu = wx.Menu()
-        id = wx.NewIdRef()
-        delete = wx.MenuItem(menu, id.GetValue(), '&Delete source file(s)\tCtrl+D', 'Delete source file(s)')
-        delete.SetBitmap(Delete_16_PNG.GetBitmap())
-        id = wx.NewIdRef()
-        nomatch = wx.MenuItem(menu, id.GetValue(), '&Reset choice\tCtrl+R', 'Reset choice')
-        nomatch.SetBitmap(NoMatch_16_PNG.GetBitmap())
-        menu.Append(delete)
-        menu.Append(nomatch)
-        self.Bind(wx.EVT_MENU, self.DeleteSelectionCb)
-        self.Bind(wx.EVT_MENU, self.NoMatchSelectionCb)
+        mnu_delete = wx.MenuItem(menu, wx.ID_ANY, '&Delete source file(s)\tCtrl+D', 'Delete source file(s)')
+        mnu_delete.SetBitmap(Delete_16_PNG.GetBitmap())
+        mnu_nomatch = wx.MenuItem(menu, wx.ID_ANY, '&Reset choice\tCtrl+R', 'Reset choice')
+        mnu_nomatch.SetBitmap(NoMatch_16_PNG.GetBitmap())
+        menu.Append(mnu_delete)
+        menu.Append(mnu_nomatch)
+        self.Bind(wx.EVT_MENU, self.DeleteSelectionCb, mnu_delete)
+        self.Bind(wx.EVT_MENU, self.NoMatchSelectionCb, mnu_nomatch)
 
         if self.GetSelectedItemCount() == 1 and candidates:
             row_id = event.GetIndex()
-            id = wx.NewIdRef()
-            search = wx.MenuItem(menu, id.GetValue(), '&Pick a match...\tCtrl+P', 'Pick a match')
-            search.SetBitmap(ProcessMatch_16_PNG.GetBitmap())
-            menu.Append(search)
-            self.Bind(wx.EVT_MENU, self.SearchSelectionCb, id=id)
-            forced_match_id[id] = (row_id, self.ClientToScreen(event.GetPoint()))
-            
+            mnu_search = wx.MenuItem(menu, wx.ID_ANY, '&Pick a match...\tCtrl+P', 'Pick a match')
+            mnu_search.SetBitmap(ProcessMatch_16_PNG.GetBitmap())
+            menu.Append(mnu_search)
+            self.Bind(wx.EVT_MENU, partial(self.SearchSelectionCb, row_id, self.ClientToScreen(event.GetPoint())), mnu_search)
+
             pos = self.GetItemData(row_id)  # 0-based unsorted index
             matches = get_match(self.listdata[pos][data_struct.FILENAME])
             if matches:
                 menu.AppendSeparator()
                 for match in matches:
-                    id = wx.NewIdRef()
                     stem, suffix = GetFileStemAndSuffix(match[0].file)
-                    menu.Append(id.GetValue(), "[%d%%] %s" % (match[1], stem))
-                    self.Bind(wx.EVT_MENU, self.MenuForceMatchCb, id=id)
-                    forced_match_id[id] = (row_id, match[0].file)
+                    mnu_match = menu.Append(wx.ID_ANY, "[%d%%] %s" % (match[1], stem))
+                    self.Bind(wx.EVT_MENU, partial(self.MenuForceMatchCb, row_id, match[0].file), mnu_match)
 
         self.PopupMenu(menu, event.GetPoint())
         menu.Destroy()
@@ -667,9 +659,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         else:
             self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText('', 1)
 
-    def SearchSelectionCb(self, event):
-        row_id, position = forced_match_id[event.GetId()]
-        forced_match_id.clear()
+    def SearchSelectionCb(self, row_id, position, event):
         dia = PickCandidate(self, row_id, position)
         dia.Show()
         dia.text.SetFocus()
@@ -704,9 +694,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.SetItem(row_id, data_struct.PREVIEW, '')
             self.SetItem(row_id, data_struct.STATUS, str(self.listdata[pos][data_struct.STATUS]))
 
-    def MenuForceMatchCb(self, event):
-        row_id, forced_match = forced_match_id[event.GetId()]
-        forced_match_id.clear()
+    def MenuForceMatchCb(self, row_id, forced_match, event):
         pos = self.GetItemData(row_id)  # 0-based unsorted index
         similarity = mySimilarityScorer(FileMasked(self.listdata[pos][data_struct.FILENAME]).masked[1], FileFiltered(forced_match).filtered)
         self.listdata[pos][data_struct.MATCH_SCORE] = similarity
@@ -864,7 +852,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 class MainPanel(wx.Panel):
 
     def __init__(self, parent):
-        wx.Panel.__init__(self, parent, -1, style=wx.WANTS_CHARS)
+        wx.Panel.__init__(self, parent, style=wx.WANTS_CHARS)
 
         self.parent = parent
 
@@ -929,7 +917,7 @@ class MainPanel(wx.Panel):
 
         panel_log = wx.Panel(parent=self)
 
-        log = wx.TextCtrl(panel_log, -1, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
+        log = wx.TextCtrl(panel_log, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
         wx.Log.SetActiveTarget(wx.LogTextCtrl(log))
 
         log_sizer = wx.BoxSizer()
@@ -939,18 +927,18 @@ class MainPanel(wx.Panel):
         self.mgr.AddPane(panel_top, wx.aui.AuiPaneInfo().Name("pane_list").CenterPane())
         self.mgr.AddPane(panel_log, wx.aui.AuiPaneInfo().CloseButton(True).Name("pane_log").Caption("Log").FloatingSize(-1, 200).BestSize(-1, 200).MinSize(-1, 120).Bottom())
         self.mgr.Update()
-        self.Bind(wx.EVT_BUTTON, self.OnRun, btn_run)
-        self.Bind(wx.EVT_BUTTON, self.OnRename, btn_ren)
-        self.Bind(wx.EVT_BUTTON, self.OnReset, btn_reset)
-        self.Bind(wx.EVT_BUTTON, self.OnFilters, btn_filters)
-        self.Bind(wx.EVT_BUTTON, self.OnUndo, btn_undo)
-        self.Bind(wx.EVT_BUTTON, self.OnAddSourceFromFiles, btn_add_source_from_files)
-        self.Bind(wx.EVT_BUTTON, self.OnAddChoicesFromFiles, btn_add_choice_from_file)
+        btn_run.Bind(wx.EVT_BUTTON, self.OnRun)
+        btn_ren.Bind(wx.EVT_BUTTON, self.OnRename)
+        btn_reset.Bind(wx.EVT_BUTTON, self.OnReset)
+        btn_filters.Bind(wx.EVT_BUTTON, self.OnFilters)
+        btn_undo.Bind(wx.EVT_BUTTON, self.OnUndo)
+        btn_add_source_from_files.Bind(wx.EVT_BUTTON, self.OnAddSourceFromFiles)
+        btn_add_choice_from_file.Bind(wx.EVT_BUTTON, self.OnAddChoicesFromFiles)
 
     def OnViewFullPath(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
         config_dict['show_fullpath'] = item.IsChecked()
-        self.parent.hide_extension.Enable(not config_dict['show_fullpath'])
+        self.parent.mnu_hide_extension.Enable(not config_dict['show_fullpath'])
         self.list_ctrl.RefreshList()
 
     def OnHideExtension(self, evt):
@@ -1067,26 +1055,22 @@ class MainPanel(wx.Panel):
             self.AddChoicesFromFiles(files)
 
     def OnOutputDirectory(self, evt):
-        item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        if item.IsChecked():
-            item = self.parent.GetMenuBar().FindItemById(108)
-            item.Check(False)
-            with wx.DirDialog(self, "Choose output directory", config_dict['folder_output'], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
-
-                if dirDialog.ShowModal() == wx.ID_CANCEL:
-                    return
-                self.SetOutputDirectory(dirDialog.GetPath())
+        if self.parent.mnu_user_dir.IsChecked():
+            self.parent.mnu_same_as_input.Check(False)
         else:
-            item.Check(True)
+            self.parent.mnu_user_dir.Check(True)
+        with wx.DirDialog(self, "Choose output directory", config_dict['folder_output'], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
+
+            if dirDialog.ShowModal() == wx.ID_CANCEL:
+                return
+            self.SetOutputDirectory(dirDialog.GetPath())
 
     def OnSameOutputDirectory(self, evt):
-        item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        if item.IsChecked():
-            item = self.parent.GetMenuBar().FindItemById(109)
-            item.Check(False)
+        if self.parent.mnu_same_as_input.IsChecked():
+            self.parent.mnu_user_dir.Check(False)
             self.SetOutputDirectory('')
         else:
-            item.Check(True)
+            self.parent.mnu_same_as_input.Check(True)
 
     def SetOutputDirectory(self, outdir):
         config_dict['folder_output'] = outdir
@@ -1149,7 +1133,7 @@ class MainPanel(wx.Panel):
         self.list_ctrl.DeleteAllItems()
 
     def OnFilters(self, evt):
-        dia = filtersDialog(None, -1, "Masks & Filters")
+        dia = filtersDialog(None, "Masks & Filters")
         res = dia.ShowModal()
         if res == wx.ID_OK:
             config_dict['filters'] = dia.panel.filters_list.GetFilters()
@@ -1250,7 +1234,7 @@ class MainPanel(wx.Panel):
 
 class aboutDialog(wx.Dialog):
     def __init__(self, parent):
-        wx.Dialog.__init__(self, parent, wx.ID_ANY, title="About PyFuzzy-renamer", size=(600,300))
+        wx.Dialog.__init__(self, parent, title="About PyFuzzy-renamer", size=(600,300))
         html = wxHTML(self)
         
         html.SetPage(
@@ -1277,15 +1261,15 @@ class aboutDialog(wx.Dialog):
 
 class wxHTML(wx.html.HtmlWindow):
     def __init__(self, parent):
-        wx.html.HtmlWindow.__init__(self, parent, wx.ID_ANY, size=(400,250))
+        wx.html.HtmlWindow.__init__(self, parent, size=(400,250))
 
     def OnLinkClicked(self, link):
         wx.LaunchDefaultBrowser(link.GetHref())
 
 
 class helpDialog(wx.Dialog):
-    def __init__(self, parent, id, label):
-        wx.Dialog.__init__(self, parent, id, label, size=(600, 300), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+    def __init__(self, parent, label):
+        wx.Dialog.__init__(self, parent, title=label, size=(600, 300), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
 
         self.Bind(wx.EVT_CLOSE, self.OnClose)
 
@@ -1307,8 +1291,8 @@ class helpDialog(wx.Dialog):
 
 
 class filtersDialog(wx.Dialog):
-    def __init__(self, parent, id, label):
-        wx.Dialog.__init__(self, parent, id, label, size=(350, 300), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+    def __init__(self, parent, label):
+        wx.Dialog.__init__(self, parent, title=label, size=(350, 300), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
 
         self.panel = filtersPanel(self)
         btns = self.CreateButtonSizer(wx.OK | wx.CANCEL | wx.APPLY)
@@ -1330,7 +1314,7 @@ class filtersDialog(wx.Dialog):
 
 class filtersPanel(wx.Panel):
     def __init__(self, parent):
-        wx.Panel.__init__(self, parent, -1, style=wx.WANTS_CHARS)
+        wx.Panel.__init__(self, parent, style=wx.WANTS_CHARS)
 
         self.notebook = wx.Notebook(self)
         page_filters = wx.Panel(self.notebook)
@@ -1470,13 +1454,8 @@ class MaskListCtrlDropTarget(wx.DropTarget):
 
 
 class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
-    ctxmenugui_titles = ['Add', 'Delete']
-    ctxmenugui_title_by_id = {}
-    for title in ctxmenugui_titles:
-        ctxmenugui_title_by_id[wx.NewIdRef()] = title
-
-    def __init__(self, parent, panel, ID=wx.ID_ANY, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
-        wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
+    def __init__(self, parent, panel, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
+        wx.ListCtrl.__init__(self, parent, pos=pos, size=size, style=style)
         listmix.TextEditMixin.__init__(self)
         self.EnableCheckBoxes()
         self.panel = panel
@@ -1538,8 +1517,25 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
 
     def onKeyPress(self, event):
         keycode = event.GetKeyCode()
-        if keycode == wx.WXK_DELETE:
-            self.DeleteSelected()
+        if keycode == wx.WXK_SPACE:
+            if self.GetSelectedItemCount() > 1:
+                index = self.GetFirstSelected()
+                second = self.GetNextSelected(index)
+                check = not self.IsItemChecked(second)
+                while index != -1:
+                    self.CheckItem(index, check)
+                    index = self.GetNextSelected(index)
+        elif keycode == wx.WXK_CONTROL_M:
+            self.AddCb(None)
+        elif keycode == wx.WXK_DELETE:
+            self.DeleteCb(None)
+        elif keycode == wx.WXK_CONTROL_A:
+            item = -1
+            while 1:
+                item = self.GetNextItem(item)
+                if item == -1:
+                    break
+                self.SetItemState(item, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
 
         if keycode:
             event.Skip()
@@ -1567,14 +1563,15 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                 masks += '+' if self.IsItemChecked(row_id0) else '-'
                 masks += self.GetItemText(row_id0, 1) + '\n'
                 if row_id == row_id0:
-                    masks += '"' + event.GetText() + '"\n'
+                    regexp = self.GetItemText(row_id, 2)
+                    masks += '"' + regexp + '"\n'
                     try:
-                        re.compile(event.GetText())
+                        re.compile(regexp)
                         self.SetItemBackgroundColour(row_id0, wx.Colour(153, 255, 153))
                     except re.error:
                         self.SetItemBackgroundColour(row_id0, wx.Colour(255, 153, 153))
                 else:
-                    masks += '"' + self.GetItemText(row_id0, col_id) + '"\n'
+                    masks += '"' + self.GetItemText(row_id0, 2) + '"\n'
 
             masks = CompileMasks(masks)
             filters = []
@@ -1668,33 +1665,26 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
 
     def RightClickCb(self, event):
         menu = wx.Menu()
-        for (id, title) in MaskListCtrl.ctxmenugui_title_by_id.items():
-            if title != 'Delete' or self.GetSelectedItemCount():
-                menu.Append(id.GetId(), title)
-                self.Bind(wx.EVT_MENU, self.MenuSelectionCb, id=id)
+        mnu_add = menu.Append(wx.ID_ANY, 'Add mask\tCtrl+M', 'Add mask')
+        self.Bind(wx.EVT_MENU, self.AddCb, mnu_add)
+        if self.GetSelectedItemCount():
+            mnu_del = menu.Append(wx.ID_ANY, 'Delete mask\tDelete', 'Delete mask')
+            self.Bind(wx.EVT_MENU, self.DeleteCb, mnu_del)
         pos = self.ScreenToClient(event.GetPosition())
         self.PopupMenu(menu, pos)
         menu.Destroy()
         event.Skip()
 
-    def MenuSelectionCb(self, event):
-        operation = MaskListCtrl.ctxmenugui_title_by_id[event.GetId()]
-        if operation == 'Add':
-            data = ('new mask', '', '')
-            row_id = self.GetItemCount()
-            self.InsertItem(row_id, "%2d" % (int(row_id) + 1))
-            self.SetItem(row_id, 1, data[0])
-            self.SetItem(row_id, 2, data[1])
-            self.CheckItem(row_id, True)
-            self.SetItemBackgroundColour(row_id, wx.Colour(153, 255, 153))
-        elif operation == 'Delete':
-            self.DeleteSelected()
+    def AddCb(self, event):
+        data = ('new mask', '', '')
+        row_id = self.GetItemCount()
+        self.InsertItem(row_id, "%2d" % (int(row_id) + 1))
+        self.SetItem(row_id, 1, data[0])
+        self.SetItem(row_id, 2, data[1])
+        self.CheckItem(row_id, True)
+        self.SetItemBackgroundColour(row_id, wx.Colour(153, 255, 153))
 
-    def CheckCb(self, event):
-        if not self.unplug_preview:
-            self.panel.UpdateMaskPreview()
-
-    def DeleteSelected(self):
+    def DeleteCb(self, event):
         selected = get_selected_items(self)
 
         selected.reverse()  # Delete all the items, starting with the last item
@@ -1709,6 +1699,10 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                 break
             self.SetItemText(row_id, "%2d" % (int(row_id) + 1))
         self.panel.UpdateMaskPreview()
+
+    def CheckCb(self, event):
+        if not self.unplug_preview:
+            self.panel.UpdateMaskPreview()
 
 
 class FilterListCtrlDropTarget(wx.DropTarget):
@@ -1737,13 +1731,8 @@ class FilterListCtrlDropTarget(wx.DropTarget):
 
 
 class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
-    ctxmenugui_titles = ['Add', 'Delete']
-    ctxmenugui_title_by_id = {}
-    for title in ctxmenugui_titles:
-        ctxmenugui_title_by_id[wx.NewIdRef()] = title
-
-    def __init__(self, parent, panel, ID=wx.ID_ANY, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
-        wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
+    def __init__(self, parent, panel, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
+        wx.ListCtrl.__init__(self, parent, pos=pos, size=size, style=style)
         listmix.TextEditMixin.__init__(self)
         self.EnableCheckBoxes()
         self.panel = panel
@@ -1808,8 +1797,25 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
 
     def onKeyPress(self, event):
         keycode = event.GetKeyCode()
-        if keycode == wx.WXK_DELETE:
-            self.DeleteSelected()
+        if keycode == wx.WXK_SPACE:
+            if self.GetSelectedItemCount() > 1:
+                index = self.GetFirstSelected()
+                second = self.GetNextSelected(index)
+                check = not self.IsItemChecked(second)
+                while index != -1:
+                    self.CheckItem(index, check)
+                    index = self.GetNextSelected(index)
+        elif keycode == wx.WXK_DELETE:
+            self.DeleteCb(None)
+        elif keycode == wx.WXK_CONTROL_F:
+            self.AddCb(None)
+        elif keycode == wx.WXK_CONTROL_A:
+            item = -1
+            while 1:
+                item = self.GetNextItem(item)
+                if item == -1:
+                    break
+                self.SetItemState(item, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
 
         if keycode:
             event.Skip()
@@ -1837,15 +1843,21 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                 filters += '+' if self.IsItemChecked(row_id0) else '-'
                 filters += self.GetItemText(row_id0, 1) + '\n'
                 if row_id == row_id0:
-                    filters += '"' + event.GetText() + '"\n'
                     if col_id == 2:
+                        regexp = self.GetItemText(row_id, 2)
+                        filters += '"' + regexp + '"\n'
+                        filters += '"' + self.GetItemText(row_id, 3) + '"\n'
                         try:
-                            re.compile(event.GetText())
+                            re.compile(regexp)
                             self.SetItemBackgroundColour(row_id0, wx.Colour(153, 255, 153))
                         except re.error:
                             self.SetItemBackgroundColour(row_id0, wx.Colour(255, 153, 153))
+                    elif col_id == 3:
+                        filters += '"' + self.GetItemText(row_id, 2) + '"\n'
+                        filters += '"' + self.GetItemText(row_id, 3) + '"\n'
                 else:
-                    filters += '"' + self.GetItemText(row_id0, col_id) + '"\n'
+                    filters += '"' + self.GetItemText(row_id0, 2) + '"\n'
+                    filters += '"' + self.GetItemText(row_id0, 3) + '"\n'
 
             filters = CompileFilters(filters)
             self.panel.result_preview_filters.SetValue(filter_processed(Path(self.panel.preview_filters.GetValue() + '.txt'), filters))
@@ -1935,34 +1947,27 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
 
     def RightClickCb(self, event):
         menu = wx.Menu()
-        for (id, title) in FilterListCtrl.ctxmenugui_title_by_id.items():
-            if title != 'Delete' or self.GetSelectedItemCount():
-                menu.Append(id.GetId(), title)
-                self.Bind(wx.EVT_MENU, self.MenuSelectionCb, id=id)
+        mnu_add = menu.Append(wx.ID_ANY, 'Add filter\tCtrl+F', 'Add filter')
+        self.Bind(wx.EVT_MENU, self.AddCb, mnu_add)
+        if self.GetSelectedItemCount():
+            mnu_del = menu.Append(wx.ID_ANY, 'Delete filter\tDelete', 'Delete filter')
+            self.Bind(wx.EVT_MENU, self.DeleteCb, mnu_del)
         pos = self.ScreenToClient(event.GetPosition())
         self.PopupMenu(menu, pos)
         menu.Destroy()
         event.Skip()
 
-    def MenuSelectionCb(self, event):
-        operation = FilterListCtrl.ctxmenugui_title_by_id[event.GetId()]
-        if operation == 'Add':
-            data = ('new filter', '', '')
-            row_id = self.GetItemCount()
-            self.InsertItem(row_id, "%2d" % (int(row_id) + 1))
-            self.SetItem(row_id, 1, data[0])
-            self.SetItem(row_id, 2, data[1])
-            self.SetItem(row_id, 3, data[2])
-            self.CheckItem(row_id, True)
-            self.SetItemBackgroundColour(row_id, wx.Colour(153, 255, 153))
-        elif operation == 'Delete':
-            self.DeleteSelected()
+    def AddCb(self, event):
+        data = ('new filter', '', '')
+        row_id = self.GetItemCount()
+        self.InsertItem(row_id, "%2d" % (int(row_id) + 1))
+        self.SetItem(row_id, 1, data[0])
+        self.SetItem(row_id, 2, data[1])
+        self.SetItem(row_id, 3, data[2])
+        self.CheckItem(row_id, True)
+        self.SetItemBackgroundColour(row_id, wx.Colour(153, 255, 153))
 
-    def CheckCb(self, event):
-        if not self.unplug_preview:
-            self.panel.UpdateFilterPreview()
-
-    def DeleteSelected(self):
+    def DeleteCb(self, event):
         selected = get_selected_items(self)
 
         selected.reverse()  # Delete all the items, starting with the last item
@@ -1978,10 +1983,14 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
             self.SetItemText(row_id, "%2d" % (int(row_id) + 1))
         self.panel.UpdateFilterPreview()
 
+    def CheckCb(self, event):
+        if not self.unplug_preview:
+            self.panel.UpdateFilterPreview()
+
 
 class MainFrame(wx.Frame):
     def __init__(self):
-        wx.Frame.__init__(self, None, wx.ID_ANY, "PyFuzzy-renamer",
+        wx.Frame.__init__(self, None, title="PyFuzzy-renamer",
                           pos=wx.Point(config_dict['window'][2], config_dict['window'][3]), size=wx.Size(config_dict['window'][0], config_dict['window'][1]))
 
         bundle = wx.IconBundle()
@@ -1990,123 +1999,123 @@ class MainFrame(wx.Frame):
         self.SetIcons(bundle)
 
         self.help = None
+        self.statusbar = self.CreateStatusBar(2)
+
+        # Add a panel so it looks the correct on all platforms
+        self.panel = MainPanel(self)
 
         menubar = wx.MenuBar()
-        self.statusbar = self.CreateStatusBar(2)
         self.files = wx.Menu()
+        options = wx.Menu()
+        help = wx.Menu()
+
         sources = wx.Menu()
-        sources_ = wx.MenuItem(self.files, 100, '&Sources', 'Select sources (to rename)')
+        sources_ = wx.MenuItem(self.files, wx.ID_ANY, '&Sources', 'Select sources (to rename)')
         sources_.SetSubMenu(sources)
 
-        source_from_dir = wx.MenuItem(sources, 102, 'Sources from &Directory...\tCtrl+D', 'Select sources from directory')
-        source_from_dir.SetBitmap(AddFolder_16_PNG.GetBitmap())
-        sources.Append(source_from_dir)
+        mnu_source_from_dir = wx.MenuItem(sources, wx.ID_ANY, 'Sources from &Directory...\tCtrl+D', 'Select sources from directory')
+        mnu_source_from_dir.SetBitmap(AddFolder_16_PNG.GetBitmap())
+        sources.Append(mnu_source_from_dir)
 
-        source_from_clipboard = wx.MenuItem(sources, 103, 'Sources from &Clipboard', 'Select sources from clipboard')
-        source_from_clipboard.SetBitmap(Clipboard_16_PNG.GetBitmap())
-        sources.Append(source_from_clipboard)
+        mnu_source_from_clipboard = wx.MenuItem(sources, wx.ID_ANY, 'Sources from &Clipboard', 'Select sources from clipboard')
+        mnu_source_from_clipboard.SetBitmap(Clipboard_16_PNG.GetBitmap())
+        sources.Append(mnu_source_from_clipboard)
 
         choices = wx.Menu()
-        choices_ = wx.MenuItem(self.files, 101, '&Choices', 'Select choices (to match)')
+        choices_ = wx.MenuItem(self.files, wx.ID_ANY, '&Choices', 'Select choices (to match)')
         choices_.SetSubMenu(choices)
 
-        target_from_dir = wx.MenuItem(choices, 105, 'Choices from &Directory...\tCtrl+T', 'Select choices from directory')
-        target_from_dir.SetBitmap(AddFolder_16_PNG.GetBitmap())
-        choices.Append(target_from_dir)
+        mnu_target_from_dir = wx.MenuItem(choices, wx.ID_ANY, 'Choices from &Directory...\tCtrl+T', 'Select choices from directory')
+        mnu_target_from_dir.SetBitmap(AddFolder_16_PNG.GetBitmap())
+        choices.Append(mnu_target_from_dir)
 
-        choices_from_clipboard = wx.MenuItem(choices, 106, 'Choices from &Clipboard', 'Select choices from clipboard')
-        choices_from_clipboard.SetBitmap(Clipboard_16_PNG.GetBitmap())
-        choices.Append(choices_from_clipboard)
+        mnu_choices_from_clipboard = wx.MenuItem(choices, wx.ID_ANY, 'Choices from &Clipboard', 'Select choices from clipboard')
+        mnu_choices_from_clipboard.SetBitmap(Clipboard_16_PNG.GetBitmap())
+        choices.Append(mnu_choices_from_clipboard)
 
         output_dir = wx.Menu()
-        output_dir_ = wx.MenuItem(self.files, 107, '&Output Directory', 'Select output directory')
+        output_dir_ = wx.MenuItem(self.files, wx.ID_ANY, '&Output Directory', 'Select output directory')
         output_dir_.SetBitmap(Folder_16_PNG.GetBitmap())
         output_dir_.SetSubMenu(output_dir)
 
-        same_as_input = output_dir.AppendCheckItem(108, '&Same as source', 'Same as source')
-        user_dir = output_dir.AppendCheckItem(109, '&User-defined directory...', 'Select User-defined directory')
+        self.mnu_same_as_input = output_dir.AppendCheckItem(wx.ID_ANY, '&Same as source', 'Same as source')
+        self.mnu_user_dir = output_dir.AppendCheckItem(wx.ID_ANY, '&User-defined directory...', 'Select User-defined directory')
 
-        if config_dict['folder_output']:
-            user_dir.Check(True)
-        else:
-            same_as_input.Check(True)
-
-        open = wx.MenuItem(self.files, 111, '&Load Session...\tCtrl+O', 'Open...')
-        open.SetBitmap(Open_16_PNG.GetBitmap())
+        mnu_open = wx.MenuItem(self.files, wx.ID_ANY, '&Load Session...\tCtrl+O', 'Open...')
+        mnu_open.SetBitmap(Open_16_PNG.GetBitmap())
         
-        save = wx.MenuItem(self.files, 110, '&Save Session\tCtrl+S', 'Save...')
-        save.SetBitmap(Save_16_PNG.GetBitmap())
+        mnu_save = wx.MenuItem(self.files, wx.ID_ANY, '&Save Session\tCtrl+S', 'Save...')
+        mnu_save.SetBitmap(Save_16_PNG.GetBitmap())
 
-        quit = wx.MenuItem(self.files, 104, '&Exit\tAlt+F4', 'Exit the Application')
-        quit.SetBitmap(Quit_16_PNG.GetBitmap())
+        self.mnu_quit = wx.MenuItem(self.files, wx.ID_ANY, '&Exit\tAlt+F4', 'Exit the Application')
+        self.mnu_quit.SetBitmap(Quit_16_PNG.GetBitmap())
 
         self.files.Append(sources_)
         self.files.Append(choices_)
         self.files.Append(output_dir_)
         self.files.AppendSeparator()
-        self.files.Append(open)
-        self.files.Append(save)
+        self.files.Append(mnu_open)
+        self.files.Append(mnu_save)
         self.files.AppendSeparator()
+        self.mnu_recents = []
         if config_dict['recent_session']:
             for i in range(0, len(config_dict['recent_session'])):
-                new_recent = wx.MenuItem(self.files, 150+i, '&' + str(i + 1) + ': ' +shorten_path(config_dict['recent_session'][i], 64), '')
-                self.files.Append(new_recent)
+                new_mnu_recent = wx.MenuItem(self.files, wx.ID_ANY, '&' + str(i + 1) + ': ' +shorten_path(config_dict['recent_session'][i], 64), '')
+                self.files.Append(new_mnu_recent)
+                self.mnu_recents.append(new_mnu_recent)
             self.files.AppendSeparator()
-        self.files.Append(quit)
+        self.files.Append(self.mnu_quit)
 
-        options = wx.Menu()
-        view_fullpath = options.AppendCheckItem(202, '&View full path', 'View full path')
-        view_fullpath.Check(config_dict['show_fullpath'])
+        mnu_view_fullpath = options.AppendCheckItem(wx.ID_ANY, '&View full path', 'View full path')
+        self.mnu_hide_extension = options.AppendCheckItem(wx.ID_ANY, '&Hide suffix', 'Hide suffix')
+        self.mnu_keep_original = options.AppendCheckItem(wx.ID_ANY, 'Keep &original on renaming', 'Keep original on renaming')
+        self.mnu_keep_match_ext = options.AppendCheckItem(wx.ID_ANY, '&Keep matched file suffix', 'Keep matched file suffix')
+        self.mnu_match_firstletter = options.AppendCheckItem(wx.ID_ANY, '&Always match first letter', 'Enforce choices that match the first letter of the source')
 
-        self.hide_extension = options.AppendCheckItem(203, '&Hide suffix', 'Hide suffix')
-        self.hide_extension.Check(config_dict['hide_extension'])
-        self.hide_extension.Enable(not config_dict['show_fullpath'])
-
-        self.keep_original = options.AppendCheckItem(205, 'Keep &original on renaming', 'Keep original on renaming')
-        self.keep_original.Check(config_dict['keep_original'])
-
-        self.keep_match_ext = options.AppendCheckItem(201, '&Keep matched file suffix', 'Keep matched file suffix')
-        self.keep_match_ext.Check(config_dict['keep_match_ext'])
-
-        self.match_firstletter = options.AppendCheckItem(204, '&Always match first letter', 'Enforce choices that match the first letter of the source')
-        self.match_firstletter.Check(config_dict['match_firstletter'])
-
-        help = wx.Menu()
-        doc = wx.MenuItem(help, 300, '&Help...', 'Help')
-        doc.SetBitmap(Help_16_PNG.GetBitmap())
-        help.Append(doc)
-        about = wx.MenuItem(help, 301, '&About...', 'About the application')
-        about.SetBitmap(Info_16_PNG.GetBitmap())
-        help.Append(about)
+        mnu_doc = wx.MenuItem(help, wx.ID_ANY, '&Help...', 'Help')
+        mnu_doc.SetBitmap(Help_16_PNG.GetBitmap())
+        help.Append(mnu_doc)
+        mnu_about = wx.MenuItem(help, wx.ID_ANY, '&About...', 'About the application')
+        mnu_about.SetBitmap(Info_16_PNG.GetBitmap())
+        help.Append(mnu_about)
 
         menubar.Append(self.files, '&File')
         menubar.Append(options, '&Options')
         menubar.Append(help, '&Help')
         self.SetMenuBar(menubar)
-        #self.Centre()
 
-        # Add a panel so it looks the correct on all platforms
-        self.panel = MainPanel(self)
+        if config_dict['folder_output']:
+            self.mnu_user_dir.Check(True)
+        else:
+            self.mnu_same_as_input.Check(True)
+
+        mnu_view_fullpath.Check(config_dict['show_fullpath'])
+        self.mnu_hide_extension.Check(config_dict['hide_extension'])
+        self.mnu_hide_extension.Enable(not config_dict['show_fullpath'])
+        self.mnu_keep_original.Check(config_dict['keep_original'])
+        self.mnu_keep_match_ext.Check(config_dict['keep_match_ext'])
+        self.mnu_match_firstletter.Check(config_dict['match_firstletter'])
+
+        self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromDir, mnu_source_from_dir)
+        self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromClipboard, mnu_source_from_clipboard)
+        self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromDir, mnu_target_from_dir)
+        self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromClipboard, mnu_choices_from_clipboard)
+        self.Bind(wx.EVT_MENU, self.panel.OnOutputDirectory, self.mnu_user_dir)
+        self.Bind(wx.EVT_MENU, self.panel.OnSameOutputDirectory, self.mnu_same_as_input)
+        self.Bind(wx.EVT_MENU, self.panel.OnViewFullPath, mnu_view_fullpath)
+        self.Bind(wx.EVT_MENU, self.panel.OnHideExtension, self.mnu_hide_extension)
+        self.Bind(wx.EVT_MENU, self.panel.OnKeepMatchExtension, self.mnu_keep_match_ext)
+        self.Bind(wx.EVT_MENU, self.panel.OnMatchFirstLetter, self.mnu_match_firstletter)
+        self.Bind(wx.EVT_MENU, self.panel.OnKeepOriginal, self.mnu_keep_original)
+        self.Bind(wx.EVT_MENU, self.OnOpen, mnu_open)
+        self.Bind(wx.EVT_MENU, self.OnSaveAs, mnu_save)
+        self.Bind(wx.EVT_MENU, self.OnQuit, self.mnu_quit)
+        self.Bind(wx.EVT_MENU, self.OnHelp, mnu_doc)
+        self.Bind(wx.EVT_MENU, self.OnAbout, mnu_about)
         self.Bind(wx.EVT_CLOSE, self.OnQuit)
-        self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromDir, id=102)
-        self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromClipboard, id=103)
-        self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromDir, id=105)
-        self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromClipboard, id=106)
-        self.Bind(wx.EVT_MENU, self.panel.OnOutputDirectory, id=109)
-        self.Bind(wx.EVT_MENU, self.panel.OnSameOutputDirectory, id=108)
-        self.Bind(wx.EVT_MENU, self.panel.OnViewFullPath, id=202)
-        self.Bind(wx.EVT_MENU, self.panel.OnHideExtension, id=203)
-        self.Bind(wx.EVT_MENU, self.panel.OnKeepMatchExtension, id=201)
-        self.Bind(wx.EVT_MENU, self.panel.OnMatchFirstLetter, id=204)
-        self.Bind(wx.EVT_MENU, self.panel.OnKeepOriginal, id=205)
-        self.Bind(wx.EVT_MENU, self.OnOpen, id=111)
-        self.Bind(wx.EVT_MENU, self.OnSaveAs, id=110)
-        self.Bind(wx.EVT_MENU, self.OnQuit, id=104)
-        self.Bind(wx.EVT_MENU, self.OnHelp, id=300)
-        self.Bind(wx.EVT_MENU, self.OnAbout, id=301)
         
-        for i in range(0, len(config_dict['recent_session'])):
-            self.Bind(wx.EVT_MENU, self.OnOpenRecent, id=150+i)
+        for mnu_recent in self.mnu_recents:
+            self.Bind(wx.EVT_MENU, self.OnOpenRecent, mnu_recent)
 
         self.Show(True)
 
@@ -2116,7 +2125,7 @@ class MainFrame(wx.Frame):
         dia.Destroy()
 
     def OnHelp(self, event):
-        self.help = helpDialog(None, -1, "Help")
+        self.help = helpDialog(None, "Help")
         self.help.Show()
 
     def OnQuit(self, event):
@@ -2135,19 +2144,12 @@ class MainFrame(wx.Frame):
                 return
 
             # save the current contents in the file
-            pathname = fileDialog.GetPath()
-            try:
-                with open(pathname, 'wb') as file:
-                    pickle.dump([glob_choices, self.panel.list_ctrl.listdata], file)
-
-                self.UpdateRecentSession(pathname)
-
-            except IOError:
-                wx.LogError("Cannot save current data in file '%s'." % pathname)
+            self.SaveSession(fileDialog.GetPath())
 
     def OnOpenRecent(self, event):
-        pathname = config_dict['recent_session'][event.GetId()-150]
-        self.UpdateRecentSession(pathname)
+        menu = event.GetEventObject()
+        menuItem = menu.FindItemById(event.GetId())
+        pathname = config_dict['recent_session'][self.mnu_recents.index(menuItem)]
         self.LoadSession(pathname)
 
     def OnOpen(self, event):
@@ -2158,11 +2160,7 @@ class MainFrame(wx.Frame):
                 return
 
             # Proceed loading the file chosen by the user
-            pathname = fileDialog.GetPath()
-
-            self.UpdateRecentSession(pathname)
-
-            self.LoadSession(pathname)
+            self.LoadSession(fileDialog.GetPath())
 
     def UpdateRecentSession(self, pathname):
         if pathname in config_dict['recent_session']:
@@ -2176,27 +2174,36 @@ class MainFrame(wx.Frame):
         # update file menu
         # - Remove all recent
         found_recent = False
-        for i in range(0, 8):
-            item = self.files.FindItemById(150+i)
-            if item:
-                found_recent = True
-                self.files.Delete(150+i)
-            else:
-                break
+        for mnu_recent in self.mnu_recents:
+            found_recent = True
+            self.files.Delete(mnu_recent)
         if not found_recent:
-            item, pos = self.files.FindChildItem(104) # Searh Exit button
+            item, pos = self.files.FindChildItem(self.mnu_quit.GetId()) # Searh Exit button
             self.files.InsertSeparator(pos)
 
         # - Refresh recents
+        self.mnu_recents.clear()
         for i in range(0, len(config_dict['recent_session'])):
-            new_recent = wx.MenuItem(self.files, 150+i, '&' + str(i + 1) + ': ' +shorten_path(config_dict['recent_session'][i], 64), '')
-            item, pos = self.files.FindChildItem(104) # Searh Exit button
-            self.files.Insert(pos - 1, new_recent)
-            self.Bind(wx.EVT_MENU, self.OnOpenRecent, id=150+i)
+            new_mnu_recent = wx.MenuItem(self.files, wx.ID_ANY, '&' + str(i + 1) + ': ' +shorten_path(config_dict['recent_session'][i], 64), '')
+            item, pos = self.files.FindChildItem(self.mnu_quit.GetId()) # Searh Exit button
+            self.files.Insert(pos - 1, new_mnu_recent)
+            self.mnu_recents.append(new_mnu_recent)
+            self.Bind(wx.EVT_MENU, self.OnOpenRecent, new_mnu_recent)
+
+    def SaveSession(self, pathname):
+        try:
+            with open(pathname, 'wb') as file:
+                pickle.dump([glob_choices, self.panel.list_ctrl.listdata], file)
+
+            self.UpdateRecentSession(pathname)
+
+        except IOError:
+            wx.LogError("Cannot save current data in file '%s'." % pathname)
 
     def LoadSession(self, pathname):
         global glob_choices
 
+        self.UpdateRecentSession(pathname)
         list = self.panel.list_ctrl
         try:
             with open(pathname, 'rb') as file:
