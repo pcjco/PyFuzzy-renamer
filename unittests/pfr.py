@@ -15,6 +15,7 @@ class PyFuzzyRenamerTestCase(unittest.TestCase):
         self.backup_config = copy.deepcopy(pyfuzzyrenamer.config_dict)
         pyfuzzyrenamer.default_config()
 
+        pyfuzzyrenamer.glob_choices.clear()
         self.app = wx.App()
         wx.Log.SetActiveTarget(wx.LogStderr())
         self.frame = pyfuzzyrenamer.MainFrame()
