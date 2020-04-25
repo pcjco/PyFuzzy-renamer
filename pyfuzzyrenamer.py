@@ -20,6 +20,7 @@ import fuzzywuzzy.fuzz
 import fuzzywuzzy.process
 import pickle as pickle
 from functools import partial
+from multiprocessing import Pool, active_children, cpu_count
 
 
 class data_struct(object):
@@ -163,31 +164,57 @@ def fuzz_processor(file):
     elif type(file).__name__ == 'FileMasked':
         return file.masked[1]
 
+def match_process(idx, f_masked, f_candidates):
+    data = fuzzywuzzy.process.extract(f_masked, f_candidates, scorer=mySimilarityScorer, processor=fuzz_processor, limit=10)
+    m = FileMatch(f_masked.file, data)
+    return idx, m
 
 def get_matches(sources, progress):
-    ret = []
+    global processed
+    processed = 0
+    total = len(sources)
+    ret = [None for i in range(total)]
+    if not candidates:
+        return ret
+
+    def callback_processed(data):
+        global processed
+        processed += 1
+        ret[data[0]] = data[1]
+
+    def progress_msg(added, processed, total):
+        return "Processed sources %d%%\nAdded sources %d%%" % (100 * (processed / total), 100 * (added / total))
+
     Qmatch_firstletter = config_dict['match_firstletter']
-    count = 0
+    added = 0
+    pool = Pool(processes=cpu_count())
     for f in sources:
-        count += 1
-        cancelled = not progress.Update(count, '')[0]
-        if cancelled:
-            return ret
-        if not candidates:
-            ret.append(None)
-            continue
         f_masked = FileMasked(f)
         if not f_masked.masked[1]:
-            ret.append(None)
+            ret[added] = None
             continue
         if Qmatch_firstletter:
             first_letter = f_masked.masked[1][0]
             if first_letter in candidates.keys():
-                ret.append(FileMatch(f, fuzzywuzzy.process.extract(f_masked, candidates[first_letter], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10)))
+                pool.apply_async(match_process, (added, f_masked, candidates[first_letter],), callback=callback_processed)
             else:
-                ret.append(None)
+                ret[added] = None
         else:
-            ret.append(FileMatch(f, fuzzywuzzy.process.extract(f_masked, candidates['all'], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10)))
+            pool.apply_async(match_process, (added, f_masked, candidates['all'],), callback=callback_processed)
+        added += 1
+        cancelled = not progress.Update(processed, progress_msg(added, processed, total))[0]
+        if cancelled:
+            pool.terminate()
+            break
+    pool.close()
+    while len(active_children()) > 0:
+        cancelled = not progress.Update(processed, progress_msg(added, processed, total))[0]
+        if cancelled:
+            pool.terminate()
+            break
+        wx.MilliSleep(1000)
+    pool.join()
+
     return ret
 
 
@@ -1092,7 +1119,7 @@ class MainPanel(wx.Panel):
                 pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
                 sources.append(self.list_ctrl.listdata[pos][data_struct.FILENAME])
 
-        progress = wx.ProgressDialog("Match Progress", "", maximum=len(sources), parent=None, style=wx.PD_AUTO_HIDE | wx.PD_CAN_ABORT | wx.PD_ESTIMATED_TIME | wx.PD_REMAINING_TIME)
+        progress = wx.ProgressDialog("Match Progress", "Processed sources    %\nAdded sources    %", maximum=len(sources), parent=None, style=wx.PD_AUTO_HIDE | wx.PD_CAN_ABORT | wx.PD_ESTIMATED_TIME | wx.PD_REMAINING_TIME)
                       
         matches = get_matches(sources, progress)
         row_id = -1
