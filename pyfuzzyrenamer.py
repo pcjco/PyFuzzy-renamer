@@ -1,5 +1,4 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-
 
 import os
 import shutil
@@ -20,7 +19,7 @@ import fuzzywuzzy.fuzz
 import fuzzywuzzy.process
 import pickle as pickle
 from functools import partial
-from multiprocessing import Pool, active_children, cpu_count
+from multiprocessing import Pool, active_children, cpu_count, freeze_support
 
 
 class data_struct(object):
@@ -37,29 +36,41 @@ glob_choices = set()
 forced_match_id = {}
 candidates = {}
 
-illegal_chars = r'/?<>\:*|"' if (sys.platform == "win32") else r':'
-default_masks_teststring = '(1986) Hitchhiker\'s Guide to the Galaxy, The (AGA) Disk1'
-default_filters_teststring = 'Hitchhiker\'s Guide to the Galaxy, The (AGA)'
-default_masks = '+Ending Disk#\n' + \
-                r'"(\s?disk\d)$"' + '\n' + \
-                '+Starting (Year)\n' + \
-                r'"^(\(\d{4}\)\s?)"'
-default_filters = '+Strip brackets\n' + \
-                  r'" ?[\(\[\{][^\)\]\}]+[\)\]\}]"' + '\n' + \
-                  r'" "' + '\n' + \
-                  '+Strip articles\n' + \
-                  r'"(^(the|a)\b|, the)"' + '\n' + \
-                  r'" "' + '\n' + \
-                  '+Strip non alphanumeric\n' + \
-                  r'"(?ui)\W"' + '\n' + \
-                  r'" "'
+illegal_chars = r'/?<>\:*|"' if (sys.platform == "win32") else r":"
+default_masks_teststring = "(1986) Hitchhiker's Guide to the Galaxy, The (AGA) Disk1"
+default_filters_teststring = "Hitchhiker's Guide to the Galaxy, The (AGA)"
+default_masks = (
+    "+Ending Disk#\n"
+    + r'"(\s?disk\d)$"'
+    + "\n"
+    + "+Starting (Year)\n"
+    + r'"^(\(\d{4}\)\s?)"'
+)
+default_filters = (
+    "+Strip brackets\n"
+    + r'" ?[\(\[\{][^\)\]\}]+[\)\]\}]"'
+    + "\n"
+    + r'" "'
+    + "\n"
+    + "+Strip articles\n"
+    + r'"(^(the|a)\b|, the)"'
+    + "\n"
+    + r'" "'
+    + "\n"
+    + "+Strip non alphanumeric\n"
+    + r'"(?ui)\W"'
+    + "\n"
+    + r'" "'
+)
 
-default_columns = [[0, 300, 'Source Name'],
-                   [1, 80, 'Similarity(%)'],
-                   [2, 300, 'Closest Match'],
-                   [3, 300, 'Renaming Preview'],
-                   [4, 100, 'Status'],
-                   [5, 60, 'Checked']]
+default_columns = [
+    [0, 300, "Source Name"],
+    [1, 80, "Similarity(%)"],
+    [2, 300, "Closest Match"],
+    [3, 300, "Renaming Preview"],
+    [4, 100, "Status"],
+    [5, 60, "Checked"],
+]
 
 def shorten_path(file_path, length):
     parts = Path(file_path).parts
@@ -67,23 +78,24 @@ def shorten_path(file_path, length):
         return parts[-1]
     if len(parts) > 2:
         for i in range(1, len(parts) - 1):
-            ret = parts[0] + '...' + os.sep + os.sep.join(parts[i:])
+            ret = parts[0] + "..." + os.sep + os.sep.join(parts[i:])
             if len(ret) <= length:
                 return ret
     return ret
 
+
 def strip_illegal_chars(s):
-    s = re.sub(r'(?<=\S)[' + illegal_chars + r'](?=\S)', '-', s)
-    s = re.sub(r'\s?[' + illegal_chars + r']\s?', ' ', s)
+    s = re.sub(r"(?<=\S)[" + illegal_chars + r"](?=\S)", "-", s)
+    s = re.sub(r"\s?[" + illegal_chars + r"]\s?", " ", s)
     return s
 
+
 def strip_extra_whitespace(s):
-    return ' '.join(s.split()).strip()
+    return " ".join(s.split()).strip()
 
 
 def mySimilarityScorer(s1, s2):
-    return fuzzywuzzy.fuzz.WRatio(s1, s2,
-                                  force_ascii=False, full_process=False)
+    return fuzzywuzzy.fuzz.WRatio(s1, s2, force_ascii=False, full_process=False)
 
 
 def GetFileStemAndSuffix(file):
@@ -91,8 +103,9 @@ def GetFileStemAndSuffix(file):
     suffix = file.suffix
     if not file.suffix[1:].isalnum():
         stem = file.name
-        suffix = ''
+        suffix = ""
     return stem, suffix
+
 
 def filter_processed(file, filters):
     stem, suffix = GetFileStemAndSuffix(file)
@@ -104,11 +117,12 @@ def filter_processed(file, filters):
     # apply filters
     for filter in filters:
         ret = filter[0].sub(filter[1], ret)
-    ret = ' '.join(ret.split())
+    ret = " ".join(ret.split())
     return ret
 
 
-def group(L):
+def group(L):
+
     first = last = L[0]
     for n in L[1:]:
         if n - 1 == last:  # Part of the group, bump the end
@@ -129,23 +143,26 @@ def mask_processed(file, masks, filters, applyFilters=True):
         if matches:
             for groupNum in range(0, len(matches.groups())):
                 groupNum = groupNum + 1
-                interval = set.union(interval, {*range(matches.start(groupNum), matches.end(groupNum) + 1)})
+                interval = set.union(
+                    interval,
+                    {*range(matches.start(groupNum), matches.end(groupNum) + 1)},
+                )
     interval_lst = sorted(interval)
-    post = ''
-    pre = ''
+    post = ""
+    pre = ""
     middle = stem
     if interval_lst:
         grp = list(group(interval_lst))
         if grp[0][0] == 0:
-            pre = stem[grp[0][0]:grp[0][1]]
+            pre = stem[grp[0][0] : grp[0][1]]
             if len(grp) > 1 and grp[-1][1] == len(stem):
-                post = stem[grp[-1][0]:grp[-1][1]]
-                middle = stem[grp[0][1]:grp[-1][0]]
+                post = stem[grp[-1][0] : grp[-1][1]]
+                middle = stem[grp[0][1] : grp[-1][0]]
             else:
-                middle = stem[grp[0][1]:]
+                middle = stem[grp[0][1] :]
         elif grp[-1][1] == len(stem):
-            post = stem[grp[-1][0]:grp[-1][1]]
-            middle = stem[:grp[-1][0]]
+            post = stem[grp[-1][0] : grp[-1][1]]
+            middle = stem[: grp[-1][0]]
     if applyFilters:
         # convert to lowercase.
         middle = middle.lower()
@@ -154,20 +171,28 @@ def mask_processed(file, masks, filters, applyFilters=True):
         # apply filters
         for filter in filters:
             middle = filter[0].sub(filter[1], middle)
-        middle = ' '.join(middle.split())
+        middle = " ".join(middle.split())
     return pre, middle, post
 
 
 def fuzz_processor(file):
-    if type(file).__name__ == 'FileFiltered':
+    if type(file).__name__ == "FileFiltered":
         return file.filtered
-    elif type(file).__name__ == 'FileMasked':
+    elif type(file).__name__ == "FileMasked":
         return file.masked[1]
 
+
 def match_process(idx, f_masked, f_candidates):
-    data = fuzzywuzzy.process.extract(f_masked, f_candidates, scorer=mySimilarityScorer, processor=fuzz_processor, limit=10)
+    data = fuzzywuzzy.process.extract(
+        f_masked,
+        f_candidates,
+        scorer=mySimilarityScorer,
+        processor=fuzz_processor,
+        limit=10,
+    )
     m = FileMatch(f_masked.file, data)
     return idx, m
+
 
 def get_matches(sources, progress):
     global processed
@@ -183,9 +208,12 @@ def get_matches(sources, progress):
         ret[data[0]] = data[1]
 
     def progress_msg(added, processed, total):
-        return "Processed sources %d%%\nAdded sources %d%%" % (100 * (processed / total), 100 * (added / total))
+        return "Processed sources %d%%\nAdded sources %d%%" % (
+            100 * (processed / total),
+            100 * (added / total),
+        )
 
-    Qmatch_firstletter = config_dict['match_firstletter']
+    Qmatch_firstletter = config_dict["match_firstletter"]
     added = 0
     pool = Pool(processes=cpu_count())
     for f in sources:
@@ -196,19 +224,31 @@ def get_matches(sources, progress):
         if Qmatch_firstletter:
             first_letter = f_masked.masked[1][0]
             if first_letter in candidates.keys():
-                pool.apply_async(match_process, (added, f_masked, candidates[first_letter],), callback=callback_processed)
+                pool.apply_async(
+                    match_process,
+                    (added, f_masked, candidates[first_letter],),
+                    callback=callback_processed,
+                )
             else:
                 ret[added] = None
         else:
-            pool.apply_async(match_process, (added, f_masked, candidates['all'],), callback=callback_processed)
+            pool.apply_async(
+                match_process,
+                (added, f_masked, candidates["all"],),
+                callback=callback_processed,
+            )
         added += 1
-        cancelled = not progress.Update(processed, progress_msg(added, processed, total))[0]
+        cancelled = not progress.Update(
+            processed, progress_msg(added, processed, total)
+        )[0]
         if cancelled:
             pool.terminate()
             break
     pool.close()
     while len(active_children()) > 0:
-        cancelled = not progress.Update(processed, progress_msg(added, processed, total))[0]
+        cancelled = not progress.Update(
+            processed, progress_msg(added, processed, total)
+        )[0]
         if cancelled:
             pool.terminate()
             break
@@ -226,34 +266,54 @@ def get_match(source):
     if not f_masked.masked[1]:
         return ret
 
-    if config_dict['match_firstletter']:
+    if config_dict["match_firstletter"]:
         first_letter = f_masked.masked[1][0]
         if first_letter in candidates.keys():
-            ret = fuzzywuzzy.process.extract(f_masked, candidates[first_letter], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10)
+            ret = fuzzywuzzy.process.extract(
+                f_masked,
+                candidates[first_letter],
+                scorer=mySimilarityScorer,
+                processor=fuzz_processor,
+                limit=10,
+            )
     else:
-        ret = fuzzywuzzy.process.extract(f_masked, candidates['all'], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10)
+        ret = fuzzywuzzy.process.extract(
+            f_masked,
+            candidates["all"],
+            scorer=mySimilarityScorer,
+            processor=fuzz_processor,
+            limit=10,
+        )
     return ret
 
 
 def getRenamePreview(input, match):
     if not match.name:
         return Path()
-    Qkeep_match_ext = config_dict['keep_match_ext']
+    Qkeep_match_ext = config_dict["keep_match_ext"]
     stem, suffix = GetFileStemAndSuffix(match)
     match_clean = strip_extra_whitespace(strip_illegal_chars(stem))
     if Qkeep_match_ext:
         match_clean += suffix
     f_masked = FileMasked(input)
     stem, suffix = GetFileStemAndSuffix(input)
-    return Path(os.path.join(config_dict['folder_output'] if config_dict['folder_output'] else input.parent, f_masked.masked[0] + match_clean + f_masked.masked[2]) + suffix)
+    return Path(
+        os.path.join(
+            config_dict["folder_output"]
+            if config_dict["folder_output"]
+            else input.parent,
+            f_masked.masked[0] + match_clean + f_masked.masked[2],
+        )
+        + suffix
+    )
 
 
 def RefreshCandidates():
     global candidates
     candidates.clear()
-    candidates['all'] = [FileFiltered(f) for f in glob_choices]
-    if config_dict['match_firstletter']:
-        for word in candidates['all']:
+    candidates["all"] = [FileFiltered(f) for f in glob_choices]
+    if config_dict["match_firstletter"]:
+        for word in candidates["all"]:
             first_letter = word.filtered[0]
             if first_letter in candidates.keys():
                 candidates[first_letter].append(word)
@@ -266,9 +326,11 @@ def CompileFilters(filters):
     lines = filters.splitlines()
     it = iter(lines)
     for l1, l2, l3 in zip(it, it, it):
-        if l1.startswith('+'):
+        if l1.startswith("+"):
             try:
-                ret.append((re.compile(l2.strip()[1:-1]), l3.strip()[1:-1], re.IGNORECASE))
+                ret.append(
+                    (re.compile(l2.strip()[1:-1]), l3.strip()[1:-1], re.IGNORECASE)
+                )
             except re.error:
                 pass
     return ret
@@ -279,7 +341,7 @@ def CompileMasks(filters):
     lines = filters.splitlines()
     it = iter(lines)
     for l1, l2 in zip(it, it):
-        if l1.startswith('+'):
+        if l1.startswith("+"):
             try:
                 ret.append(re.compile(l2.strip()[1:-1], re.IGNORECASE))
             except re.error:
@@ -303,7 +365,7 @@ def ClipBoardFiles():
                     try:
                         fp = Path(f)
                         if fp.is_dir():
-                            for fp2 in fp.resolve().glob('*'):
+                            for fp2 in fp.resolve().glob("*"):
                                 if fp2.is_file():
                                     ret.append(str(fp2))
                         else:
@@ -337,6 +399,7 @@ class FileMasked:
         self.file = file
         self.masked = mask_processed(file, FileMasked.masks, FileFiltered.filters)
 
+
 def get_selected_items(list_control):
     """
     Gets the selected items for the list control.
@@ -356,12 +419,12 @@ def get_selected_items(list_control):
         selection.append(next)
         current = next
 
+
 def GetNextSelected(list_control, current):
     """Returns next selected item, or -1 when no more"""
 
-    return list_control.GetNextItem(current,
-                            wx.LIST_NEXT_ALL,
-                            wx.LIST_STATE_SELECTED)
+    return list_control.GetNextItem(current, wx.LIST_NEXT_ALL, wx.LIST_STATE_SELECTED)
+
 
 class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
     def __init__(self, window):
@@ -377,7 +440,7 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
                 if fp.is_file():
                     files.append(f)
                 elif fp.is_dir():
-                    for fp2 in fp.resolve().glob('*'):
+                    for fp2 in fp.resolve().glob("*"):
                         if fp2.is_file():
                             files.append(str(fp2))
             except (OSError, IOError):
@@ -388,9 +451,16 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
             self.window.AddChoicesFromFiles(files)
         return True
 
-    def SourcesOrChoices(self, parent, question="Add the files to source or choice list?", caption='Drag&Drop question'):
-        dlg = wx.GenericMessageDialog(parent, question, caption, wx.YES_NO | wx.ICON_QUESTION)
-        dlg.SetYesNoLabels('Sources', 'Choices')
+    def SourcesOrChoices(
+        self,
+        parent,
+        question="Add the files to source or choice list?",
+        caption="Drag&Drop question",
+    ):
+        dlg = wx.GenericMessageDialog(
+            parent, question, caption, wx.YES_NO | wx.ICON_QUESTION
+        )
+        dlg.SetYesNoLabels("Sources", "Choices")
         result = dlg.ShowModal() == wx.ID_YES
         dlg.Destroy()
         return result
@@ -398,15 +468,19 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
 
 class PickCandidate(wx.MiniFrame):
     def __init__(self, parent, row_id, position):
-        wx.MiniFrame.__init__(self, parent, title="", pos=position, style=wx.RESIZE_BORDER)
-        self.text = wx.TextCtrl(self, size=(100,-1), style=wx.TE_PROCESS_ENTER)
-        self.text.SetMinSize((200,-1))
+        wx.MiniFrame.__init__(
+            self, parent, title="", pos=position, style=wx.RESIZE_BORDER
+        )
+        self.text = wx.TextCtrl(self, size=(100, -1), style=wx.TE_PROCESS_ENTER)
+        self.text.SetMinSize((200, -1))
         self.row_id = row_id
         panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        panel_sizer.Add(self.text, 1, wx.EXPAND|wx.ALL, 0)
+        panel_sizer.Add(self.text, 1, wx.EXPAND | wx.ALL, 0)
         self.SetSizerAndFit(panel_sizer)
         size = self.GetSize()
-        self.SetSizeHints(minW=size.GetWidth(), minH=size.GetHeight(), maxH=size.GetHeight())
+        self.SetSizeHints(
+            minW=size.GetWidth(), minH=size.GetHeight(), maxH=size.GetHeight()
+        )
         self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
         self.Bind(wx.EVT_CLOSE, self.OnCloseWindow)
         self.text.Bind(wx.EVT_TEXT_ENTER, self.OnEnter)
@@ -414,7 +488,7 @@ class PickCandidate(wx.MiniFrame):
         self.MakeModal()
 
     def OnCloseWindow(self, event):
-        self.MakeModal(False) 
+        self.MakeModal(False)
         self.Destroy()
 
     def OnKeyUP(self, event):
@@ -426,25 +500,62 @@ class PickCandidate(wx.MiniFrame):
 
     def OnEnter(self, event):
         val = self.text.GetLineText(0).strip()
-        for item in candidates['all']:
+        for item in candidates["all"]:
             if item.file.name == val:
                 list_ctrl = self.GetParent()
                 forced_match = item.file
                 pos = list_ctrl.GetItemData(self.row_id)  # 0-based unsorted index
-                similarity = mySimilarityScorer(FileMasked(list_ctrl.listdata[pos][data_struct.FILENAME]).masked[1], FileFiltered(forced_match).filtered)
+                similarity = mySimilarityScorer(
+                    FileMasked(list_ctrl.listdata[pos][data_struct.FILENAME]).masked[1],
+                    FileFiltered(forced_match).filtered,
+                )
                 list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = similarity
                 list_ctrl.listdata[pos][data_struct.MATCHNAME] = forced_match
-                list_ctrl.listdata[pos][data_struct.PREVIEW] = getRenamePreview(list_ctrl.listdata[pos][data_struct.FILENAME], forced_match)
-                list_ctrl.listdata[pos][data_struct.STATUS] = 'User choice'
+                list_ctrl.listdata[pos][data_struct.PREVIEW] = getRenamePreview(
+                    list_ctrl.listdata[pos][data_struct.FILENAME], forced_match
+                )
+                list_ctrl.listdata[pos][data_struct.STATUS] = "User choice"
 
-                Qview_fullpath = config_dict['show_fullpath']
-                Qhide_extension = config_dict['hide_extension']
-                list_ctrl.SetItem(self.row_id, data_struct.MATCH_SCORE, str(list_ctrl.listdata[pos][data_struct.MATCH_SCORE]))
-                stem, suffix = GetFileStemAndSuffix(list_ctrl.listdata[pos][data_struct.MATCHNAME])
-                list_ctrl.SetItem(self.row_id, data_struct.MATCHNAME, str(list_ctrl.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else list_ctrl.listdata[pos][data_struct.MATCHNAME].name))
-                stem, suffix = GetFileStemAndSuffix(list_ctrl.listdata[pos][data_struct.PREVIEW])
-                list_ctrl.SetItem(self.row_id, data_struct.PREVIEW, str(list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else list_ctrl.listdata[pos][data_struct.PREVIEW].name))
-                list_ctrl.SetItem(self.row_id, data_struct.STATUS, str(list_ctrl.listdata[pos][data_struct.STATUS]))
+                Qview_fullpath = config_dict["show_fullpath"]
+                Qhide_extension = config_dict["hide_extension"]
+                list_ctrl.SetItem(
+                    self.row_id,
+                    data_struct.MATCH_SCORE,
+                    str(list_ctrl.listdata[pos][data_struct.MATCH_SCORE]),
+                )
+                stem, suffix = GetFileStemAndSuffix(
+                    list_ctrl.listdata[pos][data_struct.MATCHNAME]
+                )
+                list_ctrl.SetItem(
+                    self.row_id,
+                    data_struct.MATCHNAME,
+                    str(list_ctrl.listdata[pos][data_struct.MATCHNAME])
+                    if Qview_fullpath
+                    else (
+                        stem
+                        if Qhide_extension
+                        else list_ctrl.listdata[pos][data_struct.MATCHNAME].name
+                    ),
+                )
+                stem, suffix = GetFileStemAndSuffix(
+                    list_ctrl.listdata[pos][data_struct.PREVIEW]
+                )
+                list_ctrl.SetItem(
+                    self.row_id,
+                    data_struct.PREVIEW,
+                    str(list_ctrl.listdata[pos][data_struct.PREVIEW])
+                    if Qview_fullpath
+                    else (
+                        stem
+                        if Qhide_extension
+                        else list_ctrl.listdata[pos][data_struct.PREVIEW].name
+                    ),
+                )
+                list_ctrl.SetItem(
+                    self.row_id,
+                    data_struct.STATUS,
+                    str(list_ctrl.listdata[pos][data_struct.STATUS]),
+                )
 
                 f = list_ctrl.GetItemFont(self.row_id)
                 if not f.IsOk():
@@ -457,9 +568,9 @@ class PickCandidate(wx.MiniFrame):
         self.Close(True)
 
     def MakeModal(self, modal=True):
-        if modal and not hasattr(self, '_disabler'):
+        if modal and not hasattr(self, "_disabler"):
             self._disabler = wx.WindowDisabler(self)
-        if not modal and hasattr(self, '_disabler'):
+        if not modal and hasattr(self, "_disabler"):
             del self._disabler
 
 
@@ -467,9 +578,9 @@ class CandidateCompleter(wx.TextCompleter):
     def __init__(self):
         wx.TextCompleter.__init__(self)
         self._iLastReturned = wx.NOT_FOUND
-        self._sPrefix = ''
-        self.possibleValues = candidates['all']
-        self.lcPossibleValues = [x.file.name.lower() for x in candidates['all']]
+        self._sPrefix = ""
+        self.possibleValues = candidates["all"]
+        self.lcPossibleValues = [x.file.name.lower() for x in candidates["all"]]
 
     def Start(self, prefix):
         self._sPrefix = prefix.lower()
@@ -484,14 +595,13 @@ class CandidateCompleter(wx.TextCompleter):
     def GetNext(self):
         for i in range(self._iLastReturned, len(self.lcPossibleValues)):
             if self.lcPossibleValues[i].startswith(self._sPrefix):
-                self._iLastReturned = i+1
+                self._iLastReturned = i + 1
                 return self.possibleValues[i].file.name
         # No more corresponding item
-        return ''
+        return ""
 
 
 class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
-
     def __init__(self, parent, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
         wx.ListCtrl.__init__(self, parent, pos=pos, size=size, style=style)
         listmix.ColumnSorterMixin.__init__(self, 6)
@@ -507,9 +617,16 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.UnselectCb)
 
         for col in range(0, len(default_columns)):
-            self.InsertColumn(col, default_columns[col][2], width=config_dict['col%d_size' % (col + 1)])
+            self.InsertColumn(
+                col,
+                default_columns[col][2],
+                width=config_dict["col%d_size" % (col + 1)],
+            )
 
-        order = [config_dict['col%d_order' % (col + 1)] for col in range(0, len(default_columns))]
+        order = [
+            config_dict["col%d_order" % (col + 1)]
+            for col in range(0, len(default_columns))
+        ]
         self.SetColumnsOrder(order)
 
         self.listdata = {}
@@ -546,8 +663,13 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         elif keycode == wx.WXK_CONTROL_V:
             files = ClipBoardFiles()
             if files:
-                dlg = wx.GenericMessageDialog(self.GetParent().GetParent(), "Add the files to source or choice list?", 'Paste question', wx.YES_NO | wx.ICON_QUESTION)
-                dlg.SetYesNoLabels('Sources', 'Choices')
+                dlg = wx.GenericMessageDialog(
+                    self.GetParent().GetParent(),
+                    "Add the files to source or choice list?",
+                    "Paste question",
+                    wx.YES_NO | wx.ICON_QUESTION,
+                )
+                dlg.SetYesNoLabels("Sources", "Choices")
                 Qsources = dlg.ShowModal() == wx.ID_YES
                 dlg.Destroy()
                 if Qsources:
@@ -560,11 +682,13 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 pos_column_match = 0
                 for i in self.GetColumnsOrder():
                     if i == 2:
-                        break;
+                        break
                     pos_column_match += self.GetColumnWidth(i)
                 rect = self.GetItemRect(row_id)
                 position = self.ClientToScreen(rect.GetPosition())
-                dia = PickCandidate(self, row_id, wx.Point(position.x + pos_column_match, position.y))
+                dia = PickCandidate(
+                    self, row_id, wx.Point(position.x + pos_column_match, position.y)
+                )
                 dia.Show()
                 dia.text.SetFocus()
         elif keycode == wx.WXK_CONTROL_D:
@@ -577,9 +701,9 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     fpath = str(self.listdata[pos][data_struct.FILENAME])
                     try:
                         os.remove(fpath)
-                        wx.LogMessage('Deleting : %s' % (fpath))
+                        wx.LogMessage("Deleting : %s" % (fpath))
                     except (OSError, IOError):
-                        wx.LogMessage('Error when deleting : %s' % (fpath))
+                        wx.LogMessage("Error when deleting : %s" % (fpath))
                 self.DeleteItem(row_id)
                 del self.listdata[pos]
         elif keycode == wx.WXK_CONTROL_R:
@@ -590,11 +714,15 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.listdata[pos][data_struct.MATCH_SCORE] = 0
                 self.listdata[pos][data_struct.MATCHNAME] = Path()
                 self.listdata[pos][data_struct.PREVIEW] = Path()
-                self.listdata[pos][data_struct.STATUS] = 'No match'
-                self.SetItem(row_id, data_struct.MATCH_SCORE, '')
-                self.SetItem(row_id, data_struct.MATCHNAME, '')
-                self.SetItem(row_id, data_struct.PREVIEW, '')
-                self.SetItem(row_id, data_struct.STATUS, str(self.listdata[pos][data_struct.STATUS]))
+                self.listdata[pos][data_struct.STATUS] = "No match"
+                self.SetItem(row_id, data_struct.MATCH_SCORE, "")
+                self.SetItem(row_id, data_struct.MATCHNAME, "")
+                self.SetItem(row_id, data_struct.PREVIEW, "")
+                self.SetItem(
+                    row_id,
+                    data_struct.STATUS,
+                    str(self.listdata[pos][data_struct.STATUS]),
+                )
 
         if keycode:
             event.Skip()
@@ -618,9 +746,13 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         if not self.GetSelectedItemCount():
             return
         menu = wx.Menu()
-        mnu_delete = wx.MenuItem(menu, wx.ID_ANY, '&Delete source file(s)\tCtrl+D', 'Delete source file(s)')
+        mnu_delete = wx.MenuItem(
+            menu, wx.ID_ANY, "&Delete source file(s)\tCtrl+D", "Delete source file(s)"
+        )
         mnu_delete.SetBitmap(Delete_16_PNG.GetBitmap())
-        mnu_nomatch = wx.MenuItem(menu, wx.ID_ANY, '&Reset choice\tCtrl+R', 'Reset choice')
+        mnu_nomatch = wx.MenuItem(
+            menu, wx.ID_ANY, "&Reset choice\tCtrl+R", "Reset choice"
+        )
         mnu_nomatch.SetBitmap(NoMatch_16_PNG.GetBitmap())
         menu.Append(mnu_delete)
         menu.Append(mnu_nomatch)
@@ -629,10 +761,20 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
         if self.GetSelectedItemCount() == 1 and candidates:
             row_id = event.GetIndex()
-            mnu_search = wx.MenuItem(menu, wx.ID_ANY, '&Pick a match...\tCtrl+P', 'Pick a match')
+            mnu_search = wx.MenuItem(
+                menu, wx.ID_ANY, "&Pick a match...\tCtrl+P", "Pick a match"
+            )
             mnu_search.SetBitmap(ProcessMatch_16_PNG.GetBitmap())
             menu.Append(mnu_search)
-            self.Bind(wx.EVT_MENU, partial(self.SearchSelectionCb, row_id, self.ClientToScreen(event.GetPoint())), mnu_search)
+            self.Bind(
+                wx.EVT_MENU,
+                partial(
+                    self.SearchSelectionCb,
+                    row_id,
+                    self.ClientToScreen(event.GetPoint()),
+                ),
+                mnu_search,
+            )
 
             pos = self.GetItemData(row_id)  # 0-based unsorted index
             matches = get_match(self.listdata[pos][data_struct.FILENAME])
@@ -641,7 +783,11 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 for match in matches:
                     stem, suffix = GetFileStemAndSuffix(match[0].file)
                     mnu_match = menu.Append(wx.ID_ANY, "[%d%%] %s" % (match[1], stem))
-                    self.Bind(wx.EVT_MENU, partial(self.MenuForceMatchCb, row_id, match[0].file), mnu_match)
+                    self.Bind(
+                        wx.EVT_MENU,
+                        partial(self.MenuForceMatchCb, row_id, match[0].file),
+                        mnu_match,
+                    )
 
         self.PopupMenu(menu, event.GetPoint())
         menu.Destroy()
@@ -656,8 +802,10 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         font.SetWeight(f.GetWeight())
         self.SetItemFont(row_id, font)
         pos = self.GetItemData(row_id)  # 0-based unsorted index
-        self.listdata[pos][data_struct.CHECKED] = 'True'
-        self.SetItem(row_id, data_struct.CHECKED, self.listdata[pos][data_struct.CHECKED])
+        self.listdata[pos][data_struct.CHECKED] = "True"
+        self.SetItem(
+            row_id, data_struct.CHECKED, self.listdata[pos][data_struct.CHECKED]
+        )
 
     def UncheckedCb(self, event):
         row_id = event.GetIndex()
@@ -669,22 +817,32 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         font.SetWeight(f.GetWeight())
         self.SetItemFont(row_id, font)
         pos = self.GetItemData(row_id)  # 0-based unsorted index
-        self.listdata[pos][data_struct.CHECKED] = 'False'
-        self.SetItem(row_id, data_struct.CHECKED, self.listdata[pos][data_struct.CHECKED])
+        self.listdata[pos][data_struct.CHECKED] = "False"
+        self.SetItem(
+            row_id, data_struct.CHECKED, self.listdata[pos][data_struct.CHECKED]
+        )
 
     def SelectCb(self, event):
         nb = self.GetSelectedItemCount()
         if nb:
-            self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText('%d item(s) selected' % self.GetSelectedItemCount(), 1)
+            self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText(
+                "%d item(s) selected" % self.GetSelectedItemCount(), 1
+            )
         else:
-            self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText('', 1)
+            self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText(
+                "", 1
+            )
 
     def UnselectCb(self, event):
         nb = self.GetSelectedItemCount()
         if nb:
-            self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText('%d item(s) selected' % self.GetSelectedItemCount(), 1)
+            self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText(
+                "%d item(s) selected" % self.GetSelectedItemCount(), 1
+            )
         else:
-            self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText('', 1)
+            self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText(
+                "", 1
+            )
 
     def SearchSelectionCb(self, row_id, position, event):
         dia = PickCandidate(self, row_id, position)
@@ -701,9 +859,9 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 fpath = str(self.listdata[pos][data_struct.FILENAME])
                 try:
                     os.remove(fpath)
-                    wx.LogMessage('Deleting : %s' % (fpath))
+                    wx.LogMessage("Deleting : %s" % (fpath))
                 except (OSError, IOError):
-                    wx.LogMessage('Error when deleting : %s' % (fpath))
+                    wx.LogMessage("Error when deleting : %s" % (fpath))
             self.DeleteItem(row_id)
             del self.listdata[pos]
 
@@ -715,28 +873,61 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.listdata[pos][data_struct.MATCH_SCORE] = 0
             self.listdata[pos][data_struct.MATCHNAME] = Path()
             self.listdata[pos][data_struct.PREVIEW] = Path()
-            self.listdata[pos][data_struct.STATUS] = 'No match'
-            self.SetItem(row_id, data_struct.MATCH_SCORE, '')
-            self.SetItem(row_id, data_struct.MATCHNAME, '')
-            self.SetItem(row_id, data_struct.PREVIEW, '')
-            self.SetItem(row_id, data_struct.STATUS, str(self.listdata[pos][data_struct.STATUS]))
+            self.listdata[pos][data_struct.STATUS] = "No match"
+            self.SetItem(row_id, data_struct.MATCH_SCORE, "")
+            self.SetItem(row_id, data_struct.MATCHNAME, "")
+            self.SetItem(row_id, data_struct.PREVIEW, "")
+            self.SetItem(
+                row_id, data_struct.STATUS, str(self.listdata[pos][data_struct.STATUS])
+            )
 
     def MenuForceMatchCb(self, row_id, forced_match, event):
         pos = self.GetItemData(row_id)  # 0-based unsorted index
-        similarity = mySimilarityScorer(FileMasked(self.listdata[pos][data_struct.FILENAME]).masked[1], FileFiltered(forced_match).filtered)
+        similarity = mySimilarityScorer(
+            FileMasked(self.listdata[pos][data_struct.FILENAME]).masked[1],
+            FileFiltered(forced_match).filtered,
+        )
         self.listdata[pos][data_struct.MATCH_SCORE] = similarity
         self.listdata[pos][data_struct.MATCHNAME] = forced_match
-        self.listdata[pos][data_struct.PREVIEW] = getRenamePreview(self.listdata[pos][data_struct.FILENAME], forced_match)
-        self.listdata[pos][data_struct.STATUS] = 'User choice'
+        self.listdata[pos][data_struct.PREVIEW] = getRenamePreview(
+            self.listdata[pos][data_struct.FILENAME], forced_match
+        )
+        self.listdata[pos][data_struct.STATUS] = "User choice"
 
-        Qview_fullpath = config_dict['show_fullpath']
-        Qhide_extension = config_dict['hide_extension']
-        self.SetItem(row_id, data_struct.MATCH_SCORE, str(self.listdata[pos][data_struct.MATCH_SCORE]))
+        Qview_fullpath = config_dict["show_fullpath"]
+        Qhide_extension = config_dict["hide_extension"]
+        self.SetItem(
+            row_id,
+            data_struct.MATCH_SCORE,
+            str(self.listdata[pos][data_struct.MATCH_SCORE]),
+        )
         stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.MATCHNAME])
-        self.SetItem(row_id, data_struct.MATCHNAME, str(self.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.MATCHNAME].name))
+        self.SetItem(
+            row_id,
+            data_struct.MATCHNAME,
+            str(self.listdata[pos][data_struct.MATCHNAME])
+            if Qview_fullpath
+            else (
+                stem
+                if Qhide_extension
+                else self.listdata[pos][data_struct.MATCHNAME].name
+            ),
+        )
         stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.PREVIEW])
-        self.SetItem(row_id, data_struct.PREVIEW, str(self.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.PREVIEW].name))
-        self.SetItem(row_id, data_struct.STATUS, str(self.listdata[pos][data_struct.STATUS]))
+        self.SetItem(
+            row_id,
+            data_struct.PREVIEW,
+            str(self.listdata[pos][data_struct.PREVIEW])
+            if Qview_fullpath
+            else (
+                stem
+                if Qhide_extension
+                else self.listdata[pos][data_struct.PREVIEW].name
+            ),
+        )
+        self.SetItem(
+            row_id, data_struct.STATUS, str(self.listdata[pos][data_struct.STATUS])
+        )
 
         f = self.GetItemFont(row_id)
         if not f.IsOk():
@@ -754,18 +945,20 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             if col == 2:
                 break
             start_match_col = end_match_col
-        
+
         mouse_pos = wx.GetMousePosition()
         position = self.ScreenToClient(mouse_pos)
         if position.x >= start_match_col and position.x <= end_match_col:
             event.Veto()
             row_id = event.GetIndex()
-            dia = PickCandidate(self, row_id, wx.Point(mouse_pos.x -10, mouse_pos.y - 20))
+            dia = PickCandidate(
+                self, row_id, wx.Point(mouse_pos.x - 10, mouse_pos.y - 20)
+            )
             dia.Show()
             dia.text.SetFocus()
         else:
             event.Allow()
-            if config_dict['show_fullpath']:
+            if config_dict["show_fullpath"]:
                 d = Path(event.GetLabel())
                 (self.GetEditControl()).SetValue(d.name)
 
@@ -790,38 +983,98 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             try:
                 if old_path.is_file():
                     os.rename(old_file, new_file)
-                    wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
+                    wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
 
-                    Qview_fullpath = config_dict['show_fullpath']
-                    Qhide_extension = config_dict['hide_extension']
+                    Qview_fullpath = config_dict["show_fullpath"]
+                    Qhide_extension = config_dict["hide_extension"]
 
                     new_match = get_match(new_path)
                     if new_match:
-                        self.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), 'Matched', self.listdata[pos][data_struct.CHECKED], old_path]
-                        self.SetItem(row_id, data_struct.MATCH_SCORE, str(self.listdata[pos][data_struct.MATCH_SCORE]))
-                        stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.MATCHNAME])
-                        self.SetItem(row_id, data_struct.MATCHNAME, str(self.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.MATCHNAME].name))
-                        stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.PREVIEW])
-                        self.SetItem(row_id, data_struct.PREVIEW, str(self.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.PREVIEW].name))
+                        self.listdata[pos] = [
+                            new_path,
+                            new_match[0][1],
+                            new_match[0][0].file,
+                            getRenamePreview(new_path, new_match[0][0].file),
+                            "Matched",
+                            self.listdata[pos][data_struct.CHECKED],
+                            old_path,
+                        ]
+                        self.SetItem(
+                            row_id,
+                            data_struct.MATCH_SCORE,
+                            str(self.listdata[pos][data_struct.MATCH_SCORE]),
+                        )
+                        stem, suffix = GetFileStemAndSuffix(
+                            self.listdata[pos][data_struct.MATCHNAME]
+                        )
+                        self.SetItem(
+                            row_id,
+                            data_struct.MATCHNAME,
+                            str(self.listdata[pos][data_struct.MATCHNAME])
+                            if Qview_fullpath
+                            else (
+                                stem
+                                if Qhide_extension
+                                else self.listdata[pos][data_struct.MATCHNAME].name
+                            ),
+                        )
+                        stem, suffix = GetFileStemAndSuffix(
+                            self.listdata[pos][data_struct.PREVIEW]
+                        )
+                        self.SetItem(
+                            row_id,
+                            data_struct.PREVIEW,
+                            str(self.listdata[pos][data_struct.PREVIEW])
+                            if Qview_fullpath
+                            else (
+                                stem
+                                if Qhide_extension
+                                else self.listdata[pos][data_struct.PREVIEW].name
+                            ),
+                        )
                     else:
-                        self.listdata[pos] = [new_path, 0, Path(), Path(), 'No match', self.listdata[pos][data_struct.CHECKED], old_path]
-                        self.SetItem(row_id, data_struct.MATCH_SCORE, '')
-                        self.SetItem(row_id, data_struct.MATCHNAME, '')
-                        self.SetItem(row_id, data_struct.PREVIEW, '')
+                        self.listdata[pos] = [
+                            new_path,
+                            0,
+                            Path(),
+                            Path(),
+                            "No match",
+                            self.listdata[pos][data_struct.CHECKED],
+                            old_path,
+                        ]
+                        self.SetItem(row_id, data_struct.MATCH_SCORE, "")
+                        self.SetItem(row_id, data_struct.MATCHNAME, "")
+                        self.SetItem(row_id, data_struct.PREVIEW, "")
 
-                    stem, suffix = GetFileStemAndSuffix(self.listdata[pos][data_struct.FILENAME])
-                    self.SetItem(row_id, data_struct.FILENAME, str(self.listdata[pos][data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else self.listdata[pos][data_struct.FILENAME].name))
-                    self.SetItem(row_id, data_struct.STATUS, self.listdata[pos][data_struct.STATUS])
+                    stem, suffix = GetFileStemAndSuffix(
+                        self.listdata[pos][data_struct.FILENAME]
+                    )
+                    self.SetItem(
+                        row_id,
+                        data_struct.FILENAME,
+                        str(self.listdata[pos][data_struct.FILENAME])
+                        if Qview_fullpath
+                        else (
+                            stem
+                            if Qhide_extension
+                            else self.listdata[pos][data_struct.FILENAME].name
+                        ),
+                    )
+                    self.SetItem(
+                        row_id,
+                        data_struct.STATUS,
+                        self.listdata[pos][data_struct.STATUS],
+                    )
 
             except (OSError, IOError):
-                wx.LogMessage('Error when renaming : %s --> %s' % (old_file, new_file))
+                wx.LogMessage("Error when renaming : %s --> %s" % (old_file, new_file))
 
     def GetListCtrl(self):
         return self
 
     def RefreshList(self):
-        Qview_fullpath = config_dict['show_fullpath']
-        Qhide_extension = config_dict['hide_extension']
+        Qview_fullpath = config_dict["show_fullpath"]
+        Qhide_extension = config_dict["hide_extension"]
 
         row_id = -1
         while True:
@@ -832,31 +1085,59 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             data = self.listdata[pos]
             filepath = str(data[data_struct.FILENAME])
             stem, suffix = GetFileStemAndSuffix(data[data_struct.FILENAME])
-            self.SetItem(row_id, data_struct.FILENAME, filepath if Qview_fullpath else (stem if Qhide_extension else data[data_struct.FILENAME].name))
+            self.SetItem(
+                row_id,
+                data_struct.FILENAME,
+                filepath
+                if Qview_fullpath
+                else (stem if Qhide_extension else data[data_struct.FILENAME].name),
+            )
             self.SetItem(row_id, data_struct.STATUS, str(data[data_struct.STATUS]))
             if data[data_struct.MATCHNAME].name:
-                self.SetItem(row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE]))
+                self.SetItem(
+                    row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE])
+                )
                 stem, suffix = GetFileStemAndSuffix(data[data_struct.MATCHNAME])
-                self.SetItem(row_id, data_struct.MATCHNAME, str(data[data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.MATCHNAME].name))
+                self.SetItem(
+                    row_id,
+                    data_struct.MATCHNAME,
+                    str(data[data_struct.MATCHNAME])
+                    if Qview_fullpath
+                    else (
+                        stem if Qhide_extension else data[data_struct.MATCHNAME].name
+                    ),
+                )
                 stem, suffix = GetFileStemAndSuffix(data[data_struct.PREVIEW])
-                self.SetItem(row_id, data_struct.PREVIEW, str(data[data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.PREVIEW].name))
+                self.SetItem(
+                    row_id,
+                    data_struct.PREVIEW,
+                    str(data[data_struct.PREVIEW])
+                    if Qview_fullpath
+                    else (stem if Qhide_extension else data[data_struct.PREVIEW].name),
+                )
             else:
-                self.SetItem(row_id, data_struct.MATCH_SCORE, '')
-                self.SetItem(row_id, data_struct.MATCHNAME, '')
-                self.SetItem(row_id, data_struct.PREVIEW, '')
+                self.SetItem(row_id, data_struct.MATCH_SCORE, "")
+                self.SetItem(row_id, data_struct.MATCHNAME, "")
+                self.SetItem(row_id, data_struct.PREVIEW, "")
 
     def AddToList(self, newdata):
-        Qview_fullpath = config_dict['show_fullpath']
-        Qhide_extension = config_dict['hide_extension']
+        Qview_fullpath = config_dict["show_fullpath"]
+        Qhide_extension = config_dict["hide_extension"]
 
-        index = 0 if not self.listdata else sorted(self.listdata.keys())[-1] + 1  # start indexing after max index
+        index = (
+            0 if not self.listdata else sorted(self.listdata.keys())[-1] + 1
+        )  # start indexing after max index
         row_id = self.GetItemCount()
 
         for data in newdata:
 
             # Treat duplicate file
             stem, suffix = GetFileStemAndSuffix(data[data_struct.FILENAME])
-            item_name = str(data[data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.FILENAME].name)
+            item_name = (
+                str(data[data_struct.FILENAME])
+                if Qview_fullpath
+                else (stem if Qhide_extension else data[data_struct.FILENAME].name)
+            )
             found = self.FindItem(-1, item_name)
             if found != -1:
                 continue
@@ -877,7 +1158,6 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
 
 class MainPanel(wx.Panel):
-
     def __init__(self, parent):
         wx.Panel.__init__(self, parent, style=wx.WANTS_CHARS)
 
@@ -932,7 +1212,11 @@ class MainPanel(wx.Panel):
         panel_listbutton_sizer.Add(btn_undo, 0, wx.ALL, 1)
         panel_listbutton.SetSizer(panel_listbutton_sizer)
 
-        self.list_ctrl = FuzzyRenamerListCtrl(panel_list, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN | wx.LC_EDIT_LABELS)
+        self.list_ctrl = FuzzyRenamerListCtrl(
+            panel_list,
+            size=(-1, -1),
+            style=wx.LC_REPORT | wx.BORDER_SUNKEN | wx.LC_EDIT_LABELS,
+        )
 
         file_drop_target = FuzzyRenamerFileDropTarget(self)
         self.SetDropTarget(file_drop_target)
@@ -944,7 +1228,9 @@ class MainPanel(wx.Panel):
 
         panel_log = wx.Panel(parent=self)
 
-        log = wx.TextCtrl(panel_log, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
+        log = wx.TextCtrl(
+            panel_log, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL
+        )
         wx.Log.SetActiveTarget(wx.LogTextCtrl(log))
 
         log_sizer = wx.BoxSizer()
@@ -952,7 +1238,17 @@ class MainPanel(wx.Panel):
         panel_log.SetSizer(log_sizer)
 
         self.mgr.AddPane(panel_top, wx.aui.AuiPaneInfo().Name("pane_list").CenterPane())
-        self.mgr.AddPane(panel_log, wx.aui.AuiPaneInfo().CloseButton(True).Name("pane_log").Caption("Log").FloatingSize(-1, 200).BestSize(-1, 200).MinSize(-1, 120).Bottom())
+        self.mgr.AddPane(
+            panel_log,
+            wx.aui.AuiPaneInfo()
+            .CloseButton(True)
+            .Name("pane_log")
+            .Caption("Log")
+            .FloatingSize(-1, 200)
+            .BestSize(-1, 200)
+            .MinSize(-1, 120)
+            .Bottom(),
+        )
         self.mgr.Update()
         btn_run.Bind(wx.EVT_BUTTON, self.OnRun)
         btn_ren.Bind(wx.EVT_BUTTON, self.OnRename)
@@ -964,51 +1260,64 @@ class MainPanel(wx.Panel):
 
     def OnViewFullPath(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        config_dict['show_fullpath'] = item.IsChecked()
-        self.parent.mnu_hide_extension.Enable(not config_dict['show_fullpath'])
+        config_dict["show_fullpath"] = item.IsChecked()
+        self.parent.mnu_hide_extension.Enable(not config_dict["show_fullpath"])
         self.list_ctrl.RefreshList()
 
     def OnHideExtension(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        config_dict['hide_extension'] = item.IsChecked()
+        config_dict["hide_extension"] = item.IsChecked()
         self.list_ctrl.RefreshList()
 
     def OnKeepMatchExtension(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        config_dict['keep_match_ext'] = item.IsChecked()
+        config_dict["keep_match_ext"] = item.IsChecked()
         for index in self.list_ctrl.listdata.keys():
-            self.list_ctrl.listdata[index][data_struct.PREVIEW] = getRenamePreview(self.list_ctrl.listdata[index][data_struct.FILENAME], self.list_ctrl.listdata[index][data_struct.MATCHNAME])
+            self.list_ctrl.listdata[index][data_struct.PREVIEW] = getRenamePreview(
+                self.list_ctrl.listdata[index][data_struct.FILENAME],
+                self.list_ctrl.listdata[index][data_struct.MATCHNAME],
+            )
         self.list_ctrl.RefreshList()
 
     def OnKeepOriginal(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        config_dict['keep_original'] = item.IsChecked()
+        config_dict["keep_original"] = item.IsChecked()
 
     def OnMatchFirstLetter(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        config_dict['match_firstletter'] = item.IsChecked()
+        config_dict["match_firstletter"] = item.IsChecked()
         RefreshCandidates()
 
     def OnAddSourceFromDir(self, evt):
-        with wx.DirDialog(self, "Choose source directory", config_dict['folder_sources'], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
+        with wx.DirDialog(
+            self,
+            "Choose source directory",
+            config_dict["folder_sources"],
+            wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
+        ) as dirDialog:
 
             if dirDialog.ShowModal() == wx.ID_CANCEL:
                 return
             self.AddSourceFromDir(dirDialog.GetPath())
 
     def AddSourceFromDir(self, directory):
-        config_dict['folder_sources'] = directory
+        config_dict["folder_sources"] = directory
         newdata = []
-        for f in Path(directory).resolve().glob('*'):
+        for f in Path(directory).resolve().glob("*"):
             try:
                 if f.is_file():
-                    newdata.append([f, 0, Path(), Path(), 'Not processed', 'True', f])
+                    newdata.append([f, 0, Path(), Path(), "Not processed", "True", f])
             except (OSError, IOError):
                 pass
         self.list_ctrl.AddToList(newdata)
 
     def OnAddSourceFromFiles(self, evt):
-        with wx.FileDialog(self, "Choose source files", config_dict['folder_sources'], style=wx.FD_DEFAULT_STYLE | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE) as self.fileDialog:
+        with wx.FileDialog(
+            self,
+            "Choose source files",
+            config_dict["folder_sources"],
+            style=wx.FD_DEFAULT_STYLE | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE,
+        ) as self.fileDialog:
 
             if self.fileDialog.ShowModal() == wx.ID_CANCEL:
                 return
@@ -1024,8 +1333,8 @@ class MainPanel(wx.Panel):
                 fp = Path(f)
                 if first:
                     first = False
-                    config_dict['folder_sources'] = str(fp.parent)
-                newdata.append([fp, 0, Path(), Path(), 'Not processed', 'True', fp])
+                    config_dict["folder_sources"] = str(fp.parent)
+                newdata.append([fp, 0, Path(), Path(), "Not processed", "True", fp])
             except (OSError, IOError):
                 pass
         self.list_ctrl.AddToList(newdata)
@@ -1036,7 +1345,12 @@ class MainPanel(wx.Panel):
             self.AddSourceFromFiles(files)
 
     def OnAddChoicesFromDir(self, evt):
-        with wx.DirDialog(self, "Choose choice directory", config_dict['folder_choices'], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
+        with wx.DirDialog(
+            self,
+            "Choose choice directory",
+            config_dict["folder_choices"],
+            wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
+        ) as dirDialog:
 
             if dirDialog.ShowModal() == wx.ID_CANCEL:
                 return
@@ -1044,8 +1358,8 @@ class MainPanel(wx.Panel):
 
     def AddChoicesFromDir(self, directory):
         global glob_choices
-        config_dict['folder_choices'] = directory
-        for f in Path(directory).resolve().glob('*'):
+        config_dict["folder_choices"] = directory
+        for f in Path(directory).resolve().glob("*"):
             try:
                 if f.is_file():
                     glob_choices.add(f)
@@ -1054,7 +1368,12 @@ class MainPanel(wx.Panel):
         RefreshCandidates()
 
     def OnAddChoicesFromFiles(self, evt):
-        with wx.FileDialog(self, "Choose choice files", config_dict['folder_choices'], style=wx.FD_DEFAULT_STYLE | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE) as fileDialog:
+        with wx.FileDialog(
+            self,
+            "Choose choice files",
+            config_dict["folder_choices"],
+            style=wx.FD_DEFAULT_STYLE | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE,
+        ) as fileDialog:
 
             if fileDialog.ShowModal() == wx.ID_CANCEL:
                 return
@@ -1070,7 +1389,7 @@ class MainPanel(wx.Panel):
                 fp = Path(f)
                 if first:
                     first = False
-                    config_dict['folder_choices'] = str(fp.parent)
+                    config_dict["folder_choices"] = str(fp.parent)
                 glob_choices.add(fp)
             except (OSError, IOError):
                 pass
@@ -1086,7 +1405,12 @@ class MainPanel(wx.Panel):
             self.parent.mnu_same_as_input.Check(False)
         else:
             self.parent.mnu_user_dir.Check(True)
-        with wx.DirDialog(self, "Choose output directory", config_dict['folder_output'], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as dirDialog:
+        with wx.DirDialog(
+            self,
+            "Choose output directory",
+            config_dict["folder_output"],
+            wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
+        ) as dirDialog:
 
             if dirDialog.ShowModal() == wx.ID_CANCEL:
                 return
@@ -1095,14 +1419,17 @@ class MainPanel(wx.Panel):
     def OnSameOutputDirectory(self, evt):
         if self.parent.mnu_same_as_input.IsChecked():
             self.parent.mnu_user_dir.Check(False)
-            self.SetOutputDirectory('')
+            self.SetOutputDirectory("")
         else:
             self.parent.mnu_same_as_input.Check(True)
 
     def SetOutputDirectory(self, outdir):
-        config_dict['folder_output'] = outdir
+        config_dict["folder_output"] = outdir
         for index in self.list_ctrl.listdata.keys():
-            self.list_ctrl.listdata[index][data_struct.PREVIEW] = getRenamePreview(self.list_ctrl.listdata[index][data_struct.FILENAME], self.list_ctrl.listdata[index][data_struct.MATCHNAME])
+            self.list_ctrl.listdata[index][data_struct.PREVIEW] = getRenamePreview(
+                self.list_ctrl.listdata[index][data_struct.FILENAME],
+                self.list_ctrl.listdata[index][data_struct.MATCHNAME],
+            )
         self.list_ctrl.RefreshList()
 
     def OnRun(self, evt):
@@ -1119,14 +1446,23 @@ class MainPanel(wx.Panel):
                 pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
                 sources.append(self.list_ctrl.listdata[pos][data_struct.FILENAME])
 
-        progress = wx.ProgressDialog("Match Progress", "Processed sources    %\nAdded sources    %", maximum=len(sources), parent=None, style=wx.PD_AUTO_HIDE | wx.PD_CAN_ABORT | wx.PD_ESTIMATED_TIME | wx.PD_REMAINING_TIME)
-                      
+        progress = wx.ProgressDialog(
+            "Match Progress",
+            "Processed sources    %\nAdded sources    %",
+            maximum=len(sources),
+            parent=None,
+            style=wx.PD_AUTO_HIDE
+            | wx.PD_CAN_ABORT
+            | wx.PD_ESTIMATED_TIME
+            | wx.PD_REMAINING_TIME,
+        )
+
         matches = get_matches(sources, progress)
         row_id = -1
         count = 0
         while True:  # loop all the checked items
             if len(matches) < count + 1:
-                break;
+                break
             row_id = self.list_ctrl.GetNextItem(row_id)
             if row_id == -1:
                 break
@@ -1141,15 +1477,24 @@ class MainPanel(wx.Panel):
 
                 pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
                 if matches[count]:
-                    self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = matches[count].match_results[0][1]
-                    self.list_ctrl.listdata[pos][data_struct.MATCHNAME] = matches[count].match_results[0][0].file
-                    self.list_ctrl.listdata[pos][data_struct.PREVIEW] = getRenamePreview(self.list_ctrl.listdata[pos][data_struct.FILENAME], self.list_ctrl.listdata[pos][data_struct.MATCHNAME])
-                    self.list_ctrl.listdata[pos][data_struct.STATUS] = 'Matched'
+                    self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = matches[
+                        count
+                    ].match_results[0][1]
+                    self.list_ctrl.listdata[pos][data_struct.MATCHNAME] = (
+                        matches[count].match_results[0][0].file
+                    )
+                    self.list_ctrl.listdata[pos][
+                        data_struct.PREVIEW
+                    ] = getRenamePreview(
+                        self.list_ctrl.listdata[pos][data_struct.FILENAME],
+                        self.list_ctrl.listdata[pos][data_struct.MATCHNAME],
+                    )
+                    self.list_ctrl.listdata[pos][data_struct.STATUS] = "Matched"
                 else:
                     self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = 0
                     self.list_ctrl.listdata[pos][data_struct.MATCHNAME] = Path()
                     self.list_ctrl.listdata[pos][data_struct.PREVIEW] = Path()
-                    self.list_ctrl.listdata[pos][data_struct.STATUS] = 'No match'
+                    self.list_ctrl.listdata[pos][data_struct.STATUS] = "No match"
                 count += 1
         self.list_ctrl.RefreshList()
 
@@ -1163,19 +1508,19 @@ class MainPanel(wx.Panel):
         dia = filtersDialog(None, "Masks & Filters")
         res = dia.ShowModal()
         if res == wx.ID_OK:
-            config_dict['filters'] = dia.panel.filters_list.GetFilters()
-            FileFiltered.filters = CompileFilters(config_dict['filters'])
-            config_dict['masks'] = dia.panel.masks_list.GetMasks()
-            FileMasked.masks = CompileMasks(config_dict['masks'])
-            config_dict['filters_test'] = dia.panel.preview_filters.GetValue()
-            config_dict['masks_test'] = dia.panel.preview_masks.GetValue()
+            config_dict["filters"] = dia.panel.filters_list.GetFilters()
+            FileFiltered.filters = CompileFilters(config_dict["filters"])
+            config_dict["masks"] = dia.panel.masks_list.GetMasks()
+            FileMasked.masks = CompileMasks(config_dict["masks"])
+            config_dict["filters_test"] = dia.panel.preview_filters.GetValue()
+            config_dict["masks_test"] = dia.panel.preview_masks.GetValue()
 
         dia.Destroy()
 
     def OnRename(self, evt):
-        Qview_fullpath = config_dict['show_fullpath']
-        Qhide_extension = config_dict['hide_extension']
-        Qkeep_original = config_dict['keep_original']
+        Qview_fullpath = config_dict["show_fullpath"]
+        Qhide_extension = config_dict["hide_extension"]
+        Qkeep_original = config_dict["keep_original"]
         row_id = -1
         while True:  # loop all the checked items
             row_id = self.list_ctrl.GetNextItem(row_id)
@@ -1194,35 +1539,137 @@ class MainPanel(wx.Panel):
                             if old_path.is_file():
                                 if Qkeep_original:
                                     shutil.copy2(old_file, new_file)
-                                    wx.LogMessage('Copying : %s --> %s' % (old_file, new_file))
+                                    wx.LogMessage(
+                                        "Copying : %s --> %s" % (old_file, new_file)
+                                    )
                                 else:
                                     os.rename(old_file, new_file)
-                                    wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
+                                    wx.LogMessage(
+                                        "Renaming : %s --> %s" % (old_file, new_file)
+                                    )
                                 new_path = Path(new_file)
                                 new_match = get_match(new_path)
                                 if new_match:
-                                    self.list_ctrl.listdata[pos] = [new_path, new_match[0][1], new_match[0][0].file, getRenamePreview(new_path, new_match[0][0].file), 'Matched', self.list_ctrl.listdata[pos][data_struct.CHECKED], old_path if not Qkeep_original else None]
-                                    self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, str(self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE]))
-                                    stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.MATCHNAME])
-                                    self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, str(self.list_ctrl.listdata[pos][data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.MATCHNAME].name))
-                                    stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.PREVIEW])
-                                    self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, str(self.list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.PREVIEW].name))
+                                    self.list_ctrl.listdata[pos] = [
+                                        new_path,
+                                        new_match[0][1],
+                                        new_match[0][0].file,
+                                        getRenamePreview(
+                                            new_path, new_match[0][0].file
+                                        ),
+                                        "Matched",
+                                        self.list_ctrl.listdata[pos][
+                                            data_struct.CHECKED
+                                        ],
+                                        old_path if not Qkeep_original else None,
+                                    ]
+                                    self.list_ctrl.SetItem(
+                                        row_id,
+                                        data_struct.MATCH_SCORE,
+                                        str(
+                                            self.list_ctrl.listdata[pos][
+                                                data_struct.MATCH_SCORE
+                                            ]
+                                        ),
+                                    )
+                                    stem, suffix = GetFileStemAndSuffix(
+                                        self.list_ctrl.listdata[pos][
+                                            data_struct.MATCHNAME
+                                        ]
+                                    )
+                                    self.list_ctrl.SetItem(
+                                        row_id,
+                                        data_struct.MATCHNAME,
+                                        str(
+                                            self.list_ctrl.listdata[pos][
+                                                data_struct.MATCHNAME
+                                            ]
+                                        )
+                                        if Qview_fullpath
+                                        else (
+                                            stem
+                                            if Qhide_extension
+                                            else self.list_ctrl.listdata[pos][
+                                                data_struct.MATCHNAME
+                                            ].name
+                                        ),
+                                    )
+                                    stem, suffix = GetFileStemAndSuffix(
+                                        self.list_ctrl.listdata[pos][
+                                            data_struct.PREVIEW
+                                        ]
+                                    )
+                                    self.list_ctrl.SetItem(
+                                        row_id,
+                                        data_struct.PREVIEW,
+                                        str(
+                                            self.list_ctrl.listdata[pos][
+                                                data_struct.PREVIEW
+                                            ]
+                                        )
+                                        if Qview_fullpath
+                                        else (
+                                            stem
+                                            if Qhide_extension
+                                            else self.list_ctrl.listdata[pos][
+                                                data_struct.PREVIEW
+                                            ].name
+                                        ),
+                                    )
                                 else:
-                                    self.list_ctrl.listdata[pos] = [new_path, 0, Path(), Path(), 'No match', self.listdata[pos][data_struct.CHECKED], old_path if not Qkeep_original else None]
-                                    self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, '')
-                                    self.list_ctrl.SetItem(row_id, data_struct.MATCHNAME, '')
-                                    self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, '')
+                                    self.list_ctrl.listdata[pos] = [
+                                        new_path,
+                                        0,
+                                        Path(),
+                                        Path(),
+                                        "No match",
+                                        self.listdata[pos][data_struct.CHECKED],
+                                        old_path if not Qkeep_original else None,
+                                    ]
+                                    self.list_ctrl.SetItem(
+                                        row_id, data_struct.MATCH_SCORE, ""
+                                    )
+                                    self.list_ctrl.SetItem(
+                                        row_id, data_struct.MATCHNAME, ""
+                                    )
+                                    self.list_ctrl.SetItem(
+                                        row_id, data_struct.PREVIEW, ""
+                                    )
 
-                                stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.FILENAME])
-                                self.list_ctrl.SetItem(row_id, data_struct.FILENAME, str(self.list_ctrl.listdata[pos][data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.FILENAME].name))
-                                self.list_ctrl.SetItem(row_id, data_struct.STATUS, self.list_ctrl.listdata[pos][data_struct.STATUS])
+                                stem, suffix = GetFileStemAndSuffix(
+                                    self.list_ctrl.listdata[pos][data_struct.FILENAME]
+                                )
+                                self.list_ctrl.SetItem(
+                                    row_id,
+                                    data_struct.FILENAME,
+                                    str(
+                                        self.list_ctrl.listdata[pos][
+                                            data_struct.FILENAME
+                                        ]
+                                    )
+                                    if Qview_fullpath
+                                    else (
+                                        stem
+                                        if Qhide_extension
+                                        else self.list_ctrl.listdata[pos][
+                                            data_struct.FILENAME
+                                        ].name
+                                    ),
+                                )
+                                self.list_ctrl.SetItem(
+                                    row_id,
+                                    data_struct.STATUS,
+                                    self.list_ctrl.listdata[pos][data_struct.STATUS],
+                                )
 
                         except (OSError, IOError):
-                            wx.LogMessage('Error when renaming : %s --> %s' % (old_file, new_file))
+                            wx.LogMessage(
+                                "Error when renaming : %s --> %s" % (old_file, new_file)
+                            )
 
     def OnUndo(self, evt):
-        Qview_fullpath = config_dict['show_fullpath']
-        Qhide_extension = config_dict['hide_extension']
+        Qview_fullpath = config_dict["show_fullpath"]
+        Qhide_extension = config_dict["hide_extension"]
         row_id = -1
         while True:  # loop all the checked items
             row_id = self.list_ctrl.GetNextItem(row_id)
@@ -1238,44 +1685,85 @@ class MainPanel(wx.Panel):
             if current_path != previous_path:
                 old_file = str(current_path)
                 new_file = str(previous_path)
-                
+
                 try:
                     if current_path.is_file():
                         os.rename(old_file, new_file)
-                    wx.LogMessage('Renaming : %s --> %s' % (old_file, new_file))
+                    wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
                     new_path = Path(new_file)
-                    similarity = mySimilarityScorer(FileMasked(new_path).masked[1], FileFiltered(self.list_ctrl.listdata[pos][data_struct.MATCHNAME]).filtered)
+                    similarity = mySimilarityScorer(
+                        FileMasked(new_path).masked[1],
+                        FileFiltered(
+                            self.list_ctrl.listdata[pos][data_struct.MATCHNAME]
+                        ).filtered,
+                    )
                     self.list_ctrl.listdata[pos][data_struct.FILENAME] = new_path
                     self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE] = similarity
-                    self.list_ctrl.listdata[pos][data_struct.PREVIEW] = getRenamePreview(new_path, self.list_ctrl.listdata[pos][data_struct.MATCHNAME])
-                    self.list_ctrl.listdata[pos][data_struct.PREVIOUS_FILENAME] = new_path
-                    stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.FILENAME])
-                    self.list_ctrl.SetItem(row_id, data_struct.FILENAME, str(self.list_ctrl.listdata[pos][data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.FILENAME].name))
-                    self.list_ctrl.SetItem(row_id, data_struct.MATCH_SCORE, str(self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE]))
-                    stem, suffix = GetFileStemAndSuffix(self.list_ctrl.listdata[pos][data_struct.PREVIEW])
-                    self.list_ctrl.SetItem(row_id, data_struct.PREVIEW, str(self.list_ctrl.listdata[pos][data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else self.list_ctrl.listdata[pos][data_struct.PREVIEW].name))
+                    self.list_ctrl.listdata[pos][
+                        data_struct.PREVIEW
+                    ] = getRenamePreview(
+                        new_path, self.list_ctrl.listdata[pos][data_struct.MATCHNAME]
+                    )
+                    self.list_ctrl.listdata[pos][
+                        data_struct.PREVIOUS_FILENAME
+                    ] = new_path
+                    stem, suffix = GetFileStemAndSuffix(
+                        self.list_ctrl.listdata[pos][data_struct.FILENAME]
+                    )
+                    self.list_ctrl.SetItem(
+                        row_id,
+                        data_struct.FILENAME,
+                        str(self.list_ctrl.listdata[pos][data_struct.FILENAME])
+                        if Qview_fullpath
+                        else (
+                            stem
+                            if Qhide_extension
+                            else self.list_ctrl.listdata[pos][data_struct.FILENAME].name
+                        ),
+                    )
+                    self.list_ctrl.SetItem(
+                        row_id,
+                        data_struct.MATCH_SCORE,
+                        str(self.list_ctrl.listdata[pos][data_struct.MATCH_SCORE]),
+                    )
+                    stem, suffix = GetFileStemAndSuffix(
+                        self.list_ctrl.listdata[pos][data_struct.PREVIEW]
+                    )
+                    self.list_ctrl.SetItem(
+                        row_id,
+                        data_struct.PREVIEW,
+                        str(self.list_ctrl.listdata[pos][data_struct.PREVIEW])
+                        if Qview_fullpath
+                        else (
+                            stem
+                            if Qhide_extension
+                            else self.list_ctrl.listdata[pos][data_struct.PREVIEW].name
+                        ),
+                    )
 
                 except (OSError, IOError):
-                    wx.LogMessage('Error when renaming : %s --> %s' % (old_file, new_file))
+                    wx.LogMessage(
+                        "Error when renaming : %s --> %s" % (old_file, new_file)
+                    )
 
 
 class aboutDialog(wx.Dialog):
     def __init__(self, parent):
-        wx.Dialog.__init__(self, parent, title="About PyFuzzy-renamer", size=(600,300))
+        wx.Dialog.__init__(self, parent, title="About PyFuzzy-renamer", size=(600, 300))
         html = wxHTML(self)
-        
+
         html.SetPage(
-            "<font size=\"30\">PyFuzzy-renamer</font><br><br>"
+            '<font size="30">PyFuzzy-renamer</font><br><br>'
             "<u>Authors</u><br>"
             "<ul><li>pcjco</li></ul>"
             "<u>Credits</u><br>"
-            "<ul><li><a href =\"https://wxpython.org\">wxPython</a></li>"
-            "<li><a href =\"https://becrisdesign.com\">Becris Design</a> (icons)</li>"
-            "<li><a href =\"https://www.waste.org/~winkles/fuzzyRename/\">Fuzzy Rename</a> (original by jeff@silent.net)</li></ul>"
+            '<ul><li><a href ="https://wxpython.org">wxPython</a></li>'
+            '<li><a href ="https://becrisdesign.com">Becris Design</a> (icons)</li>'
+            '<li><a href ="https://www.waste.org/~winkles/fuzzyRename/">Fuzzy Rename</a> (original by jeff@silent.net)</li></ul>'
             "<u>License</u><br>"
             "<ul><li>MIT License</li>"
             "<li>Copyright (c) 2020 pcjco</li></ul>"
-            )
+        )
 
         btns = self.CreateButtonSizer(wx.CLOSE)
 
@@ -1288,7 +1776,7 @@ class aboutDialog(wx.Dialog):
 
 class wxHTML(wx.html.HtmlWindow):
     def __init__(self, parent):
-        wx.html.HtmlWindow.__init__(self, parent, size=(400,250))
+        wx.html.HtmlWindow.__init__(self, parent, size=(400, 250))
 
     def OnLinkClicked(self, link):
         wx.LaunchDefaultBrowser(link.GetHref())
@@ -1296,7 +1784,13 @@ class wxHTML(wx.html.HtmlWindow):
 
 class helpDialog(wx.Dialog):
     def __init__(self, parent, label):
-        wx.Dialog.__init__(self, parent, title=label, size=(600, 300), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+        wx.Dialog.__init__(
+            self,
+            parent,
+            title=label,
+            size=(600, 300),
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+        )
 
         self.Bind(wx.EVT_CLOSE, self.OnClose)
 
@@ -1319,12 +1813,18 @@ class helpDialog(wx.Dialog):
 
 class filtersDialog(wx.Dialog):
     def __init__(self, parent, label):
-        wx.Dialog.__init__(self, parent, title=label, size=(350, 300), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+        wx.Dialog.__init__(
+            self,
+            parent,
+            title=label,
+            size=(350, 300),
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+        )
 
         self.panel = filtersPanel(self)
         btns = self.CreateButtonSizer(wx.OK | wx.CANCEL | wx.APPLY)
         default_button = wx.FindWindowById(wx.ID_APPLY, self)
-        default_button.SetLabel('Reset')
+        default_button.SetLabel("Reset")
 
         default_button.Bind(wx.EVT_BUTTON, self.OnReset)
 
@@ -1347,26 +1847,35 @@ class filtersPanel(wx.Panel):
         page_filters = wx.Panel(self.notebook)
         page_masks = wx.Panel(self.notebook)
 
-        self.notebook.AddPage(page_masks, 'Masks on Sources')
-        self.notebook.AddPage(page_filters, 'Matching Filters')
+        self.notebook.AddPage(page_masks, "Masks on Sources")
+        self.notebook.AddPage(page_filters, "Matching Filters")
 
-        self.filters_list = FilterListCtrl(page_filters, self, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN)
+        self.filters_list = FilterListCtrl(
+            page_filters, self, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN
+        )
         label1 = wx.StaticText(page_filters, label="Test String", size=(60, -1))
-        self.preview_filters = wx.TextCtrl(page_filters, value='Hitchhiker\'s Guide to the Galaxy, The (AGA)', size=(300, -1))
+        self.preview_filters = wx.TextCtrl(
+            page_filters,
+            value="Hitchhiker's Guide to the Galaxy, The (AGA)",
+            size=(300, -1),
+        )
         label2 = wx.StaticText(page_filters, label="Result", size=(60, -1))
-        self.result_preview_filters = wx.TextCtrl(page_filters, value='', size=(300, -1), style=wx.TE_READONLY)
+        self.result_preview_filters = wx.TextCtrl(
+            page_filters, value="", size=(300, -1), style=wx.TE_READONLY
+        )
 
         wx.FileSystem.AddHandler(wx.MemoryFSHandler())
         image_Info = wx.MemoryFSHandler()
-        image_Info.AddFile('info.png', Info_16_PNG.GetBitmap(), wx.BITMAP_TYPE_PNG)
+        image_Info.AddFile("info.png", Info_16_PNG.GetBitmap(), wx.BITMAP_TYPE_PNG)
 
         html_desc_filters = wx.html.HtmlWindow(page_filters, size=(-1, 135))
         html_desc_filters.SetPage(
-            "<img src=\"memory:info.png\">"
+            '<img src="memory:info.png">'
             " These filters, using Python regular expression patterns, are applied to <b>sources</b> and <b>choices</b> strings before matching occurs."
             "It is used to help matching by cleaning strings (removing tags, ...) beforehand.<br><br>"
             "For example, replacing the pattern <font face=\"verdana\">'(\\(\\d{4}\\))'</font> by <font face=\"verdana\">''</font>:<br>"
-            "<ul><li><i><font face=\"verdana\">The Wire <font color=\"red\">(2002)</font></font></i> \u2B62 <i><font face=\"verdana\">The Wire</font></i></li>")
+            '<ul><li><i><font face="verdana">The Wire <font color="red">(2002)</font></font></i> \u2B62 <i><font face="verdana">The Wire</font></i></li>'
+        )
 
         sizer2 = wx.BoxSizer(wx.HORIZONTAL)
         sizer2.Add(label1, 0, wx.ALL, 5)
@@ -1385,23 +1894,36 @@ class filtersPanel(wx.Panel):
         sizer_filters.Add(html_desc_filters, 0, wx.EXPAND | wx.ALL)
         page_filters.SetSizer(sizer_filters)
 
-        self.masks_list = MaskListCtrl(page_masks, self, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN)
+        self.masks_list = MaskListCtrl(
+            page_masks, self, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN
+        )
         label21 = wx.StaticText(page_masks, label="Test String", size=(80, -1))
-        self.preview_masks = wx.TextCtrl(page_masks, value='(1986) Hitchhiker\'s Guide to the Galaxy, The (AGA) Disk1', size=(300, -1))
-        self.result_preview_masks_lead = wx.TextCtrl(page_masks, value='', size=(40, -1), style=wx.TE_READONLY)
-        self.result_preview_masks_mid = wx.TextCtrl(page_masks, value='', size=(220, -1), style=wx.TE_READONLY)
-        self.result_preview_masks_trail = wx.TextCtrl(page_masks, value='', size=(40, -1), style=wx.TE_READONLY)
+        self.preview_masks = wx.TextCtrl(
+            page_masks,
+            value="(1986) Hitchhiker's Guide to the Galaxy, The (AGA) Disk1",
+            size=(300, -1),
+        )
+        self.result_preview_masks_lead = wx.TextCtrl(
+            page_masks, value="", size=(40, -1), style=wx.TE_READONLY
+        )
+        self.result_preview_masks_mid = wx.TextCtrl(
+            page_masks, value="", size=(220, -1), style=wx.TE_READONLY
+        )
+        self.result_preview_masks_trail = wx.TextCtrl(
+            page_masks, value="", size=(40, -1), style=wx.TE_READONLY
+        )
         label22 = wx.StaticText(page_masks, label="Lead-Mid-Trail", size=(80, -1))
 
         html_desc_masks = wx.html.HtmlWindow(page_masks, size=(-1, 200))
         html_desc_masks.SetPage(
-            "<img src=\"memory:info.png\">"
+            '<img src="memory:info.png">'
             " These masks, using Python regular expression patterns, are removed from <b>sources</b> strings before filtering and matching occur."
             "It is used to remove leading and trailing expressions (year, disk#...) before matching and restore them at renaming.<br><br>"
             "For example, masking the pattern <font face=\"verdana\">'(\\s?disk\\d)$'</font>:<br>"
-            "<ol><li>Source\u2B62masked source: <i><font face=\"verdana\">The Wiiire <font color=\"red\"> Disk1</font> \u2B62 The Wiiire</font></i></li>"
-            "<li>Masked source\u2B62best choice: <i><font face=\"verdana\">The Wiiire \u2B62 The Wire</font></i></li>"
-            "<li>Best choice\u2B62renamed unmasked source: <i><font face=\"verdana\">The Wire \u2B62 The Wire<font color=\"red\"> Disk1</font></font></i></li>")
+            '<ol><li>Source\u2B62masked source: <i><font face="verdana">The Wiiire <font color="red"> Disk1</font> \u2B62 The Wiiire</font></i></li>'
+            '<li>Masked source\u2B62best choice: <i><font face="verdana">The Wiiire \u2B62 The Wire</font></i></li>'
+            '<li>Best choice\u2B62renamed unmasked source: <i><font face="verdana">The Wire \u2B62 The Wire<font color="red"> Disk1</font></font></i></li>'
+        )
 
         sizer22 = wx.BoxSizer(wx.HORIZONTAL)
         sizer22.Add(label21, 0, wx.ALL, 5)
@@ -1444,12 +1966,19 @@ class filtersPanel(wx.Panel):
 
     def UpdateFilterPreview(self):
         filters = CompileFilters(self.filters_list.GetFilters())
-        self.result_preview_filters.SetValue(filter_processed(Path(self.preview_filters.GetValue() + '.txt'), filters))
+        self.result_preview_filters.SetValue(
+            filter_processed(Path(self.preview_filters.GetValue() + ".txt"), filters)
+        )
 
     def UpdateMaskPreview(self):
         masks = CompileMasks(self.masks_list.GetMasks())
         filters = []
-        pre, middle, post = mask_processed(Path(self.preview_masks.GetValue() + '.txt'), masks, filters, applyFilters=False)
+        pre, middle, post = mask_processed(
+            Path(self.preview_masks.GetValue() + ".txt"),
+            masks,
+            filters,
+            applyFilters=False,
+        )
         self.result_preview_masks_lead.SetValue(pre)
         self.result_preview_masks_mid.SetValue(middle)
         self.result_preview_masks_trail.SetValue(post)
@@ -1481,7 +2010,9 @@ class MaskListCtrlDropTarget(wx.DropTarget):
 
 
 class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
-    def __init__(self, parent, panel, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
+    def __init__(
+        self, parent, panel, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0
+    ):
         wx.ListCtrl.__init__(self, parent, pos=pos, size=size, style=style)
         listmix.TextEditMixin.__init__(self)
         self.EnableCheckBoxes()
@@ -1495,15 +2026,15 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         self.Bind(wx.EVT_LIST_ITEM_CHECKED, self.CheckCb)
         self.Bind(wx.EVT_LIST_ITEM_UNCHECKED, self.CheckCb)
 
-        self.InsertColumn(0, '#', width=35)
-        self.InsertColumn(1, 'Mask Name', width=150)
-        self.InsertColumn(2, 'Pattern', width=150)
+        self.InsertColumn(0, "#", width=35)
+        self.InsertColumn(1, "Mask Name", width=150)
+        self.InsertColumn(2, "Pattern", width=150)
 
         dt = MaskListCtrlDropTarget(self)
         dt.SetDefaultAction(wx.DragMove)
         self.SetDropTarget(dt)
 
-        self.PopulateMasks(config_dict['masks'])
+        self.PopulateMasks(config_dict["masks"])
         self.unplug_preview = False
 
     def PopulateMasks(self, masks):
@@ -1517,7 +2048,7 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
             self.InsertItem(row_id, "%2d" % (int(index) + 1))
             self.SetItem(row_id, 1, data[0])
             self.SetItem(row_id, 2, data[1])
-            if (l1.strip()[0]) == '+':
+            if (l1.strip()[0]) == "+":
                 self.CheckItem(row_id, True)
             else:
                 self.CheckItem(row_id, False)
@@ -1531,14 +2062,14 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
             index += 1
 
     def GetMasks(self):
-        ret = ''
+        ret = ""
         row_id = -1
         while 1:
             row_id = self.GetNextItem(row_id)
             if row_id == -1:
                 break
-            ret += '+' if self.IsItemChecked(row_id) else '-'
-            ret += self.GetItemText(row_id, 1) + '\n'
+            ret += "+" if self.IsItemChecked(row_id) else "-"
+            ret += self.GetItemText(row_id, 1) + "\n"
             ret += '"' + self.GetItemText(row_id, 2) + '"\n'
         return ret
 
@@ -1581,14 +2112,14 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         row_id = event.GetIndex()
         col_id = event.GetColumn()
         if col_id > 1:
-            masks = ''
+            masks = ""
             row_id0 = -1
             while 1:
                 row_id0 = self.GetNextItem(row_id0)
                 if row_id0 == -1:
                     break
-                masks += '+' if self.IsItemChecked(row_id0) else '-'
-                masks += self.GetItemText(row_id0, 1) + '\n'
+                masks += "+" if self.IsItemChecked(row_id0) else "-"
+                masks += self.GetItemText(row_id0, 1) + "\n"
                 if row_id == row_id0:
                     regexp = self.GetItemText(row_id, 2)
                     masks += '"' + regexp + '"\n'
@@ -1602,7 +2133,12 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
 
             masks = CompileMasks(masks)
             filters = []
-            pre, middle, post = mask_processed(Path(self.panel.preview_masks.GetValue() + '.txt'), masks, filters, applyFilters=False)
+            pre, middle, post = mask_processed(
+                Path(self.panel.preview_masks.GetValue() + ".txt"),
+                masks,
+                filters,
+                applyFilters=False,
+            )
             self.panel.result_preview_masks_lead.SetValue(pre)
             self.panel.result_preview_masks_mid.SetValue(middle)
             self.panel.result_preview_masks_trail.SetValue(post)
@@ -1610,7 +2146,9 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
     def getItemInfo(self, idx):
         """Collect all relevant data of a listitem, and put it in a list"""
         collect = []
-        collect.append(idx)  # We need the original index, so it is easier to eventualy delete it
+        collect.append(
+            idx
+        )  # We need the original index, so it is easier to eventualy delete it
         collect.append(self.IsItemChecked(idx))  # check
         collect.append(self.GetItemText(idx))  # Text first column
         for i in range(1, self.GetColumnCount()):  # Possible extra columns
@@ -1662,7 +2200,9 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         index, flags = self.HitTest((x, y))
 
         if index == wx.NOT_FOUND:  # not clicked on an item
-            if flags & (wx.LIST_HITTEST_NOWHERE | wx.LIST_HITTEST_ABOVE | wx.LIST_HITTEST_BELOW):  # empty list or below last item
+            if flags & (
+                wx.LIST_HITTEST_NOWHERE | wx.LIST_HITTEST_ABOVE | wx.LIST_HITTEST_BELOW
+            ):  # empty list or below last item
                 index = self.GetItemCount()  # append to end of list
             elif self.GetItemCount() > 0:
                 if y <= self.GetItemRect(0).y:  # clicked just above first item
@@ -1692,10 +2232,10 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
 
     def RightClickCb(self, event):
         menu = wx.Menu()
-        mnu_add = menu.Append(wx.ID_ANY, 'Add mask\tCtrl+M', 'Add mask')
+        mnu_add = menu.Append(wx.ID_ANY, "Add mask\tCtrl+M", "Add mask")
         self.Bind(wx.EVT_MENU, self.AddCb, mnu_add)
         if self.GetSelectedItemCount():
-            mnu_del = menu.Append(wx.ID_ANY, 'Delete mask\tDelete', 'Delete mask')
+            mnu_del = menu.Append(wx.ID_ANY, "Delete mask\tDelete", "Delete mask")
             self.Bind(wx.EVT_MENU, self.DeleteCb, mnu_del)
         pos = self.ScreenToClient(event.GetPosition())
         self.PopupMenu(menu, pos)
@@ -1703,7 +2243,7 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         event.Skip()
 
     def AddCb(self, event):
-        data = ('new mask', '', '')
+        data = ("new mask", "", "")
         row_id = self.GetItemCount()
         self.InsertItem(row_id, "%2d" % (int(row_id) + 1))
         self.SetItem(row_id, 1, data[0])
@@ -1758,7 +2298,9 @@ class FilterListCtrlDropTarget(wx.DropTarget):
 
 
 class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
-    def __init__(self, parent, panel, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
+    def __init__(
+        self, parent, panel, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0
+    ):
         wx.ListCtrl.__init__(self, parent, pos=pos, size=size, style=style)
         listmix.TextEditMixin.__init__(self)
         self.EnableCheckBoxes()
@@ -1772,16 +2314,16 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         self.Bind(wx.EVT_LIST_ITEM_CHECKED, self.CheckCb)
         self.Bind(wx.EVT_LIST_ITEM_UNCHECKED, self.CheckCb)
 
-        self.InsertColumn(0, '#', width=35)
-        self.InsertColumn(1, 'Filter Name', width=150)
-        self.InsertColumn(2, 'Pattern', width=150)
-        self.InsertColumn(3, 'Replace', width=150)
+        self.InsertColumn(0, "#", width=35)
+        self.InsertColumn(1, "Filter Name", width=150)
+        self.InsertColumn(2, "Pattern", width=150)
+        self.InsertColumn(3, "Replace", width=150)
 
         dt = FilterListCtrlDropTarget(self)
         dt.SetDefaultAction(wx.DragMove)
         self.SetDropTarget(dt)
 
-        self.PopulateFilters(config_dict['filters'])
+        self.PopulateFilters(config_dict["filters"])
         self.unplug_preview = False
 
     def PopulateFilters(self, filters):
@@ -1796,7 +2338,7 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
             self.SetItem(row_id, 1, data[0])
             self.SetItem(row_id, 2, data[1])
             self.SetItem(row_id, 3, data[2])
-            if (l1.strip()[0]) == '+':
+            if (l1.strip()[0]) == "+":
                 self.CheckItem(row_id, True)
             else:
                 self.CheckItem(row_id, False)
@@ -1810,14 +2352,14 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
             index += 1
 
     def GetFilters(self):
-        ret = ''
+        ret = ""
         row_id = -1
         while 1:
             row_id = self.GetNextItem(row_id)
             if row_id == -1:
                 break
-            ret += '+' if self.IsItemChecked(row_id) else '-'
-            ret += self.GetItemText(row_id, 1) + '\n'
+            ret += "+" if self.IsItemChecked(row_id) else "-"
+            ret += self.GetItemText(row_id, 1) + "\n"
             ret += '"' + self.GetItemText(row_id, 2) + '"\n'
             ret += '"' + self.GetItemText(row_id, 3) + '"\n'
         return ret
@@ -1861,14 +2403,14 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         row_id = event.GetIndex()
         col_id = event.GetColumn()
         if col_id > 1:
-            filters = ''
+            filters = ""
             row_id0 = -1
             while 1:
                 row_id0 = self.GetNextItem(row_id0)
                 if row_id0 == -1:
                     break
-                filters += '+' if self.IsItemChecked(row_id0) else '-'
-                filters += self.GetItemText(row_id0, 1) + '\n'
+                filters += "+" if self.IsItemChecked(row_id0) else "-"
+                filters += self.GetItemText(row_id0, 1) + "\n"
                 if row_id == row_id0:
                     if col_id == 2:
                         regexp = self.GetItemText(row_id, 2)
@@ -1876,9 +2418,13 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                         filters += '"' + self.GetItemText(row_id, 3) + '"\n'
                         try:
                             re.compile(regexp)
-                            self.SetItemBackgroundColour(row_id0, wx.Colour(153, 255, 153))
+                            self.SetItemBackgroundColour(
+                                row_id0, wx.Colour(153, 255, 153)
+                            )
                         except re.error:
-                            self.SetItemBackgroundColour(row_id0, wx.Colour(255, 153, 153))
+                            self.SetItemBackgroundColour(
+                                row_id0, wx.Colour(255, 153, 153)
+                            )
                     elif col_id == 3:
                         filters += '"' + self.GetItemText(row_id, 2) + '"\n'
                         filters += '"' + self.GetItemText(row_id, 3) + '"\n'
@@ -1887,12 +2433,18 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                     filters += '"' + self.GetItemText(row_id0, 3) + '"\n'
 
             filters = CompileFilters(filters)
-            self.panel.result_preview_filters.SetValue(filter_processed(Path(self.panel.preview_filters.GetValue() + '.txt'), filters))
+            self.panel.result_preview_filters.SetValue(
+                filter_processed(
+                    Path(self.panel.preview_filters.GetValue() + ".txt"), filters
+                )
+            )
 
     def getItemInfo(self, idx):
         """Collect all relevant data of a listitem, and put it in a list"""
         collect = []
-        collect.append(idx)  # We need the original index, so it is easier to eventualy delete it
+        collect.append(
+            idx
+        )  # We need the original index, so it is easier to eventualy delete it
         collect.append(self.IsItemChecked(idx))  # check
         collect.append(self.GetItemText(idx))  # Text first column
         for i in range(1, self.GetColumnCount()):  # Possible extra columns
@@ -1944,7 +2496,9 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         index, flags = self.HitTest((x, y))
 
         if index == wx.NOT_FOUND:  # not clicked on an item
-            if flags & (wx.LIST_HITTEST_NOWHERE | wx.LIST_HITTEST_ABOVE | wx.LIST_HITTEST_BELOW):  # empty list or below last item
+            if flags & (
+                wx.LIST_HITTEST_NOWHERE | wx.LIST_HITTEST_ABOVE | wx.LIST_HITTEST_BELOW
+            ):  # empty list or below last item
                 index = self.GetItemCount()  # append to end of list
             elif self.GetItemCount() > 0:
                 if y <= self.GetItemRect(0).y:  # clicked just above first item
@@ -1974,10 +2528,10 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
 
     def RightClickCb(self, event):
         menu = wx.Menu()
-        mnu_add = menu.Append(wx.ID_ANY, 'Add filter\tCtrl+F', 'Add filter')
+        mnu_add = menu.Append(wx.ID_ANY, "Add filter\tCtrl+F", "Add filter")
         self.Bind(wx.EVT_MENU, self.AddCb, mnu_add)
         if self.GetSelectedItemCount():
-            mnu_del = menu.Append(wx.ID_ANY, 'Delete filter\tDelete', 'Delete filter')
+            mnu_del = menu.Append(wx.ID_ANY, "Delete filter\tDelete", "Delete filter")
             self.Bind(wx.EVT_MENU, self.DeleteCb, mnu_del)
         pos = self.ScreenToClient(event.GetPosition())
         self.PopupMenu(menu, pos)
@@ -1985,7 +2539,7 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         event.Skip()
 
     def AddCb(self, event):
-        data = ('new filter', '', '')
+        data = ("new filter", "", "")
         row_id = self.GetItemCount()
         self.InsertItem(row_id, "%2d" % (int(row_id) + 1))
         self.SetItem(row_id, 1, data[0])
@@ -2017,8 +2571,13 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
 
 class MainFrame(wx.Frame):
     def __init__(self):
-        wx.Frame.__init__(self, None, title="PyFuzzy-renamer",
-                          pos=wx.Point(config_dict['window'][2], config_dict['window'][3]), size=wx.Size(config_dict['window'][0], config_dict['window'][1]))
+        wx.Frame.__init__(
+            self,
+            None,
+            title="PyFuzzy-renamer",
+            pos=wx.Point(config_dict["window"][2], config_dict["window"][3]),
+            size=wx.Size(config_dict["window"][0], config_dict["window"][1]),
+        )
 
         bundle = wx.IconBundle()
         bundle.AddIcon(wx.Icon(Rename_16_PNG.GetBitmap()))
@@ -2037,44 +2596,80 @@ class MainFrame(wx.Frame):
         help = wx.Menu()
 
         sources = wx.Menu()
-        sources_ = wx.MenuItem(self.files, wx.ID_ANY, '&Sources', 'Select sources (to rename)')
+        sources_ = wx.MenuItem(
+            self.files, wx.ID_ANY, "&Sources", "Select sources (to rename)"
+        )
         sources_.SetSubMenu(sources)
 
-        mnu_source_from_dir = wx.MenuItem(sources, wx.ID_ANY, 'Sources from &Directory...\tCtrl+D', 'Select sources from directory')
+        mnu_source_from_dir = wx.MenuItem(
+            sources,
+            wx.ID_ANY,
+            "Sources from &Directory...\tCtrl+D",
+            "Select sources from directory",
+        )
         mnu_source_from_dir.SetBitmap(AddFolder_16_PNG.GetBitmap())
         sources.Append(mnu_source_from_dir)
 
-        mnu_source_from_clipboard = wx.MenuItem(sources, wx.ID_ANY, 'Sources from &Clipboard', 'Select sources from clipboard')
+        mnu_source_from_clipboard = wx.MenuItem(
+            sources,
+            wx.ID_ANY,
+            "Sources from &Clipboard",
+            "Select sources from clipboard",
+        )
         mnu_source_from_clipboard.SetBitmap(Clipboard_16_PNG.GetBitmap())
         sources.Append(mnu_source_from_clipboard)
 
         choices = wx.Menu()
-        choices_ = wx.MenuItem(self.files, wx.ID_ANY, '&Choices', 'Select choices (to match)')
+        choices_ = wx.MenuItem(
+            self.files, wx.ID_ANY, "&Choices", "Select choices (to match)"
+        )
         choices_.SetSubMenu(choices)
 
-        mnu_target_from_dir = wx.MenuItem(choices, wx.ID_ANY, 'Choices from &Directory...\tCtrl+T', 'Select choices from directory')
+        mnu_target_from_dir = wx.MenuItem(
+            choices,
+            wx.ID_ANY,
+            "Choices from &Directory...\tCtrl+T",
+            "Select choices from directory",
+        )
         mnu_target_from_dir.SetBitmap(AddFolder_16_PNG.GetBitmap())
         choices.Append(mnu_target_from_dir)
 
-        mnu_choices_from_clipboard = wx.MenuItem(choices, wx.ID_ANY, 'Choices from &Clipboard', 'Select choices from clipboard')
+        mnu_choices_from_clipboard = wx.MenuItem(
+            choices,
+            wx.ID_ANY,
+            "Choices from &Clipboard",
+            "Select choices from clipboard",
+        )
         mnu_choices_from_clipboard.SetBitmap(Clipboard_16_PNG.GetBitmap())
         choices.Append(mnu_choices_from_clipboard)
 
         output_dir = wx.Menu()
-        output_dir_ = wx.MenuItem(self.files, wx.ID_ANY, '&Output Directory', 'Select output directory')
+        output_dir_ = wx.MenuItem(
+            self.files, wx.ID_ANY, "&Output Directory", "Select output directory"
+        )
         output_dir_.SetBitmap(Folder_16_PNG.GetBitmap())
         output_dir_.SetSubMenu(output_dir)
 
-        self.mnu_same_as_input = output_dir.AppendCheckItem(wx.ID_ANY, '&Same as source', 'Same as source')
-        self.mnu_user_dir = output_dir.AppendCheckItem(wx.ID_ANY, '&User-defined directory...', 'Select User-defined directory')
+        self.mnu_same_as_input = output_dir.AppendCheckItem(
+            wx.ID_ANY, "&Same as source", "Same as source"
+        )
+        self.mnu_user_dir = output_dir.AppendCheckItem(
+            wx.ID_ANY, "&User-defined directory...", "Select User-defined directory"
+        )
 
-        mnu_open = wx.MenuItem(self.files, wx.ID_ANY, '&Load Session...\tCtrl+O', 'Open...')
+        mnu_open = wx.MenuItem(
+            self.files, wx.ID_ANY, "&Load Session...\tCtrl+O", "Open..."
+        )
         mnu_open.SetBitmap(Open_16_PNG.GetBitmap())
-        
-        mnu_save = wx.MenuItem(self.files, wx.ID_ANY, '&Save Session\tCtrl+S', 'Save...')
+
+        mnu_save = wx.MenuItem(
+            self.files, wx.ID_ANY, "&Save Session\tCtrl+S", "Save..."
+        )
         mnu_save.SetBitmap(Save_16_PNG.GetBitmap())
 
-        self.mnu_quit = wx.MenuItem(self.files, wx.ID_ANY, '&Exit\tAlt+F4', 'Exit the Application')
+        self.mnu_quit = wx.MenuItem(
+            self.files, wx.ID_ANY, "&Exit\tAlt+F4", "Exit the Application"
+        )
         self.mnu_quit.SetBitmap(Quit_16_PNG.GetBitmap())
 
         self.files.Append(sources_)
@@ -2085,54 +2680,82 @@ class MainFrame(wx.Frame):
         self.files.Append(mnu_save)
         self.files.AppendSeparator()
         self.mnu_recents = []
-        if config_dict['recent_session']:
-            for i in range(0, len(config_dict['recent_session'])):
-                new_mnu_recent = wx.MenuItem(self.files, wx.ID_ANY, '&' + str(i + 1) + ': ' +shorten_path(config_dict['recent_session'][i], 64), '')
+        if config_dict["recent_session"]:
+            for i in range(0, len(config_dict["recent_session"])):
+                new_mnu_recent = wx.MenuItem(
+                    self.files,
+                    wx.ID_ANY,
+                    "&"
+                    + str(i + 1)
+                    + ": "
+                    + shorten_path(config_dict["recent_session"][i], 64),
+                    "",
+                )
                 self.files.Append(new_mnu_recent)
                 self.mnu_recents.append(new_mnu_recent)
             self.files.AppendSeparator()
         self.files.Append(self.mnu_quit)
 
-        mnu_view_fullpath = options.AppendCheckItem(wx.ID_ANY, '&View full path', 'View full path')
-        self.mnu_hide_extension = options.AppendCheckItem(wx.ID_ANY, '&Hide suffix', 'Hide suffix')
-        self.mnu_keep_original = options.AppendCheckItem(wx.ID_ANY, 'Keep &original on renaming', 'Keep original on renaming')
-        self.mnu_keep_match_ext = options.AppendCheckItem(wx.ID_ANY, '&Keep matched file suffix', 'Keep matched file suffix')
-        self.mnu_match_firstletter = options.AppendCheckItem(wx.ID_ANY, '&Always match first letter', 'Enforce choices that match the first letter of the source')
+        mnu_view_fullpath = options.AppendCheckItem(
+            wx.ID_ANY, "&View full path", "View full path"
+        )
+        self.mnu_hide_extension = options.AppendCheckItem(
+            wx.ID_ANY, "&Hide suffix", "Hide suffix"
+        )
+        self.mnu_keep_original = options.AppendCheckItem(
+            wx.ID_ANY, "Keep &original on renaming", "Keep original on renaming"
+        )
+        self.mnu_keep_match_ext = options.AppendCheckItem(
+            wx.ID_ANY, "&Keep matched file suffix", "Keep matched file suffix"
+        )
+        self.mnu_match_firstletter = options.AppendCheckItem(
+            wx.ID_ANY,
+            "&Always match first letter",
+            "Enforce choices that match the first letter of the source",
+        )
 
-        mnu_doc = wx.MenuItem(help, wx.ID_ANY, '&Help...', 'Help')
+        mnu_doc = wx.MenuItem(help, wx.ID_ANY, "&Help...", "Help")
         mnu_doc.SetBitmap(Help_16_PNG.GetBitmap())
         help.Append(mnu_doc)
-        mnu_about = wx.MenuItem(help, wx.ID_ANY, '&About...', 'About the application')
+        mnu_about = wx.MenuItem(help, wx.ID_ANY, "&About...", "About the application")
         mnu_about.SetBitmap(Info_16_PNG.GetBitmap())
         help.Append(mnu_about)
 
-        menubar.Append(self.files, '&File')
-        menubar.Append(options, '&Options')
-        menubar.Append(help, '&Help')
+        menubar.Append(self.files, "&File")
+        menubar.Append(options, "&Options")
+        menubar.Append(help, "&Help")
         self.SetMenuBar(menubar)
 
-        if config_dict['folder_output']:
+        if config_dict["folder_output"]:
             self.mnu_user_dir.Check(True)
         else:
             self.mnu_same_as_input.Check(True)
 
-        mnu_view_fullpath.Check(config_dict['show_fullpath'])
-        self.mnu_hide_extension.Check(config_dict['hide_extension'])
-        self.mnu_hide_extension.Enable(not config_dict['show_fullpath'])
-        self.mnu_keep_original.Check(config_dict['keep_original'])
-        self.mnu_keep_match_ext.Check(config_dict['keep_match_ext'])
-        self.mnu_match_firstletter.Check(config_dict['match_firstletter'])
+        mnu_view_fullpath.Check(config_dict["show_fullpath"])
+        self.mnu_hide_extension.Check(config_dict["hide_extension"])
+        self.mnu_hide_extension.Enable(not config_dict["show_fullpath"])
+        self.mnu_keep_original.Check(config_dict["keep_original"])
+        self.mnu_keep_match_ext.Check(config_dict["keep_match_ext"])
+        self.mnu_match_firstletter.Check(config_dict["match_firstletter"])
 
         self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromDir, mnu_source_from_dir)
-        self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromClipboard, mnu_source_from_clipboard)
+        self.Bind(
+            wx.EVT_MENU, self.panel.OnAddSourceFromClipboard, mnu_source_from_clipboard
+        )
         self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromDir, mnu_target_from_dir)
-        self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromClipboard, mnu_choices_from_clipboard)
+        self.Bind(
+            wx.EVT_MENU,
+            self.panel.OnAddChoicesFromClipboard,
+            mnu_choices_from_clipboard,
+        )
         self.Bind(wx.EVT_MENU, self.panel.OnOutputDirectory, self.mnu_user_dir)
         self.Bind(wx.EVT_MENU, self.panel.OnSameOutputDirectory, self.mnu_same_as_input)
         self.Bind(wx.EVT_MENU, self.panel.OnViewFullPath, mnu_view_fullpath)
         self.Bind(wx.EVT_MENU, self.panel.OnHideExtension, self.mnu_hide_extension)
         self.Bind(wx.EVT_MENU, self.panel.OnKeepMatchExtension, self.mnu_keep_match_ext)
-        self.Bind(wx.EVT_MENU, self.panel.OnMatchFirstLetter, self.mnu_match_firstletter)
+        self.Bind(
+            wx.EVT_MENU, self.panel.OnMatchFirstLetter, self.mnu_match_firstletter
+        )
         self.Bind(wx.EVT_MENU, self.panel.OnKeepOriginal, self.mnu_keep_original)
         self.Bind(wx.EVT_MENU, self.OnOpen, mnu_open)
         self.Bind(wx.EVT_MENU, self.OnSaveAs, mnu_save)
@@ -2140,7 +2763,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.OnHelp, mnu_doc)
         self.Bind(wx.EVT_MENU, self.OnAbout, mnu_about)
         self.Bind(wx.EVT_CLOSE, self.OnQuit)
-        
+
         for mnu_recent in self.mnu_recents:
             self.Bind(wx.EVT_MENU, self.OnOpenRecent, mnu_recent)
 
@@ -2164,8 +2787,12 @@ class MainFrame(wx.Frame):
         self.Destroy()
 
     def OnSaveAs(self, event):
-        with wx.FileDialog(self, "Save file", wildcard="SAVE files (*.sav)|*.sav",
-                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+        with wx.FileDialog(
+            self,
+            "Save file",
+            wildcard="SAVE files (*.sav)|*.sav",
+            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
+        ) as fileDialog:
 
             if fileDialog.ShowModal() == wx.ID_CANCEL:
                 return
@@ -2176,12 +2803,16 @@ class MainFrame(wx.Frame):
     def OnOpenRecent(self, event):
         menu = event.GetEventObject()
         menuItem = menu.FindItemById(event.GetId())
-        pathname = config_dict['recent_session'][self.mnu_recents.index(menuItem)]
+        pathname = config_dict["recent_session"][self.mnu_recents.index(menuItem)]
         self.LoadSession(pathname)
 
     def OnOpen(self, event):
-        with wx.FileDialog(self, "Open SAVE file", wildcard="SAVE files (*.sav)|*.sav",
-                           style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
+        with wx.FileDialog(
+            self,
+            "Open SAVE file",
+            wildcard="SAVE files (*.sav)|*.sav",
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        ) as fileDialog:
 
             if fileDialog.ShowModal() == wx.ID_CANCEL:
                 return
@@ -2190,14 +2821,16 @@ class MainFrame(wx.Frame):
             self.LoadSession(fileDialog.GetPath())
 
     def UpdateRecentSession(self, pathname):
-        if pathname in config_dict['recent_session']:
-            idx = config_dict['recent_session'].index(pathname)
+        if pathname in config_dict["recent_session"]:
+            idx = config_dict["recent_session"].index(pathname)
             if idx:
-                config_dict['recent_session'].insert(0, config_dict['recent_session'].pop(idx))
+                config_dict["recent_session"].insert(
+                    0, config_dict["recent_session"].pop(idx)
+                )
         else:
-            config_dict['recent_session'].insert(0, pathname)
-            config_dict['recent_session'] = config_dict['recent_session'][:8]
-            
+            config_dict["recent_session"].insert(0, pathname)
+            config_dict["recent_session"] = config_dict["recent_session"][:8]
+
         # update file menu
         # - Remove all recent
         found_recent = False
@@ -2205,21 +2838,33 @@ class MainFrame(wx.Frame):
             found_recent = True
             self.files.Delete(mnu_recent)
         if not found_recent:
-            item, pos = self.files.FindChildItem(self.mnu_quit.GetId()) # Searh Exit button
+            item, pos = self.files.FindChildItem(
+                self.mnu_quit.GetId()
+            )  # Searh Exit button
             self.files.InsertSeparator(pos)
 
         # - Refresh recents
         self.mnu_recents.clear()
-        for i in range(0, len(config_dict['recent_session'])):
-            new_mnu_recent = wx.MenuItem(self.files, wx.ID_ANY, '&' + str(i + 1) + ': ' +shorten_path(config_dict['recent_session'][i], 64), '')
-            item, pos = self.files.FindChildItem(self.mnu_quit.GetId()) # Searh Exit button
+        for i in range(0, len(config_dict["recent_session"])):
+            new_mnu_recent = wx.MenuItem(
+                self.files,
+                wx.ID_ANY,
+                "&"
+                + str(i + 1)
+                + ": "
+                + shorten_path(config_dict["recent_session"][i], 64),
+                "",
+            )
+            item, pos = self.files.FindChildItem(
+                self.mnu_quit.GetId()
+            )  # Searh Exit button
             self.files.Insert(pos - 1, new_mnu_recent)
             self.mnu_recents.append(new_mnu_recent)
             self.Bind(wx.EVT_MENU, self.OnOpenRecent, new_mnu_recent)
 
     def SaveSession(self, pathname):
         try:
-            with open(pathname, 'wb') as file:
+            with open(pathname, "wb") as file:
                 pickle.dump([glob_choices, self.panel.list_ctrl.listdata], file)
 
             self.UpdateRecentSession(pathname)
@@ -2233,7 +2878,7 @@ class MainFrame(wx.Frame):
         self.UpdateRecentSession(pathname)
         list = self.panel.list_ctrl
         try:
-            with open(pathname, 'rb') as file:
+            with open(pathname, "rb") as file:
                 glob_choices, list.listdata = pickle.load(file)
         except IOError:
             wx.LogError("Cannot open file '%s'." % pathname)
@@ -2241,27 +2886,49 @@ class MainFrame(wx.Frame):
         RefreshCandidates()
         list.DeleteAllItems()
         row_id = 0
-        Qview_fullpath = config_dict['show_fullpath']
-        Qhide_extension = config_dict['hide_extension']
+        Qview_fullpath = config_dict["show_fullpath"]
+        Qhide_extension = config_dict["hide_extension"]
         for key, data in list.listdata.items():
             stem, suffix = GetFileStemAndSuffix(data[data_struct.FILENAME])
-            item_name = str(data[data_struct.FILENAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.FILENAME].name)
+            item_name = (
+                str(data[data_struct.FILENAME])
+                if Qview_fullpath
+                else (stem if Qhide_extension else data[data_struct.FILENAME].name)
+            )
             list.InsertItem(row_id, item_name)
             if data[data_struct.MATCHNAME].name:
-                list.SetItem(row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE]))
+                list.SetItem(
+                    row_id, data_struct.MATCH_SCORE, str(data[data_struct.MATCH_SCORE])
+                )
                 stem, suffix = GetFileStemAndSuffix(data[data_struct.MATCHNAME])
-                list.SetItem(row_id, data_struct.MATCHNAME, str(data[data_struct.MATCHNAME]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.MATCHNAME].name))
+                list.SetItem(
+                    row_id,
+                    data_struct.MATCHNAME,
+                    str(data[data_struct.MATCHNAME])
+                    if Qview_fullpath
+                    else (
+                        stem if Qhide_extension else data[data_struct.MATCHNAME].name
+                    ),
+                )
                 stem, suffix = GetFileStemAndSuffix(data[data_struct.PREVIEW])
-                list.SetItem(row_id, data_struct.PREVIEW, str(data[data_struct.PREVIEW]) if Qview_fullpath else (stem if Qhide_extension else data[data_struct.PREVIEW].name))
+                list.SetItem(
+                    row_id,
+                    data_struct.PREVIEW,
+                    str(data[data_struct.PREVIEW])
+                    if Qview_fullpath
+                    else (stem if Qhide_extension else data[data_struct.PREVIEW].name),
+                )
             else:
-                list.SetItem(row_id, data_struct.MATCH_SCORE, '')
-                list.SetItem(row_id, data_struct.MATCHNAME, '')
-                list.SetItem(row_id, data_struct.PREVIEW, '')
+                list.SetItem(row_id, data_struct.MATCH_SCORE, "")
+                list.SetItem(row_id, data_struct.MATCHNAME, "")
+                list.SetItem(row_id, data_struct.PREVIEW, "")
             list.SetItem(row_id, data_struct.STATUS, data[data_struct.STATUS])
             list.SetItem(row_id, data_struct.CHECKED, data[data_struct.CHECKED])
             list.SetItemData(row_id, key)
-            list.CheckItem(row_id, True if data[data_struct.CHECKED] == 'True' else False)
-            if data[data_struct.CHECKED] == 'False':
+            list.CheckItem(
+                row_id, True if data[data_struct.CHECKED] == "True" else False
+            )
+            if data[data_struct.CHECKED] == "False":
                 f = list.GetItemFont(row_id)
                 if not f.IsOk():
                     f = list.GetFont()
@@ -2269,7 +2936,7 @@ class MainFrame(wx.Frame):
                 font.SetStyle(wx.FONTSTYLE_ITALIC)
                 font.SetWeight(f.GetWeight())
                 list.SetItemFont(row_id, font)
-            if data[data_struct.STATUS] == 'User choice':
+            if data[data_struct.STATUS] == "User choice":
                 f = list.GetItemFont(row_id)
                 if not f.IsOk():
                     f = list.GetFont()
@@ -2283,50 +2950,57 @@ class MainFrame(wx.Frame):
     def SaveUI(self):
         list = self.panel.list_ctrl
         for col in range(0, len(default_columns)):
-            config_dict['col%d_order' % (col + 1)] = list.GetColumnOrder(col)
-            config_dict['col%d_size' % (col + 1)] = list.GetColumnWidth(col)
-        config_dict['window'] = [self.GetSize().x, self.GetSize().y, self.GetPosition().x, self.GetPosition().y]
+            config_dict["col%d_order" % (col + 1)] = list.GetColumnOrder(col)
+            config_dict["col%d_size" % (col + 1)] = list.GetColumnWidth(col)
+        config_dict["window"] = [
+            self.GetSize().x,
+            self.GetSize().y,
+            self.GetPosition().x,
+            self.GetPosition().y,
+        ]
 
 
 def default_config():
     global config_dict
-    config_dict = {'show_fullpath': False,
-                   'hide_extension': False,
-                   'match_firstletter': False,
-                   'keep_match_ext': False,
-                   'keep_original': False,
-                   'folder_sources': os.getcwd(),
-                   'folder_choices': os.getcwd(),
-                   'folder_output': os.getcwd(),
-                   'filters': default_filters,
-                   'masks': default_masks,
-                   'masks_test': default_masks_teststring,
-                   'filters_test': default_filters_teststring,
-                   'window': [1000, 800, -10, 0],
-                   'recent_session': []
-                   }
+    config_dict = {
+        "show_fullpath": False,
+        "hide_extension": False,
+        "match_firstletter": False,
+        "keep_match_ext": False,
+        "keep_original": False,
+        "folder_sources": os.getcwd(),
+        "folder_choices": os.getcwd(),
+        "folder_output": os.getcwd(),
+        "filters": default_filters,
+        "masks": default_masks,
+        "masks_test": default_masks_teststring,
+        "filters_test": default_filters_teststring,
+        "window": [1000, 800, -10, 0],
+        "recent_session": [],
+    }
     for i in range(0, len(default_columns)):
-        config_dict['col%d_order' % (i + 1)] = default_columns[i][0]
-        config_dict['col%d_size' % (i + 1)] = default_columns[i][1]
+        config_dict["col%d_order" % (i + 1)] = default_columns[i][0]
+        config_dict["col%d_size" % (i + 1)] = default_columns[i][1]
+
 
 def read_config():
     default_config()
-    
-    INI_show_fullpath_val = config_dict['show_fullpath']
-    INI_hide_extension_val = config_dict['hide_extension']
-    INI_keep_match_ext_val = config_dict['keep_match_ext']
-    INI_keep_original_val = config_dict['keep_original']
-    INI_match_firstletter_val = config_dict['match_firstletter']
-    INI_folder_sources_val = config_dict['folder_sources']
-    INI_folder_choices_val = config_dict['folder_choices']
-    INI_folder_output_val = config_dict['folder_output']
-    INI_filters_val = config_dict['filters']
-    INI_masks_val = config_dict['masks']
-    INI_filters_test_val = config_dict['filters_test']
-    INI_masks_test_val = config_dict['masks_test']
-    INI_window_val = config_dict['window'].copy()
+
+    INI_show_fullpath_val = config_dict["show_fullpath"]
+    INI_hide_extension_val = config_dict["hide_extension"]
+    INI_keep_match_ext_val = config_dict["keep_match_ext"]
+    INI_keep_original_val = config_dict["keep_original"]
+    INI_match_firstletter_val = config_dict["match_firstletter"]
+    INI_folder_sources_val = config_dict["folder_sources"]
+    INI_folder_choices_val = config_dict["folder_choices"]
+    INI_folder_output_val = config_dict["folder_output"]
+    INI_filters_val = config_dict["filters"]
+    INI_masks_val = config_dict["masks"]
+    INI_filters_test_val = config_dict["filters_test"]
+    INI_masks_test_val = config_dict["masks_test"]
+    INI_window_val = config_dict["window"].copy()
     INI_col_val = copy.deepcopy(default_columns)
-    INI_recent_session_val = config_dict['recent_session'].copy()
+    INI_recent_session_val = config_dict["recent_session"].copy()
 
     # read config file
     INI_global_cat = {}
@@ -2334,167 +3008,169 @@ def read_config():
     INI_matching_cat = {}
     INI_ui_cat = {}
     try:
-        config_file = os.sep.join([os.getcwd(), 'config.ini'])
+        config_file = os.sep.join([os.getcwd(), "config.ini"])
         config = configparser.ConfigParser()
-        cfg_file = config.read(config_file, encoding='utf-8-sig')
+        cfg_file = config.read(config_file, encoding="utf-8-sig")
         if not len(cfg_file):
             return config_dict
         try:
-            INI_global_cat = config['global']
+            INI_global_cat = config["global"]
         except KeyError:
             pass
         try:
-            INI_recent_cat = config['recent']
+            INI_recent_cat = config["recent"]
         except KeyError:
             pass
         try:
-            INI_matching_cat = config['matching']
+            INI_matching_cat = config["matching"]
         except KeyError:
             pass
         try:
-            INI_ui_cat = config['ui']
+            INI_ui_cat = config["ui"]
         except KeyError:
             pass
 
         try:
-            INI_show_fullpath_val = True if INI_global_cat['show_fullpath'] == 'True' else False
+            INI_show_fullpath_val = (
+                True if INI_global_cat["show_fullpath"] == "True" else False
+            )
         except KeyError:
             pass
         try:
-            INI_hide_extension_val = True if INI_global_cat['hide_extension'] == 'True' else False
+            INI_hide_extension_val = (
+                True if INI_global_cat["hide_extension"] == "True" else False
+            )
         except KeyError:
             pass
         try:
-            INI_keep_match_ext_val = True if INI_global_cat['keep_match_ext'] == 'True' else False
+            INI_keep_match_ext_val = (
+                True if INI_global_cat["keep_match_ext"] == "True" else False
+            )
         except KeyError:
             pass
         try:
-            INI_keep_original_val = True if INI_global_cat['keep_original'] == 'True' else False
+            INI_keep_original_val = (
+                True if INI_global_cat["keep_original"] == "True" else False
+            )
         except KeyError:
             pass
         try:
-            INI_match_firstletter_val = True if INI_global_cat['match_firstletter'] == 'True' else False
+            INI_match_firstletter_val = (
+                True if INI_global_cat["match_firstletter"] == "True" else False
+            )
         except KeyError:
             pass
         try:
-            INI_folder_sources_val = INI_recent_cat['folder_sources']
+            INI_folder_sources_val = INI_recent_cat["folder_sources"]
         except KeyError:
             pass
         try:
-            INI_folder_choices_val = INI_recent_cat['folder_choices']
+            INI_folder_choices_val = INI_recent_cat["folder_choices"]
         except KeyError:
             pass
         try:
-            INI_folder_output_val = INI_recent_cat['folder_output']
+            INI_folder_output_val = INI_recent_cat["folder_output"]
         except KeyError:
             pass
         for i in range(1, 9):
             try:
-                f = INI_recent_cat['recent_session%d' % i]
+                f = INI_recent_cat["recent_session%d" % i]
                 if Path(f).is_file():
                     INI_recent_session_val.append(f)
             except KeyError:
                 pass
         try:
-            INI_filters_val = INI_matching_cat['filters']
+            INI_filters_val = INI_matching_cat["filters"]
         except KeyError:
             pass
         try:
-            INI_masks_val = INI_matching_cat['masks']
+            INI_masks_val = INI_matching_cat["masks"]
         except KeyError:
             pass
         try:
-            INI_masks_test_val = INI_matching_cat['masks_test']
+            INI_masks_test_val = INI_matching_cat["masks_test"]
         except KeyError:
             pass
         try:
-            INI_filters_test_val = INI_matching_cat['filters_test']
+            INI_filters_test_val = INI_matching_cat["filters_test"]
         except KeyError:
             pass
         for i in range(0, len(default_columns)):
             try:
-                INI_col_val[i][0] = int(INI_ui_cat['col%d_order' % (i + 1)])
-                INI_col_val[i][1] = int(INI_ui_cat['col%d_size' % (i + 1)])
+                INI_col_val[i][0] = int(INI_ui_cat["col%d_order" % (i + 1)])
+                INI_col_val[i][1] = int(INI_ui_cat["col%d_size" % (i + 1)])
             except KeyError:
                 pass
         try:
-            INI_window_val[0] = int(INI_ui_cat['width'])
-            INI_window_val[1] = int(INI_ui_cat['height'])
-            INI_window_val[2] = int(INI_ui_cat['left'])
-            INI_window_val[3] = int(INI_ui_cat['top'])
+            INI_window_val[0] = int(INI_ui_cat["width"])
+            INI_window_val[1] = int(INI_ui_cat["height"])
+            INI_window_val[2] = int(INI_ui_cat["left"])
+            INI_window_val[3] = int(INI_ui_cat["top"])
         except KeyError:
             pass
 
     except configparser.Error as e:
-        logging.error("%s when reading config file '%s'" %
-                      (e.args[0], config_file))
+        logging.error("%s when reading config file '%s'" % (e.args[0], config_file))
         return config_dict
 
-    config_dict['show_fullpath'] = INI_show_fullpath_val
-    config_dict['hide_extension'] = INI_hide_extension_val
-    config_dict['keep_match_ext'] = INI_keep_match_ext_val
-    config_dict['keep_original'] = INI_keep_original_val
-    config_dict['match_firstletter'] = INI_match_firstletter_val
-    config_dict['folder_sources'] = INI_folder_sources_val
-    config_dict['folder_choices'] = INI_folder_choices_val
-    config_dict['folder_output'] = INI_folder_output_val
-    config_dict['filters'] = INI_filters_val
-    config_dict['masks'] = INI_masks_val
-    config_dict['filters_test'] = INI_filters_test_val
-    config_dict['masks_test'] = INI_masks_test_val
+    config_dict["show_fullpath"] = INI_show_fullpath_val
+    config_dict["hide_extension"] = INI_hide_extension_val
+    config_dict["keep_match_ext"] = INI_keep_match_ext_val
+    config_dict["keep_original"] = INI_keep_original_val
+    config_dict["match_firstletter"] = INI_match_firstletter_val
+    config_dict["folder_sources"] = INI_folder_sources_val
+    config_dict["folder_choices"] = INI_folder_choices_val
+    config_dict["folder_output"] = INI_folder_output_val
+    config_dict["filters"] = INI_filters_val
+    config_dict["masks"] = INI_masks_val
+    config_dict["filters_test"] = INI_filters_test_val
+    config_dict["masks_test"] = INI_masks_test_val
     for i in range(0, len(default_columns)):
-        config_dict['col%d_order' % (i + 1)] = INI_col_val[i][0]
-        config_dict['col%d_size' % (i + 1)] = INI_col_val[i][1]
-    config_dict['window'] = INI_window_val
-    config_dict['recent_session'] = INI_recent_session_val
-    FileMasked.masks = CompileMasks(config_dict['masks'])
-    FileFiltered.filters = CompileFilters(config_dict['filters'])
+        config_dict["col%d_order" % (i + 1)] = INI_col_val[i][0]
+        config_dict["col%d_size" % (i + 1)] = INI_col_val[i][1]
+    config_dict["window"] = INI_window_val
+    config_dict["recent_session"] = INI_recent_session_val
+    FileMasked.masks = CompileMasks(config_dict["masks"])
+    FileFiltered.filters = CompileFilters(config_dict["filters"])
 
 
 def write_config():
-    config_file = os.sep.join([os.getcwd(), 'config.ini'])
+    config_file = os.sep.join([os.getcwd(), "config.ini"])
     config = configparser.ConfigParser()
-    config['global'] = {'show_fullpath':
-                        config_dict['show_fullpath'],
-                        'hide_extension':
-                        config_dict['hide_extension'],
-                        'keep_match_ext':
-                        config_dict['keep_match_ext'],
-                        'keep_original':
-                        config_dict['keep_original'],
-                        'match_firstletter':
-                        config_dict['match_firstletter']
-                        }
-    config['matching'] = {'masks':
-                          config_dict['masks'],
-                          'filters':
-                          config_dict['filters'],
-                          'masks_test':
-                          config_dict['masks_test'],
-                          'filters_test':
-                          config_dict['filters_test']
-                          }
-    config['recent'] = {'folder_sources':
-                        config_dict['folder_sources'],
-                        'folder_choices':
-                        config_dict['folder_choices'],
-                        'folder_output':
-                        config_dict['folder_output']
-                        }
-    for i in range(0, len(config_dict['recent_session'])):
-        config['recent']['recent_session%d' % (i + 1)] = config_dict['recent_session'][i]
+    config["global"] = {
+        "show_fullpath": config_dict["show_fullpath"],
+        "hide_extension": config_dict["hide_extension"],
+        "keep_match_ext": config_dict["keep_match_ext"],
+        "keep_original": config_dict["keep_original"],
+        "match_firstletter": config_dict["match_firstletter"],
+    }
+    config["matching"] = {
+        "masks": config_dict["masks"],
+        "filters": config_dict["filters"],
+        "masks_test": config_dict["masks_test"],
+        "filters_test": config_dict["filters_test"],
+    }
+    config["recent"] = {
+        "folder_sources": config_dict["folder_sources"],
+        "folder_choices": config_dict["folder_choices"],
+        "folder_output": config_dict["folder_output"],
+    }
+    for i in range(0, len(config_dict["recent_session"])):
+        config["recent"]["recent_session%d" % (i + 1)] = config_dict["recent_session"][
+            i
+        ]
 
     ui = {}
-    ui['width'] = config_dict['window'][0]
-    ui['height'] = config_dict['window'][1]
-    ui['left'] = config_dict['window'][2]
-    ui['top'] = config_dict['window'][3]
+    ui["width"] = config_dict["window"][0]
+    ui["height"] = config_dict["window"][1]
+    ui["left"] = config_dict["window"][2]
+    ui["top"] = config_dict["window"][3]
     for i in range(0, len(default_columns)):
-        ui['col%d_order' % (i + 1)] = config_dict['col%d_order' % (i + 1)]
-        ui['col%d_size' % (i + 1)] = config_dict['col%d_size' % (i + 1)]
-    config['ui'] = ui
+        ui["col%d_order" % (i + 1)] = config_dict["col%d_order" % (i + 1)]
+        ui["col%d_size" % (i + 1)] = config_dict["col%d_size" % (i + 1)]
+    config["ui"] = ui
 
-    with open(config_file, 'w') as configfile:
+    with open(config_file, "w") as configfile:
         config.write(configfile)
 
 
@@ -2508,34 +3184,34 @@ def getDoc():
         "<li>The strings used to search for similarity are called the <b>choices</b>;</li>"
         "<li>The process to search the most similar <b>choice</b> for a given <b>source</b> is referred here as <b>matching</b> process;</li>"
         "<li>When strings are coming from file paths, the following terminology is used:"
-            "<ul>"
-            "<li>A <b>file path</b> is composed of a <b>parent directory</b> and a <b>file name</b>;<br>e.g. <b>file path</b>=<code>c:/foo/bar/setup.tar.gz</code>, <b>parent directory</b>=<code>c:/foo/bar</code>, <b>file name</b>=<code>setup.tar.gz</code></li>"
-            "<li>A <b>file name</b> is composed of a <b>stem</b> and a <b>suffix</b>;<br>e.g. <b>file name</b>=<code>setup.tar.gz</code>, <b>stem</b>=<code>setup.tar</code>, <b>suffix</b>=<code>.gz</code></li>"
-            "<li>A <b>suffix</b> can only contain alphanumeric characters after the dot, if it contains non-alphanumeric characters, the suffix is considered as part of the <b>stem</b>;<br>e.g. <b>file name</b>=<code>A.Train III</code>, <b>stem</b>=<code>A.Train III</code>, <b>suffix</b>=<code>None</code></li>"
+        "<ul>"
+        "<li>A <b>file path</b> is composed of a <b>parent directory</b> and a <b>file name</b>;<br>e.g. <b>file path</b>=<code>c:/foo/bar/setup.tar.gz</code>, <b>parent directory</b>=<code>c:/foo/bar</code>, <b>file name</b>=<code>setup.tar.gz</code></li>"
+        "<li>A <b>file name</b> is composed of a <b>stem</b> and a <b>suffix</b>;<br>e.g. <b>file name</b>=<code>setup.tar.gz</code>, <b>stem</b>=<code>setup.tar</code>, <b>suffix</b>=<code>.gz</code></li>"
+        "<li>A <b>suffix</b> can only contain alphanumeric characters after the dot, if it contains non-alphanumeric characters, the suffix is considered as part of the <b>stem</b>;<br>e.g. <b>file name</b>=<code>A.Train III</code>, <b>stem</b>=<code>A.Train III</code>, <b>suffix</b>=<code>None</code></li>"
         "</ul></li>"
         "</ul>"
         "<h3>Principles</h3>"
         "<p>Here is the process applied to match and rename each <b>source</b>:</p>"
         "<pre>"
-        " <font color=\"red\">Choices</font>────┐<br>"
+        ' <font color="red">Choices</font>────┐<br>'
         "            │<br>"
         "        ┌───┴────┐                     ┌────────┐<br>"
-        " <font color=\"blue\">Source</font>─┤Matching├─<font color=\"red\">Most Similar Choice</font>─┤Renaming├─<font color=\"red\">Renamed</font> <font color=\"blue\">Source</font><br>"
+        ' <font color="blue">Source</font>─┤Matching├─<font color="red">Most Similar Choice</font>─┤Renaming├─<font color="red">Renamed</font> <font color="blue">Source</font><br>'
         "        └────────┘                     └────────┘"
         "</pre>"
         "<p>When searching for the most similar <b>choice</b>, only the <b>stems</b> of <b>choices</b> and <b>stem</b> of <b>source</b> are compared.</p>"
         "<p>When renaming a <b>source</b> file path, only the <b>stem</b> is renamed with the most similar <b>stem</b> among <b>choices</b> file paths.</p>"
-        "<p>E.g. if <b>source</b> is <code><font color=\"blue\">c:/foo/Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color=\"red\">d:/bar/Amaryllidinae.jpg</font></code>, <b>renamed source</b> is <code><font color=\"blue\">c:/foo/</font><font color=\"red\">Amaryllidinae</font><font color=\"blue\">.png</font></code></p>"
+        '<p>E.g. if <b>source</b> is <code><font color="blue">c:/foo/Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color="red">d:/bar/Amaryllidinae.jpg</font></code>, <b>renamed source</b> is <code><font color="blue">c:/foo/</font><font color="red">Amaryllidinae</font><font color="blue">.png</font></code></p>'
         "<p>If <b>masks</b> and <b>filters</b> are applied, the process applied to match and rename each <b>source</b> is the following:</p>"
         "<pre>"
         "                                ┌─────────┐<br>"
-        "                      <font color=\"red\">Choices</font>───┤Filtering├────<font color=\"red\">Filtered Choices</font>────────┐<br>"
+        '                      <font color="red">Choices</font>───┤Filtering├────<font color="red">Filtered Choices</font>────────┐<br>'
         "                                └─────────┘                            │<br>"
         "        ┌───────┐               ┌─────────┐                        ┌───┴────┐                     ┌────────┐                       ┌─────────┐<br>"
-        " <font color=\"blue\">Source</font>─┤Masking├─<font color=\"blue\">Masked Source</font>─┤Filtering├─<font color=\"blue\">Masked&Filtered Source</font>─┤Matching├─<font color=\"red\">Most Similar Choice</font>─┤Renaming├─<font color=\"blue\">Masked</font> <font color=\"red\">Renamed</font> <font color=\"blue\">Source</font>─┤Unmasking├─<font color=\"green\">Unmasked</font> <font color=\"red\">Renamed</font> <font color=\"blue\">Source</font><br>"
+        ' <font color="blue">Source</font>─┤Masking├─<font color="blue">Masked Source</font>─┤Filtering├─<font color="blue">Masked&Filtered Source</font>─┤Matching├─<font color="red">Most Similar Choice</font>─┤Renaming├─<font color="blue">Masked</font> <font color="red">Renamed</font> <font color="blue">Source</font>─┤Unmasking├─<font color="green">Unmasked</font> <font color="red">Renamed</font> <font color="blue">Source</font><br>'
         "        └───┬───┘               └─────────┘                        └────────┘                     └────────┘                       └────┬────┘<br>"
         "            │                                                                                                                           │<br>"
-        "            └────────────────────────────────────────── <font color=\"green\">Leading & Trailing Masks</font> ───────────────────────────────────────────────────────┘"
+        '            └────────────────────────────────────────── <font color="green">Leading & Trailing Masks</font> ───────────────────────────────────────────────────────┘'
         "</pre>"
         "<h3>Sources</h3>"
         "<p>Sources are entered in the following ways:"
@@ -2553,16 +3229,16 @@ def getDoc():
         "<li>Paste (Ctrl+V) into application panel and choose <code><b>Choices</b></code> to add file paths of the files or folders in clipboard to the current <b>choices</b>. For folders, the file paths of the files inside folders are added</li></ul>"
         "<h3>Filters</h3>"
         "<p>To ease the <b>matching</b> process, filters can be applied to <b>sources</b> and <b>choices</b> before they are compared.</p>"
-        "<p>E.g. <b>source</b> is <code><font color=\"blue\">c:/foo/The Amaryllis.png</font></code> and <b>choice</b> is <code><font color=\"red\">d:/bar/Amaryllidinae, The.txt</font></code>. It would be smart to clean the <b>sources</b> and <b>choices</b> by ignoring all articles before trying to find the <b>most similar choice</b>.</p>"
+        '<p>E.g. <b>source</b> is <code><font color="blue">c:/foo/The Amaryllis.png</font></code> and <b>choice</b> is <code><font color="red">d:/bar/Amaryllidinae, The.txt</font></code>. It would be smart to clean the <b>sources</b> and <b>choices</b> by ignoring all articles before trying to find the <b>most similar choice</b>.</p>'
         "<p>To achieve this, the application uses <b>filters</b>.</p>"
         "<p>The filters are using Python regular expression patterns with capture groups (). The captured groups are replaced by a given expression (usually empty to clean a string). This is applied to both <b>sources</b> and <b>choices</b> when <b>matching</b> occurs.</p>"
         "<p>Filters are only applied for the <b>matching</b> process, original unfiltered files are used otherwise.</p>"
         "<p>For example, to clean articles of <b>source</b> and <b>choice</b> file, a filter with the pattern <code>(^the\\b|, the)</code> with an empty replacement <code> </code> could be used:<br>"
         "<ol>"
-        "<li><b>Filtering source</b>: <code><font color=\"blue\">c:/foo/The Amaryllis.png</font></code> &#11106; <code><font color=\"blue\">Amaryllis</font></code></li>"
-        "<li><b>Filtering choice</b>: <code><font color=\"red\">d:/bar/Amaryllidinae, The.txt</font></code> &#11106; <code><font color=\"red\">Amaryllidinae</font></code></li>"
-        "<li><b>Matching</b>: <code><font color=\"blue\">The Amaryllis</font></code> &#11106; <code><font color=\"red\">Amaryllidinae, The</font></code></li>"
-        "<li><b>Renaming</b>: <code><font color=\"blue\">c:/foo/The Amaryllis.png</font></code> &#11106; <code><font color=\"blue\">c:/foo/</font><font color=\"red\">Amaryllidinae, The</font><font color=\"blue\">.png</font></code></li>"
+        '<li><b>Filtering source</b>: <code><font color="blue">c:/foo/The Amaryllis.png</font></code> &#11106; <code><font color="blue">Amaryllis</font></code></li>'
+        '<li><b>Filtering choice</b>: <code><font color="red">d:/bar/Amaryllidinae, The.txt</font></code> &#11106; <code><font color="red">Amaryllidinae</font></code></li>'
+        '<li><b>Matching</b>: <code><font color="blue">The Amaryllis</font></code> &#11106; <code><font color="red">Amaryllidinae, The</font></code></li>'
+        '<li><b>Renaming</b>: <code><font color="blue">c:/foo/The Amaryllis.png</font></code> &#11106; <code><font color="blue">c:/foo/</font><font color="red">Amaryllidinae, The</font><font color="blue">.png</font></code></li>'
         "</ol>"
         "<p>Filters creation, addition, deletion, re-ordering is available from <code><b>Masks &amp; Filters</b></code> button.</p>"
         "<ul>"
@@ -2573,17 +3249,17 @@ def getDoc():
         "</ul>"
         "<h3>Masks</h3>"
         "<p>Sometimes, it can be interesting to ignore some leading and/or trailing parts from a <b>source</b> in the <b>matching</b> process and restore them after the <b>renaming</b> process. It is particularly important in order to enhance <b>matching</b> when <b>choices</b> don't contain these parts.</p>"
-        "<p>E.g. <b>source</b> is <code><font color=\"blue\">c:/foo/(1983-06-22) Amaryllis [Russia].png</font></code>, and we want to ignore the date <code><font color=\"blue\">(1983-06-22)</font></code> and the country <code><font color=\"blue\">[Russia]</font></code> during <b>matching</b> but we need to restore them when <b>renaming</b>, "
-        " then if <b>most similar choice</b> is <code><font color=\"red\">d:/bar/Amaryllidinae.jpg</font></code>, the <b>renamed source</b> should be <code><font color=\"blue\">c:/foo/(1983-06-22) </font><font color=\"red\">Amaryllidinae</font><font color=\"blue\"> [Russia].png</font></code></p>"
+        '<p>E.g. <b>source</b> is <code><font color="blue">c:/foo/(1983-06-22) Amaryllis [Russia].png</font></code>, and we want to ignore the date <code><font color="blue">(1983-06-22)</font></code> and the country <code><font color="blue">[Russia]</font></code> during <b>matching</b> but we need to restore them when <b>renaming</b>, '
+        ' then if <b>most similar choice</b> is <code><font color="red">d:/bar/Amaryllidinae.jpg</font></code>, the <b>renamed source</b> should be <code><font color="blue">c:/foo/(1983-06-22) </font><font color="red">Amaryllidinae</font><font color="blue"> [Russia].png</font></code></p>'
         "<p>To achieve this, the application uses <b>masks</b>.</p>"
         "<p>The masks are using Python regular expression patterns. They are removed from <b>sources</b> strings before <b>filtering</b> and <b>matching</b> occur."
         "It is used to remove leading and trailing expressions (year, disk#...) before <b>matching</b> and restore them after <b>renaming</b>.</p>"
         "<p>For example, to preserve the Disk number at the end of a <b>source</b> file, a mask with the pattern <code>(\\s?disk\\d)$</code> could be used:<br>"
         "<ol>"
-        "<li><b>Masking</b>: <code><font color=\"blue\">c:/foo/The Wiiire Disk1.rom</font></code> &#11106; <code><font color=\"blue\">The Wiiire</font></code> + Trailing mask = <code><font color=\"green\"> Disk1</font></code></li>"
-        "<li><b>Matching</b>: <code><font color=\"blue\">The Wiiire</font></code> &#11106; <code><font color=\"red\">The Wire</font></code></li>"
-        "<li><b>Renaming</b>: <code><font color=\"blue\">c:/foo/The Wiiire.rom</font></code> &#11106; <code><font color=\"blue\">c:/foo/</font><font color=\"red\">The Wire</font><font color=\"blue\">.rom</font></code></li>"
-        "<li><b>Unmkasking</b>: <code><font color=\"blue\">c:/foo/The Wiiire.rom</font></code> &#11106; <code><font color=\"blue\">c:/foo/The Wire<font color=\"green\"> Disk1</font>.rom</font></code></li>"
+        '<li><b>Masking</b>: <code><font color="blue">c:/foo/The Wiiire Disk1.rom</font></code> &#11106; <code><font color="blue">The Wiiire</font></code> + Trailing mask = <code><font color="green"> Disk1</font></code></li>'
+        '<li><b>Matching</b>: <code><font color="blue">The Wiiire</font></code> &#11106; <code><font color="red">The Wire</font></code></li>'
+        '<li><b>Renaming</b>: <code><font color="blue">c:/foo/The Wiiire.rom</font></code> &#11106; <code><font color="blue">c:/foo/</font><font color="red">The Wire</font><font color="blue">.rom</font></code></li>'
+        '<li><b>Unmkasking</b>: <code><font color="blue">c:/foo/The Wiiire.rom</font></code> &#11106; <code><font color="blue">c:/foo/The Wire<font color="green"> Disk1</font>.rom</font></code></li>'
         "</ol>"
         "<p>Masks creation, addition, deletion, re-ordering is available from <code><b>Masks &amp; Filters</b></code> button.</p>"
         "<ul>"
@@ -2611,7 +3287,7 @@ def getDoc():
         "During <b>renaming</b>, the original file is kept."
         "<br><li><b>Keep matched file suffix</b><br><br>"
         "During <b>renaming</b>, the suffix of the <b>most similar choice</b> is used before suffix of the <b>source</b>.<br>"
-        "E.g. if <b>source</b> is <code><font color=\"blue\">Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color=\"red\">Amaryllidinae.rom</font></code>, <b>renamed source</b> is <code><font color=\"red\">Amaryllidinae.rom</font></code><code><font color=\"blue\">.png</font></code>"
+        'E.g. if <b>source</b> is <code><font color="blue">Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color="red">Amaryllidinae.rom</font></code>, <b>renamed source</b> is <code><font color="red">Amaryllidinae.rom</font></code><code><font color="blue">.png</font></code>'
         "<br><li><b>Always match first letter</b><br><br>"
         "During <b>matching</b>, each <b>source</b> will search for the <b>most similar choice</b> among <b>choices</b> that start with the same letter only. This decreases greatly the processing time during <b>matching</b>."
         "</ul>"
@@ -2631,31 +3307,68 @@ def getDoc():
         "<p>The current list of <b>sources</b> and <b>choices</b> as well as the current <b>most similar choice</b> can be saved to a file by using <code><b>File->Save Session</b></code>.</p>"
         "<p>A saved session is restored by using <code><b>File->Load Session</b></code>. When restoring a session, the current list of sources and choices is resetted first.</p>"
         "<p>The list of the 8 most recent saved session files can be loaded directly from the <code><b>File</b></code> menu.</p>"
-
         )
 
 
-Quit_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAVklEQVQ4jWNgYGCoYGBgWEIkXsrAwBDKgAaWoAvgARoMDAw1owZQZoAAAwODEQMDQzYDA4MCIQPEGBgYAnDgNAYGhmswQ2hmAMVewAYGPhYGqQEUZWcALdEnU4lzkXYAAAAASUVORK5CYII=")
-Clipboard_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAtklEQVQ4jcXSLQoCURiF4SdYpk+1WLS4ATEKYtA2zQUYzTLRLGaNioILcQtux+AHyjB3dJIfvOXcw3t/uKQnwznIGnq1M8IRi+AYWeMUuMWOD8wwDGaRnaNT1AnWmKLEHfnHWh5ZGZ11SrDEHltcvd/gGtk+Oo2CsuGa5a+CPk4V+m0E/z9Bx+vlP+m0EfSwq9BrI8gwqJC1EXSxqdD9VXDAOMHhm2CC1RcmKcEcF+/vm+ISXfAEy/NDr/2o1MAAAAAASUVORK5CYII=")
-AddFile_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAv0lEQVQ4jeXTsUvCQRjG8Q+KYhFEUnuD4W90aHZtjf4dUxpyc3QQQTCTIGpJh/6KxD/JwfdHFL/qcvWB43mP5/i+d8cd1PCC+R9jiroCHWFUFHzTEm9FkFTAAkN84HAXQBOXmOB8F0Cu+z0GXOAGT/8FVDFGH9foxfpyKuAO7aivwtsYpAJm0S2zfUwZKnhOBcxxgFusw4/xgJII3/38iVY+L60bfoLHX5p+0Rle0YqjtGLeSAXkkF5su4PTPNgARiAq9du6DoYAAAAASUVORK5CYII=")
-AddFolder_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAArklEQVQ4je3SMQuBYRTF8Z9FMSgxG4zKKj6ChdikzD6CL2AXpQy2txSDUiZfzuAmKXles1N3uMP5n/M8XVgge5kDWnIoe9sruKD2KwCauL41e531N0Cu0D8gHVBED2Oc8gLaOGOOEY4YpAKKYS6hig4KWKGbAuhFchX9MDZQxzYFMI7anTDfMEMZO1j6fLKZx4cdo3YjzDDB9Ev4U0NsonY5zPuAJqvr8eZdJBfgDs5MKn5hEi99AAAAAElFTkSuQmCC")
-Folder_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAWUlEQVQ4je3ToQ2AQAxA0ScQl4BGMxFrsAOaCVAMgIIlsQS4XJogr8k3FS81hYTuVis4J7ZbB6YIsH/sVowYCvU5oMGMpdCRA0LXV6ACvwDPZ4p08n7nSOkCBygjcGZQPuwAAAAASUVORK5CYII=")
-ProcessMatch_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAApklEQVQ4je3RMQ4BURSF4S9BZwWjIlGpZDqFEoUtmMQuTDVEopmShkRiDzaoeAoS7w29vz33nntyLu9MUeGGErkv6eKCDYZoY4QDanSaDM4YR7QFdqnl6fNyiiMGMbESYqeYoYiJN7QaDPrYx8RSKCzFEquYmAttp7iilxqoMY9oa2wbDugIrzoJhfWF2Nfn8h1ZkwnhVYVQ2OoldvaLSYy/yWeTyQNeOBiZybXdVAAAAABJRU5ErkJggg==")
-Rename_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAQklEQVQ4jWNgoBPgYWBgWMLAwLABSouQa9ASSl2C1YBJUAli8D00/iRSnYWudsmoAVQygOJoJAXQJiUSA6iWmTAAAFKsJvUTORWWAAAAAElFTkSuQmCC")
-Rename_32_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAj0lEQVRYhe2XsQ2AIBBF3wq2dq7gAiziEI7jGC5jYmdpQ2JhQWtzBQ1BDYIk95JfEC7hBYrjQElLA4yBtDkEOmCVHMDprfscAj4TMOc+VAVeCRgpTJ0N2CM1BmAAnBinzCISoX0nZzMA9s5VPST2BFYFVEAFVEAFfiVQtBkVb8dfUc+PSAVSUnwwKT6a1ccFLuSbvR2v1tcAAAAASUVORK5CYII=")
-Delete_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAUklEQVQ4jaWTyREAIAgDtw5KsW0b9ONDxzOEd7IDAQAKEOgV3UsAVYQsHgVy1P5Anpqb4LvLnVDOaTRkQp4gKbMNsEawQrTWaB2Sdcr2M1nv3AAJSRotv+t5dgAAAABJRU5ErkJggg==")
-Reset_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA3klEQVQ4jZ3TMU7DUBCE4c8okVxQcAMkCisNBQUSSrhFbkBFn4IKCckHoHYazAUirpVbpNhNCMFEfvzVs+wdz+7sI5jgIs8VHvCGD/Rosch3gzzjEff4wgtmmKZ4gxU2+c2gwDvWuPzrL6jRYTkksMUrns4I7OlOnVyl5RmuRwjUop0K7nA7ouiUFebEhG/+IdBkrU/fEZYwERHr86GU6V6gTTulHFpYiIGUchhiJSKpC4p/xEgsRVcgsDaw0ssUOeekzuJfq3zsZCP6a0Q6oy7TMZUYTiti6vM8N3Cddx5tH3Yo4PYdAAAAAElFTkSuQmCC")
-Filters_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAnElEQVQ4jc3OPQ4BURTF8R/xlZDYinJKdDQS6tkGk1gDralohkYvszyFJxERzIvCSU7y3rn3f3IhQxHpTHjEqvhJQYY0Ak6xun+2mFeAF9g8BjXsMPkCnobd2vOgjgOGb+AR9mH3pZo4IXkxS3BE49OJHZwxeMgGIWt/gu/qokQruAxZJeXoBedV4f8p6GOJdWzBBbMYGMZu57/VFRydH90nhFjmAAAAAElFTkSuQmCC")
-Undo_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA20lEQVQ4jaXRr0sDQBiH8Y+bMhUUTMIMYjCIYFtSWLQMg1sTDSaL2ETUJM7gsBk2RPwB/goGBf+/hTtk4G2T29Pe9+4e+N6Xvywkdv9iDC2c5zweRwen+MIWVqN0KNN4RRWT2EAjyt5wbUisG+wPOF/GnRCtmLpQwjM2MYUKlmKsXmp4wUxKUsQtLvGDJh7xgd0YDVbwmZD/coGznnkCdXxjO+7Whbb6Mp/YFXCC4zi3sDZI0o+a0M6s8G9Z7OAIbczlSu5xGGVZLAptXeUK4AkPowj28D6KoIyDLrNQHV7K7UHqAAAAAElFTkSuQmCC")
-Preview_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAApklEQVQ4jd3STQrCMBAF4A8KihfSVXVlQV31CAXdCbrXY+gRRMVLunBCQ9EiuHPgkeQlbzJ//K0NUWEbqIL7SnjEFQ3GgSa4Y5+jKR6xwgaXwKbzpuyKV7hhlIl32f0O69iPcMcyXdY4ocgElzcR5lwRmvoXB+fkQITTl8L+TQqL7g+lV4FmcV5ri5jEMx+KmGyIg7aNk0Bq48GX8zDAXDtI8+D+0Z4L/CAYjFzsAAAAAABJRU5ErkJggg==")
-Info_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAvUlEQVQ4jaWTMQ7CMAxFX6QideEaGdlY2gGxMCP1KByhp0inniAj52PIL2pTp0D50l8S/2/HsWENB7RAD4xirzNnxC9wBiLwADxQiV5nUTEmOiAA9UaCWjGdlTkYgquYI8wrcSrNynwUrUqitLSk9+U4AU/gZtwhTQOpw74QdBcteGkZSZ3+1aCSdrfBYTL4+wmlJn4yeDdx6xtLBotvhPIgXcQcA8ZIfzvKA8YozyvZvUwTHKk5+To3GOv8AnPjI1AbZiwoAAAAAElFTkSuQmCC")
-Help_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA+klEQVQ4ja3TMVLDQAwF0OeCVHTgMfcgjD2h4wq5TVzmCmYwpVvT5RbuciQKy5PFLJkUaGaLlf5fSX8lfluBVxwxxDmGr8jgf9gLTphQ4z5OHb5TYLK2x4gSn6iS2FP4ysDsc5nH1f2ARzygxXMSH9NKiiitTABvOKOLcw7fYmVwCmZxpihxG8APbBLCBn3EtoGdsGNWuI6eD5Htbt1jPHIOTIUmuAaz0qLnLkNerDNrIjjDvzyQttBGmZsMeWmhXbewiNi7iNi7LmIvEfHaN7674Ru5bZC2SfxLZqSvjXIVZf85ymnmZZkal2Vq3LBMixVmcdbrvJNZ52/umT0spYP52gAAAABJRU5ErkJggg==")
-Save_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAp0lEQVQ4jc3TsQ3CMBCF4T9lSMsA0KXIIHRZgDIlRcpIoWQAJkAKCg2T0LESzXMUTM4GV5z05OLOn1ycATpgBO46rdw00+LVCKyBs9+Y1RbYACfgAPS/AtcZgI+kAA5pvwUeC4C7OwFPIVYuISATEsvKAlLrA6iAfSRVCDgCDbAz0mgmCJSBJ5f/CxRAreaAvQuDZmrdeduDAsiJ70Ku2cwB7junpHsBwvZEMcVfbJ0AAAAASUVORK5CYII=")
-Open_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAuklEQVQ4ja3TvWoCQRSG4QcstBCLqPdgl94qdxAsBcuUghCE1OksbUwpgruGSAixE8zFWbgDk8WfHfCDj5lzhvPOYX64g1roRH5IBewwj7zGNAWQncm94rNYK/sHz7cA1/SEl3OAN2wu7Br7G7/FOIsB28ROBhgGQBeLRMAH2gEwUjqYCvoKkwxLNBOKe3gPQR7TKmqCfggOTjeQohy1EPzhMaG4gVWc2Pv/lG85xzgGlD9TFdcTOr6uI0ftKryCmkZ/AAAAAElFTkSuQmCC")
-NoMatch_16_PNG = PyEmbeddedImage("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABAklEQVQ4jbXRTSuEURjG8d8oLJSFMoWNohQrZG9lMRYYeclkwVLKhi3WSsO8UIRiFtbie1j4QBbPOfV0eoTiqlN393X+1326D3+oaZzhEccYSvwDPKGJuRTeQx3DKGESz5gP/hhaoS7jFvsRngqpqWpYCvU1RhO/GVinYUKqB/ShH+84TPxxnMA9ugsCXtEI9Q1GEr8Hd3CEmYKABeyGF3zEaTnNBlZZtrBScqGONwzgBb05ryswg7FRwVVBSEf2dRO5Xkm21Er65BW0k5AOdhK4jeUUjlqVfU8MWUzgFqpfwVHruCzoN7D2HRy1KVti1AU2fgpH1XAeztZv4ajtcP5PnyUZJk/LAkldAAAAAElFTkSuQmCC")
+Quit_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAVklEQVQ4jWNgYGCoYGBgWEIkXsrAwBDKgAaWoAvgARoMDAw1owZQZoAAAwODEQMDQzYDA4MCIQPEGBgYAnDgNAYGhmswQ2hmAMVewAYGPhYGqQEUZWcALdEnU4lzkXYAAAAASUVORK5CYII="
+)
+Clipboard_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAtklEQVQ4jcXSLQoCURiF4SdYpk+1WLS4ATEKYtA2zQUYzTLRLGaNioILcQtux+AHyjB3dJIfvOXcw3t/uKQnwznIGnq1M8IRi+AYWeMUuMWOD8wwDGaRnaNT1AnWmKLEHfnHWh5ZGZ11SrDEHltcvd/gGtk+Oo2CsuGa5a+CPk4V+m0E/z9Bx+vlP+m0EfSwq9BrI8gwqJC1EXSxqdD9VXDAOMHhm2CC1RcmKcEcF+/vm+ISXfAEy/NDr/2o1MAAAAAASUVORK5CYII="
+)
+AddFile_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAv0lEQVQ4jeXTsUvCQRjG8Q+KYhFEUnuD4W90aHZtjf4dUxpyc3QQQTCTIGpJh/6KxD/JwfdHFL/qcvWB43mP5/i+d8cd1PCC+R9jiroCHWFUFHzTEm9FkFTAAkN84HAXQBOXmOB8F0Cu+z0GXOAGT/8FVDFGH9foxfpyKuAO7aivwtsYpAJm0S2zfUwZKnhOBcxxgFusw4/xgJII3/38iVY+L60bfoLHX5p+0Rle0YqjtGLeSAXkkF5su4PTPNgARiAq9du6DoYAAAAASUVORK5CYII="
+)
+AddFolder_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAArklEQVQ4je3SMQuBYRTF8Z9FMSgxG4zKKj6ChdikzD6CL2AXpQy2txSDUiZfzuAmKXles1N3uMP5n/M8XVgge5kDWnIoe9sruKD2KwCauL41e531N0Cu0D8gHVBED2Oc8gLaOGOOEY4YpAKKYS6hig4KWKGbAuhFchX9MDZQxzYFMI7anTDfMEMZO1j6fLKZx4cdo3YjzDDB9Ev4U0NsonY5zPuAJqvr8eZdJBfgDs5MKn5hEi99AAAAAElFTkSuQmCC"
+)
+Folder_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAWUlEQVQ4je3ToQ2AQAxA0ScQl4BGMxFrsAOaCVAMgIIlsQS4XJogr8k3FS81hYTuVis4J7ZbB6YIsH/sVowYCvU5oMGMpdCRA0LXV6ACvwDPZ4p08n7nSOkCBygjcGZQPuwAAAAASUVORK5CYII="
+)
+ProcessMatch_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAApklEQVQ4je3RMQ4BURSF4S9BZwWjIlGpZDqFEoUtmMQuTDVEopmShkRiDzaoeAoS7w29vz33nntyLu9MUeGGErkv6eKCDYZoY4QDanSaDM4YR7QFdqnl6fNyiiMGMbESYqeYoYiJN7QaDPrYx8RSKCzFEquYmAttp7iilxqoMY9oa2wbDugIrzoJhfWF2Nfn8h1ZkwnhVYVQ2OoldvaLSYy/yWeTyQNeOBiZybXdVAAAAABJRU5ErkJggg=="
+)
+Rename_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAQklEQVQ4jWNgoBPgYWBgWMLAwLABSouQa9ASSl2C1YBJUAli8D00/iRSnYWudsmoAVQygOJoJAXQJiUSA6iWmTAAAFKsJvUTORWWAAAAAElFTkSuQmCC"
+)
+Rename_32_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAj0lEQVRYhe2XsQ2AIBBF3wq2dq7gAiziEI7jGC5jYmdpQ2JhQWtzBQ1BDYIk95JfEC7hBYrjQElLA4yBtDkEOmCVHMDprfscAj4TMOc+VAVeCRgpTJ0N2CM1BmAAnBinzCISoX0nZzMA9s5VPST2BFYFVEAFVEAFfiVQtBkVb8dfUc+PSAVSUnwwKT6a1ccFLuSbvR2v1tcAAAAASUVORK5CYII="
+)
+Delete_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAUklEQVQ4jaWTyREAIAgDtw5KsW0b9ONDxzOEd7IDAQAKEOgV3UsAVYQsHgVy1P5Anpqb4LvLnVDOaTRkQp4gKbMNsEawQrTWaB2Sdcr2M1nv3AAJSRotv+t5dgAAAABJRU5ErkJggg=="
+)
+Reset_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA3klEQVQ4jZ3TMU7DUBCE4c8okVxQcAMkCisNBQUSSrhFbkBFn4IKCckHoHYazAUirpVbpNhNCMFEfvzVs+wdz+7sI5jgIs8VHvCGD/Rosch3gzzjEff4wgtmmKZ4gxU2+c2gwDvWuPzrL6jRYTkksMUrns4I7OlOnVyl5RmuRwjUop0K7nA7ouiUFebEhG/+IdBkrU/fEZYwERHr86GU6V6gTTulHFpYiIGUchhiJSKpC4p/xEgsRVcgsDaw0ssUOeekzuJfq3zsZCP6a0Q6oy7TMZUYTiti6vM8N3Cddx5tH3Yo4PYdAAAAAElFTkSuQmCC"
+)
+Filters_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAnElEQVQ4jc3OPQ4BURTF8R/xlZDYinJKdDQS6tkGk1gDralohkYvszyFJxERzIvCSU7y3rn3f3IhQxHpTHjEqvhJQYY0Ak6xun+2mFeAF9g8BjXsMPkCnobd2vOgjgOGb+AR9mH3pZo4IXkxS3BE49OJHZwxeMgGIWt/gu/qokQruAxZJeXoBedV4f8p6GOJdWzBBbMYGMZu57/VFRydH90nhFjmAAAAAElFTkSuQmCC"
+)
+Undo_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA20lEQVQ4jaXRr0sDQBiH8Y+bMhUUTMIMYjCIYFtSWLQMg1sTDSaL2ETUJM7gsBk2RPwB/goGBf+/hTtk4G2T29Pe9+4e+N6Xvywkdv9iDC2c5zweRwen+MIWVqN0KNN4RRWT2EAjyt5wbUisG+wPOF/GnRCtmLpQwjM2MYUKlmKsXmp4wUxKUsQtLvGDJh7xgd0YDVbwmZD/coGznnkCdXxjO+7Whbb6Mp/YFXCC4zi3sDZI0o+a0M6s8G9Z7OAIbczlSu5xGGVZLAptXeUK4AkPowj28D6KoIyDLrNQHV7K7UHqAAAAAElFTkSuQmCC"
+)
+Preview_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAApklEQVQ4jd3STQrCMBAF4A8KihfSVXVlQV31CAXdCbrXY+gRRMVLunBCQ9EiuHPgkeQlbzJ//K0NUWEbqIL7SnjEFQ3GgSa4Y5+jKR6xwgaXwKbzpuyKV7hhlIl32f0O69iPcMcyXdY4ocgElzcR5lwRmvoXB+fkQITTl8L+TQqL7g+lV4FmcV5ri5jEMx+KmGyIg7aNk0Bq48GX8zDAXDtI8+D+0Z4L/CAYjFzsAAAAAABJRU5ErkJggg=="
+)
+Info_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAvUlEQVQ4jaWTMQ7CMAxFX6QideEaGdlY2gGxMCP1KByhp0inniAj52PIL2pTp0D50l8S/2/HsWENB7RAD4xirzNnxC9wBiLwADxQiV5nUTEmOiAA9UaCWjGdlTkYgquYI8wrcSrNynwUrUqitLSk9+U4AU/gZtwhTQOpw74QdBcteGkZSZ3+1aCSdrfBYTL4+wmlJn4yeDdx6xtLBotvhPIgXcQcA8ZIfzvKA8YozyvZvUwTHKk5+To3GOv8AnPjI1AbZiwoAAAAAElFTkSuQmCC"
+)
+Help_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA+klEQVQ4ja3TMVLDQAwF0OeCVHTgMfcgjD2h4wq5TVzmCmYwpVvT5RbuciQKy5PFLJkUaGaLlf5fSX8lfluBVxwxxDmGr8jgf9gLTphQ4z5OHb5TYLK2x4gSn6iS2FP4ysDsc5nH1f2ARzygxXMSH9NKiiitTABvOKOLcw7fYmVwCmZxpihxG8APbBLCBn3EtoGdsGNWuI6eD5Htbt1jPHIOTIUmuAaz0qLnLkNerDNrIjjDvzyQttBGmZsMeWmhXbewiNi7iNi7LmIvEfHaN7674Ru5bZC2SfxLZqSvjXIVZf85ymnmZZkal2Vq3LBMixVmcdbrvJNZ52/umT0spYP52gAAAABJRU5ErkJggg=="
+)
+Save_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAp0lEQVQ4jc3TsQ3CMBCF4T9lSMsA0KXIIHRZgDIlRcpIoWQAJkAKCg2T0LESzXMUTM4GV5z05OLOn1ycATpgBO46rdw00+LVCKyBs9+Y1RbYACfgAPS/AtcZgI+kAA5pvwUeC4C7OwFPIVYuISATEsvKAlLrA6iAfSRVCDgCDbAz0mgmCJSBJ5f/CxRAreaAvQuDZmrdeduDAsiJ70Ku2cwB7junpHsBwvZEMcVfbJ0AAAAASUVORK5CYII="
+)
+Open_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAuklEQVQ4ja3TvWoCQRSG4QcstBCLqPdgl94qdxAsBcuUghCE1OksbUwpgruGSAixE8zFWbgDk8WfHfCDj5lzhvPOYX64g1roRH5IBewwj7zGNAWQncm94rNYK/sHz7cA1/SEl3OAN2wu7Br7G7/FOIsB28ROBhgGQBeLRMAH2gEwUjqYCvoKkwxLNBOKe3gPQR7TKmqCfggOTjeQohy1EPzhMaG4gVWc2Pv/lG85xzgGlD9TFdcTOr6uI0ftKryCmkZ/AAAAAElFTkSuQmCC"
+)
+NoMatch_16_PNG = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABAklEQVQ4jbXRTSuEURjG8d8oLJSFMoWNohQrZG9lMRYYeclkwVLKhi3WSsO8UIRiFtbie1j4QBbPOfV0eoTiqlN393X+1326D3+oaZzhEccYSvwDPKGJuRTeQx3DKGESz5gP/hhaoS7jFvsRngqpqWpYCvU1RhO/GVinYUKqB/ShH+84TPxxnMA9ugsCXtEI9Q1GEr8Hd3CEmYKABeyGF3zEaTnNBlZZtrBScqGONwzgBb05ryswg7FRwVVBSEf2dRO5Xkm21Er65BW0k5AOdhK4jeUUjlqVfU8MWUzgFqpfwVHruCzoN7D2HRy1KVti1AU2fgpH1XAeztZv4ajtcP5PnyUZJk/LAkldAAAAAElFTkSuQmCC"
+)
 
 if __name__ == '__main__':
 
+    print(__version__)
+    freeze_support()
     read_config()
     app = wx.App(False)
     frame = MainFrame()
