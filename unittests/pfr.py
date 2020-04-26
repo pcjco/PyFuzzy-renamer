@@ -1,28 +1,31 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
-import unittest
-import pyfuzzyrenamer
-import wx
 import os
 import copy
+import unittest
+import wx
+
+from pyfuzzyrenamer import config, main_dlg
+
 
 class PyFuzzyRenamerTestCase(unittest.TestCase):
     def setUp(self):
 
         # Backup and Reset config file
-        pyfuzzyrenamer.read_config()
-        self.backup_config = copy.deepcopy(pyfuzzyrenamer.config_dict)
-        pyfuzzyrenamer.default_config()
+        config.read()
+        self.backup_config = copy.deepcopy(config.theConfig)
+        config.default()
 
-        pyfuzzyrenamer.glob_choices.clear()
+        main_dlg.glob_choices.clear()
         self.app = wx.App()
         wx.Log.SetActiveTarget(wx.LogStderr())
-        self.frame = pyfuzzyrenamer.MainFrame()
+        self.frame = main_dlg.MainFrame()
         self.frame.Show()
         self.frame.PostSizeEvent()
-        self.button_panel = self.frame.panel.GetChildren()[1].GetChildren()[0].GetChildren()[0]
-        self.outdir = os.path.abspath(os.path.join(os.path.dirname(__file__), './outdir'))
+        self.button_panel = (
+            self.frame.panel.GetChildren()[1].GetChildren()[0].GetChildren()[0]
+        )
+        self.outdir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "./outdir")
+        )
 
     def tearDown(self):
         def _cleanup():
@@ -34,12 +37,11 @@ class PyFuzzyRenamerTestCase(unittest.TestCase):
                     else:
                         tlw.Close(force=True)
             # Restore backup config file
-            pyfuzzyrenamer.config_dict = self.backup_config
-            pyfuzzyrenamer.write_config()
+            config.theConfig = self.backup_config
+            config.write()
             wx.WakeUpIdle()
 
         timer = wx.PyTimer(_cleanup)
         timer.Start(100)
         self.app.MainLoop()
         del self.app
-

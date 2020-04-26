@@ -1,20 +1,18 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
-import unittest
-from unittests import pfr
-import pyfuzzyrenamer
 import os
+import unittest
 import wx
 from pathlib import Path
 
-#---------------------------------------------------------------------------
+from pyfuzzyrenamer import config
+from unittests import pfr
+
+# ---------------------------------------------------------------------------
+
 
 class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
-
     def test_addsources(self):
         self.add_sources(singles=False)
-        
+
     def test_addsources_single(self):
         self.add_sources(singles=True)
 
@@ -28,12 +26,14 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
         self.add_sources(drop=True)
 
     def add_sources(self, dir=False, singles=False, clipboard=False, drop=False):
-        sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), './data/sources'))
+        sourcesDir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "./data/sources")
+        )
         if dir:
             self.frame.panel.AddSourceFromDir(sourcesDir)
         else:
             sources = []
-            for f in Path(sourcesDir).resolve().glob('*'):
+            for f in Path(sourcesDir).resolve().glob("*"):
                 try:
                     if f.is_file():
                         sources.append(f)
@@ -44,16 +44,20 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
                     pass
             if not singles:
                 if drop:
+
                     def clickYES():
                         dlg = wx.GetActiveWindow()
-                        clickEvent = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_YES)
+                        clickEvent = wx.CommandEvent(
+                            wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_YES
+                        )
                         dlg.ProcessEvent(clickEvent)
+
                     droptarget = self.frame.panel.GetDropTarget()
                     wx.CallAfter(clickYES)
                     droptarget.OnDropFiles(0, 0, [str(f) for f in sources])
                 elif clipboard:
                     clipdata = wx.TextDataObject()
-                    clipdata.SetText('\n'.join([str(f) for f in sources]))
+                    clipdata.SetText("\n".join([str(f) for f in sources]))
                     wx.TheClipboard.Open()
                     wx.TheClipboard.SetData(clipdata)
                     wx.TheClipboard.Close()
@@ -64,11 +68,25 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(6, lst.GetItemCount())
-        self.assertEqual(["Abutilon à feuilles marbrées.txt", "", "", "", "Not processed", "True"], [lst.GetItemText(item, col) for col in range(0, len(pyfuzzyrenamer.default_columns))])
-        for i in range(0,5):item = lst.GetNextItem(item)
-        self.assertEqual(["Volutaire à fleurs tubulées.txt", "", "", "", "Not processed", "True"], [lst.GetItemText(item, col) for col in range(0, len(pyfuzzyrenamer.default_columns))])
+        self.assertEqual(
+            ["Abutilon à feuilles marbrées.txt", "", "", "", "Not processed", "True"],
+            [
+                lst.GetItemText(item, col)
+                for col in range(0, len(config.default_columns))
+            ],
+        )
+        for i in range(0, 5):
+            item = lst.GetNextItem(item)
+        self.assertEqual(
+            ["Volutaire à fleurs tubulées.txt", "", "", "", "Not processed", "True"],
+            [
+                lst.GetItemText(item, col)
+                for col in range(0, len(config.default_columns))
+            ],
+        )
 
-#---------------------------------------------------------------------------
 
-if __name__ == '__main__':
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
     unittest.main()

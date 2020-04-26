@@ -1,16 +1,13 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 import unittest
-from unittests import pfr
-import pyfuzzyrenamer
-import os
 import wx
 
-#---------------------------------------------------------------------------
+from pyfuzzyrenamer import config
+from unittests import pfr
+
+# ---------------------------------------------------------------------------
+
 
 class filter_Tests(pfr.PyFuzzyRenamerTestCase):
-
     def test_filter(self):
         for each in self.button_panel.GetChildren():
             if each.GetLabel() == "Masks && Filters...":
@@ -27,24 +24,28 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
             event.SetKeyCode(wx.WXK_DELETE)
             dlg.panel.filters_list.GetEventHandler().ProcessEvent(event)
 
-            self.addFilter(dlg.panel.filters_list, "my filter", "(^(the)\\b|, the)", " ", True)
-            self.addFilter(dlg.panel.filters_list, "my filter 2", "(wire)", "foo", False)
+            self.addFilter(
+                dlg.panel.filters_list, "my filter", "(^(the)\\b|, the)", " ", True
+            )
+            self.addFilter(
+                dlg.panel.filters_list, "my filter 2", "(wire)", "foo", False
+            )
 
             event = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_OK)
             dlg.panel.filters_list.GetEventHandler().ProcessEvent(event)
-            
+
         wx.CallAfter(setFilters)
         event = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, btn.GetId())
         btn.GetEventHandler().ProcessEvent(event)
-        
+
         clipdata = wx.TextDataObject()
-        clipdata.SetText('The wiire')
+        clipdata.SetText("The wiire")
         wx.TheClipboard.Open()
         wx.TheClipboard.SetData(clipdata)
         wx.TheClipboard.Close()
         self.frame.panel.OnAddSourceFromClipboard(None)
         clipdata = wx.TextDataObject()
-        clipdata.SetText('Wire, The')
+        clipdata.SetText("Wire, The")
         wx.TheClipboard.Open()
         wx.TheClipboard.SetData(clipdata)
         wx.TheClipboard.Close()
@@ -61,7 +62,13 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
         lst = self.frame.panel.list_ctrl
         item = -1
         item = lst.GetNextItem(item)
-        self.assertEqual(["The wiire", "89", "Wire, The", "Wire, The", "Matched", "True"], [lst.GetItemText(item, col) for col in range(0, len(pyfuzzyrenamer.default_columns))])
+        self.assertEqual(
+            ["The wiire", "89", "Wire, The", "Wire, The", "Matched", "True"],
+            [
+                lst.GetItemText(item, col)
+                for col in range(0, len(config.default_columns))
+            ],
+        )
 
     def test_filter2(self):
         for each in self.button_panel.GetChildren():
@@ -80,23 +87,25 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
             dlg.panel.filters_list.GetEventHandler().ProcessEvent(event)
 
             self.addFilter(dlg.panel.filters_list, "my filter", "(wire)", "foo", True)
-            self.addFilter(dlg.panel.filters_list, "my filter 2", "(^(the)\\b|, the)", " ", True)
+            self.addFilter(
+                dlg.panel.filters_list, "my filter 2", "(^(the)\\b|, the)", " ", True
+            )
 
             event = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_OK)
             dlg.panel.filters_list.GetEventHandler().ProcessEvent(event)
-            
+
         wx.CallAfter(setFilters)
         event = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, btn.GetId())
         btn.GetEventHandler().ProcessEvent(event)
-        
+
         clipdata = wx.TextDataObject()
-        clipdata.SetText('The foo')
+        clipdata.SetText("The foo")
         wx.TheClipboard.Open()
         wx.TheClipboard.SetData(clipdata)
         wx.TheClipboard.Close()
         self.frame.panel.OnAddSourceFromClipboard(None)
         clipdata = wx.TextDataObject()
-        clipdata.SetText('Wire, The')
+        clipdata.SetText("Wire, The")
         wx.TheClipboard.Open()
         wx.TheClipboard.SetData(clipdata)
         wx.TheClipboard.Close()
@@ -113,7 +122,13 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
         lst = self.frame.panel.list_ctrl
         item = -1
         item = lst.GetNextItem(item)
-        self.assertEqual(["The foo", "100", "Wire, The", "Wire, The", "Matched", "True"], [lst.GetItemText(item, col) for col in range(0, len(pyfuzzyrenamer.default_columns))])
+        self.assertEqual(
+            ["The foo", "100", "Wire, The", "Wire, The", "Matched", "True"],
+            [
+                lst.GetItemText(item, col)
+                for col in range(0, len(config.default_columns))
+            ],
+        )
 
     def addFilter(self, lst, name, regexp, repl, active):
         event = wx.KeyEvent(wx.wxEVT_CHAR)
@@ -132,8 +147,9 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
         event.SetColumn(3)
         lst.GetEventHandler().ProcessEvent(event)
         lst.CheckItem(row_id, active)
-        
-#---------------------------------------------------------------------------
 
-if __name__ == '__main__':
+
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
     unittest.main()
