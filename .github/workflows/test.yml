@@ -30,6 +30,7 @@ jobs:
           - 'macos-latest'
           - 'windows-latest'
     steps:
+    if: startsWith(matrix.os, 'ubuntu') == false
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v1
