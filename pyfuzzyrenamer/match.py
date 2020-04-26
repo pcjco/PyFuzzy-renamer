@@ -1,7 +1,7 @@
 import fuzzywuzzy.fuzz
 import fuzzywuzzy.process
 import wx
-from multiprocessing import Pool, active_children, cpu_count
+from multiprocessing import Pool, active_children
 
 from pyfuzzyrenamer import config, main_dlg, masks
 
@@ -66,45 +66,85 @@ def get_matches(sources):
     )
     Qmatch_firstletter = config.theConfig["match_firstletter"]
     added = 0
-    pool = Pool(processes=cpu_count())
-    for f in sources:
-        f_masked = masks.FileMasked(f)
-        if not f_masked.masked[1]:
-            ret[added] = None
-            continue
-        if Qmatch_firstletter:
-            first_letter = f_masked.masked[1][0]
-            if first_letter in main_dlg.candidates.keys():
+    if config.theConfig["workers"] > 1:
+        pool = Pool(processes=config.theConfig["workers"])
+        for f in sources:
+            f_masked = masks.FileMasked(f)
+            if not f_masked.masked[1]:
+                ret[added] = None
+                continue
+            if Qmatch_firstletter:
+                first_letter = f_masked.masked[1][0]
+                if first_letter in main_dlg.candidates.keys():
+                    pool.apply_async(
+                        match_process,
+                        (added, f_masked, main_dlg.candidates[first_letter],),
+                        callback=callback_processed,
+                    )
+                else:
+                    ret[added] = None
+            else:
                 pool.apply_async(
                     match_process,
-                    (added, f_masked, main_dlg.candidates[first_letter],),
+                    (added, f_masked, main_dlg.candidates["all"],),
                     callback=callback_processed,
                 )
-            else:
+            added += 1
+            cancelled = not progress.Update(
+                processed, progress_msg(added, processed, total)
+            )[0]
+            if cancelled:
+                pool.terminate()
+                break
+        pool.close()
+        while len(active_children()) > 0:
+            cancelled = not progress.Update(
+                processed, progress_msg(added, processed, total)
+            )[0]
+            if cancelled:
+                pool.terminate()
+                break
+            wx.MilliSleep(1000)
+        pool.join()
+    else:
+        for f in sources:
+            f_masked = masks.FileMasked(f)
+            if not f_masked.masked[1]:
                 ret[added] = None
-        else:
-            pool.apply_async(
-                match_process,
-                (added, f_masked, main_dlg.candidates["all"],),
-                callback=callback_processed,
-            )
-        added += 1
-        cancelled = not progress.Update(
-            processed, progress_msg(added, processed, total)
-        )[0]
-        if cancelled:
-            pool.terminate()
-            break
-    pool.close()
-    while len(active_children()) > 0:
-        cancelled = not progress.Update(
-            processed, progress_msg(added, processed, total)
-        )[0]
-        if cancelled:
-            pool.terminate()
-            break
-        wx.MilliSleep(1000)
-    pool.join()
+                continue
+            if Qmatch_firstletter:
+                first_letter = f_masked.masked[1][0]
+                if first_letter in main_dlg.candidates.keys():
+                    ret[added] = FileMatch(
+                        f_masked.file,
+                        fuzzywuzzy.process.extract(
+                            f_masked,
+                            main_dlg.candidates[first_letter],
+                            scorer=mySimilarityScorer,
+                            processor=fuzz_processor,
+                            limit=10,
+                        ),
+                    )
+                else:
+                    ret[added] = None
+            else:
+                ret[added] = FileMatch(
+                    f_masked.file,
+                    fuzzywuzzy.process.extract(
+                        f_masked,
+                        main_dlg.candidates["all"],
+                        scorer=mySimilarityScorer,
+                        processor=fuzz_processor,
+                        limit=10,
+                    ),
+                )
+            added += 1
+            processed += 1
+            cancelled = not progress.Update(
+                processed, progress_msg(added, processed, total)
+            )[0]
+            if cancelled:
+                break
 
     return ret
 

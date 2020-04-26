@@ -2,6 +2,7 @@ import configparser
 import copy
 import logging
 import os
+from multiprocessing import cpu_count
 from pathlib import Path
 
 from pyfuzzyrenamer import filters, masks
@@ -59,12 +60,13 @@ def default():
     theConfig["keep_original"] = False
     theConfig["folder_sources"] = os.getcwd()
     theConfig["folder_choices"] = os.getcwd()
-    theConfig["folder_output"] = os.getcwd()
+    theConfig["folder_output"] = ""
     theConfig["filters"] = default_filters
     theConfig["masks"] = default_masks
     theConfig["masks_test"] = default_masks_teststring
     theConfig["filters_test"] = default_filters_teststring
     theConfig["window"] = [1000, 800, -10, 0]
+    theConfig["workers"] = cpu_count()
     theConfig["recent_session"] = []
     for i in range(0, len(default_columns)):
         theConfig["col%d_order" % (i + 1)] = default_columns[i][0]
@@ -87,6 +89,7 @@ def read():
     INI_filters_test_val = theConfig["filters_test"]
     INI_masks_test_val = theConfig["masks_test"]
     INI_window_val = theConfig["window"].copy()
+    INI_workers_val = theConfig["workers"]
     INI_col_val = copy.deepcopy(default_columns)
     INI_recent_session_val = theConfig["recent_session"].copy()
 
@@ -183,6 +186,10 @@ def read():
             INI_filters_test_val = INI_matching_cat["filters_test"]
         except KeyError:
             pass
+        try:
+            INI_workers_val = int(INI_matching_cat["workers"])
+        except KeyError:
+            pass
         for i in range(0, len(default_columns)):
             try:
                 INI_col_val[i][0] = int(INI_ui_cat["col%d_order" % (i + 1)])
@@ -216,6 +223,7 @@ def read():
     for i in range(0, len(default_columns)):
         theConfig["col%d_order" % (i + 1)] = INI_col_val[i][0]
         theConfig["col%d_size" % (i + 1)] = INI_col_val[i][1]
+    theConfig["workers"] = INI_workers_val
     theConfig["window"] = INI_window_val
     theConfig["recent_session"] = INI_recent_session_val
     masks.FileMasked.masks = masks.CompileMasks(theConfig["masks"])
@@ -237,6 +245,7 @@ def write():
         "filters": theConfig["filters"],
         "masks_test": theConfig["masks_test"],
         "filters_test": theConfig["filters_test"],
+        "workers": theConfig["workers"],
     }
     config["recent"] = {
         "folder_sources": theConfig["folder_sources"],

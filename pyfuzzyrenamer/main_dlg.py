@@ -5,6 +5,7 @@ import shutil
 import wx
 import wx.aui
 import wx.html
+from multiprocessing import cpu_count, freeze_support
 from pathlib import Path
 
 from pyfuzzyrenamer import (
@@ -729,6 +730,7 @@ class MainFrame(wx.Frame):
             pos=wx.Point(config.theConfig["window"][2], config.theConfig["window"][3]),
             size=wx.Size(config.theConfig["window"][0], config.theConfig["window"][1]),
         )
+        freeze_support()
 
         bundle = wx.IconBundle()
         bundle.AddIcon(wx.Icon(icons.Rename_16_PNG.GetBitmap()))
@@ -865,6 +867,31 @@ class MainFrame(wx.Frame):
             "Enforce choices that match the first letter of the source",
         )
 
+        workers = wx.Menu()
+        workers_ = wx.MenuItem(
+            options,
+            wx.ID_ANY,
+            "&Number of matching processes",
+            "Select the number of parallel processes used during matching",
+        )
+        self.mnu_procs = []
+        workers_.SetSubMenu(workers)
+        for i in range(2 * cpu_count()):
+            new_mnu_proc = workers.AppendCheckItem(
+                wx.ID_ANY,
+                "&"
+                + str(i + 1)
+                + (" (Number of processors)" if i + 1 == cpu_count() else ""),
+                "",
+            )
+            self.mnu_procs.append(new_mnu_proc)
+        options.Append(workers_)
+        if (
+            config.theConfig["workers"] <= len(self.mnu_procs)
+            and config.theConfig["workers"] > 0
+        ):
+            self.mnu_procs[config.theConfig["workers"] - 1].Check(True)
+
         mnu_doc = wx.MenuItem(help, wx.ID_ANY, "&Help...", "Help")
         mnu_doc.SetBitmap(icons.Help_16_PNG.GetBitmap())
         help.Append(mnu_doc)
@@ -917,6 +944,8 @@ class MainFrame(wx.Frame):
 
         for mnu_recent in self.mnu_recents:
             self.Bind(wx.EVT_MENU, self.OnOpenRecent, mnu_recent)
+        for mnu_proc in self.mnu_procs:
+            self.Bind(wx.EVT_MENU, self.OnNumProc, mnu_proc)
 
         self.Show(True)
 
@@ -950,6 +979,11 @@ class MainFrame(wx.Frame):
 
             # save the current contents in the file
             self.SaveSession(fileDialog.GetPath())
+
+    def OnNumProc(self, event):
+        menu = event.GetEventObject()
+        menuItem = menu.FindItemById(event.GetId())
+        config.theConfig["workers"] = self.mnu_procs.index(menuItem) + 1
 
     def OnOpenRecent(self, event):
         menu = event.GetEventObject()
