@@ -1,3 +1,6 @@
+[![license](https://img.shields.io/github/license/pcjco/PyFuzzy-renamer)](https://github.com/pcjco/PyFuzzy-renamer/blob/master/LICENSE)
+![Test](https://github.com/pcjco/PyFuzzy-renamer/workflows/Test/badge.svg?branch=master&event=push)
+
 ![Screenshot](screenshot.png?raw=true "Screenshot")
 
 This application uses a list of input strings and will rename each one with the most similar string from another list of strings.
