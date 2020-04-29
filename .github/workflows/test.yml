@@ -33,10 +33,10 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install GTK+3 (Linux)
+    - name: Install packages (ubuntu)
       if: startsWith(matrix.os, 'ubuntu')
       run: |
-        sudo apt-get install -y -qq sudo make gcc libgtk-3-dev libwebkitgtk-dev libwebkitgtk-3.0-dev libgstreamer-gl1.0-0 freeglut3 freeglut3-dev python-gst-1.0 python3-gst-1.0 libglib2.0-dev ubuntu-restricted-extras libgstreamer-plugins-base1.0-dev
+        sudo apt-get install -y -qq sudo make gcc xvfb libgtk-3-dev libwebkitgtk-dev libwebkitgtk-3.0-dev libgstreamer-gl1.0-0 freeglut3 freeglut3-dev python-gst-1.0 python3-gst-1.0 libglib2.0-dev ubuntu-restricted-extras libgstreamer-plugins-base1.0-dev
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -48,7 +48,13 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
+    - name: Test with pytest (ubuntu)
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        pip install pytest
+        xvfb-run --auto-servernum pytest
+    - name: Test with pytest (ubuntu)
+      if: startsWith(matrix.os, 'windows') || startsWith(matrix.os, 'macos')
       run: |
         pip install pytest
         pytest
