@@ -8,6 +8,7 @@ import wx.html
 from multiprocessing import cpu_count, freeze_support
 from pathlib import Path
 
+from . import __version__
 from pyfuzzyrenamer import (
     config,
     filters,
@@ -664,7 +665,7 @@ class aboutDialog(wx.Dialog):
         html = wxHTML(self)
 
         html.SetPage(
-            '<font size="30">PyFuzzy-renamer</font><br><br>'
+            '<font size="30">PyFuzzy-renamer ' +  __version__ + '</font><br><br>'
             "<u>Authors</u><br>"
             "<ul><li>pcjco</li></ul>"
             "<u>Credits</u><br>"
@@ -727,7 +728,7 @@ class MainFrame(wx.Frame):
         wx.Frame.__init__(
             self,
             None,
-            title="PyFuzzy-renamer",
+            title="PyFuzzy-renamer " + __version__,
             pos=wx.Point(get_config()["window"][2], get_config()["window"][3]),
             size=wx.Size(get_config()["window"][0], get_config()["window"][1]),
         )
