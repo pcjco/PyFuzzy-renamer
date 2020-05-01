@@ -33,7 +33,7 @@ class add_choices_Tests(pfr.PyFuzzyRenamerTestCase):
             self.frame.panel.AddChoicesFromDir(choicesDir)
         else:
             choices = []
-            for f in Path(choicesDir).resolve().glob("*"):
+            for f in sorted(Path(choicesDir).resolve().glob("*"), key=os.path.basename):
                 try:
                     if f.is_file():
                         choices.append(f)

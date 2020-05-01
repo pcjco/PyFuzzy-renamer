@@ -169,11 +169,12 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 width=config.theConfig["col%d_size" % (col + 1)],
             )
 
-        order = [
-            config.theConfig["col%d_order" % (col + 1)]
-            for col in range(0, len(config.default_columns))
-        ]
-        self.SetColumnsOrder(order)
+        if self.HasColumnOrderSupport():
+            order = [
+                config.theConfig["col%d_order" % (col + 1)]
+                for col in range(0, len(config.default_columns))
+            ]
+            self.SetColumnsOrder(order)
 
         self.listdata = {}
         self.itemDataMap = self.listdata
@@ -226,7 +227,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             if self.GetSelectedItemCount() == 1:
                 row_id = self.GetFirstSelected()
                 pos_column_match = 0
-                for i in self.GetColumnsOrder():
+                for i in (self.GetColumnsOrder() if self.HasColumnOrderSupport() else range(0, len(config.default_columns))):
                     if i == 2:
                         break
                     pos_column_match += self.GetColumnWidth(i)
@@ -474,7 +475,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
     def OnBeginLabelEdit(self, event):
         start_match_col = 0
         end_match_col = 0
-        for col in self.GetColumnsOrder():
+        for col in (self.GetColumnsOrder() if self.HasColumnOrderSupport() else range(0, len(config.default_columns))):
             end_match_col += self.GetColumnWidth(col)
             if col == 2:
                 break
@@ -682,8 +683,3 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.CheckItem(row_id, True)
             row_id += 1
             index += 1
-
-    def OnSortOrderChanged(self):
-        row_id = self.GetFirstSelected()
-        if row_id != -1:
-            self.EnsureVisible(row_id)

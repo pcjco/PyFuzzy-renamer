@@ -733,7 +733,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
         btn.GetEventHandler().ProcessEvent(event)
 
         renamed = []
-        for f in Path(self.outdir).resolve().glob("*"):
+        for f in sorted(Path(self.outdir).resolve().glob("*"), key=os.path.basename):
             try:
                 if f.is_file():
                     renamed.append(f.name)
@@ -786,7 +786,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
         btn.GetEventHandler().ProcessEvent(event)
 
         renamed = []
-        for f in Path(self.outdir).resolve().glob("*"):
+        for f in sorted(Path(self.outdir).resolve().glob("*"), key=os.path.basename):
             try:
                 if f.is_file():
                     renamed.append(f.name)

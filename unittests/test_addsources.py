@@ -33,7 +33,7 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
             self.frame.panel.AddSourceFromDir(sourcesDir)
         else:
             sources = []
-            for f in Path(sourcesDir).resolve().glob("*"):
+            for f in sorted(Path(sourcesDir).resolve().glob("*"), key=os.path.basename):
                 try:
                     if f.is_file():
                         sources.append(f)

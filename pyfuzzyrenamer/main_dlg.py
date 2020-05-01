@@ -242,7 +242,7 @@ class MainPanel(wx.Panel):
     def AddSourceFromDir(self, directory):
         config.theConfig["folder_sources"] = directory
         newdata = []
-        for f in Path(directory).resolve().glob("*"):
+        for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
             try:
                 if f.is_file():
                     newdata.append([f, 0, Path(), Path(), "Not processed", "True", f])
@@ -297,7 +297,7 @@ class MainPanel(wx.Panel):
 
     def AddChoicesFromDir(self, directory):
         config.theConfig["folder_choices"] = directory
-        for f in Path(directory).resolve().glob("*"):
+        for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
             try:
                 if f.is_file():
                     glob_choices.add(f)
@@ -877,11 +877,11 @@ class MainFrame(wx.Frame):
         self.mnu_procs = []
         workers_.SetSubMenu(workers)
         for i in range(2 * cpu_count()):
-            new_mnu_proc = workers.AppendCheckItem(
+            new_mnu_proc = workers.AppendRadioItem(
                 wx.ID_ANY,
                 "&"
                 + str(i + 1)
-                + (" (Number of processors)" if i + 1 == cpu_count() else ""),
+                + (" (# of processors)" if i + 1 == cpu_count() else ""),
                 "",
             )
             self.mnu_procs.append(new_mnu_proc)
@@ -1131,7 +1131,7 @@ class MainFrame(wx.Frame):
     def SaveUI(self):
         list = self.panel.list_ctrl
         for col in range(0, len(config.default_columns)):
-            config.theConfig["col%d_order" % (col + 1)] = list.GetColumnOrder(col)
+            config.theConfig["col%d_order" % (col + 1)] = list.GetColumnOrder(col) if list.HasColumnOrderSupport() else col
             config.theConfig["col%d_size" % (col + 1)] = list.GetColumnWidth(col)
         config.theConfig["window"] = [
             self.GetSize().x,
@@ -1202,10 +1202,10 @@ def getDoc():
         "<p>Filters are only applied for the <b>matching</b> process, original unfiltered files are used otherwise.</p>"
         "<p>For example, to clean articles of <b>source</b> and <b>choice</b> file, a filter with the pattern <code>(^the\\b|, the)</code> with an empty replacement <code> </code> could be used:<br>"
         "<ol>"
-        '<li><b>Filtering source</b>: <code><font color="blue">c:/foo/The Amaryllis.png</font></code> &#11106; <code><font color="blue">Amaryllis</font></code></li>'
-        '<li><b>Filtering choice</b>: <code><font color="red">d:/bar/Amaryllidinae, The.txt</font></code> &#11106; <code><font color="red">Amaryllidinae</font></code></li>'
-        '<li><b>Matching</b>: <code><font color="blue">The Amaryllis</font></code> &#11106; <code><font color="red">Amaryllidinae, The</font></code></li>'
-        '<li><b>Renaming</b>: <code><font color="blue">c:/foo/The Amaryllis.png</font></code> &#11106; <code><font color="blue">c:/foo/</font><font color="red">Amaryllidinae, The</font><font color="blue">.png</font></code></li>'
+        '<li><b>Filtering source</b>: <code><font color="blue">c:/foo/The Amaryllis.png</font></code> &rarr; <code><font color="blue">Amaryllis</font></code></li>'
+        '<li><b>Filtering choice</b>: <code><font color="red">d:/bar/Amaryllidinae, The.txt</font></code> &rarr; <code><font color="red">Amaryllidinae</font></code></li>'
+        '<li><b>Matching</b>: <code><font color="blue">The Amaryllis</font></code> &rarr; <code><font color="red">Amaryllidinae, The</font></code></li>'
+        '<li><b>Renaming</b>: <code><font color="blue">c:/foo/The Amaryllis.png</font></code> &rarr; <code><font color="blue">c:/foo/</font><font color="red">Amaryllidinae, The</font><font color="blue">.png</font></code></li>'
         "</ol>"
         "<p>Filters creation, addition, deletion, re-ordering is available from <code><b>Masks &amp; Filters</b></code> button.</p>"
         "<ul>"
@@ -1223,10 +1223,10 @@ def getDoc():
         "It is used to remove leading and trailing expressions (year, disk#...) before <b>matching</b> and restore them after <b>renaming</b>.</p>"
         "<p>For example, to preserve the Disk number at the end of a <b>source</b> file, a mask with the pattern <code>(\\s?disk\\d)$</code> could be used:<br>"
         "<ol>"
-        '<li><b>Masking</b>: <code><font color="blue">c:/foo/The Wiiire Disk1.rom</font></code> &#11106; <code><font color="blue">The Wiiire</font></code> + Trailing mask = <code><font color="green"> Disk1</font></code></li>'
-        '<li><b>Matching</b>: <code><font color="blue">The Wiiire</font></code> &#11106; <code><font color="red">The Wire</font></code></li>'
-        '<li><b>Renaming</b>: <code><font color="blue">c:/foo/The Wiiire.rom</font></code> &#11106; <code><font color="blue">c:/foo/</font><font color="red">The Wire</font><font color="blue">.rom</font></code></li>'
-        '<li><b>Unmkasking</b>: <code><font color="blue">c:/foo/The Wiiire.rom</font></code> &#11106; <code><font color="blue">c:/foo/The Wire<font color="green"> Disk1</font>.rom</font></code></li>'
+        '<li><b>Masking</b>: <code><font color="blue">c:/foo/The Wiiire Disk1.rom</font></code> &rarr; <code><font color="blue">The Wiiire</font></code> + Trailing mask = <code><font color="green"> Disk1</font></code></li>'
+        '<li><b>Matching</b>: <code><font color="blue">The Wiiire</font></code> &rarr; <code><font color="red">The Wire</font></code></li>'
+        '<li><b>Renaming</b>: <code><font color="blue">c:/foo/The Wiiire.rom</font></code> &rarr; <code><font color="blue">c:/foo/</font><font color="red">The Wire</font><font color="blue">.rom</font></code></li>'
+        '<li><b>Unmkasking</b>: <code><font color="blue">c:/foo/The Wiiire.rom</font></code> &rarr; <code><font color="blue">c:/foo/The Wire<font color="green"> Disk1</font>.rom</font></code></li>'
         "</ol>"
         "<p>Masks creation, addition, deletion, re-ordering is available from <code><b>Masks &amp; Filters</b></code> button.</p>"
         "<ul>"

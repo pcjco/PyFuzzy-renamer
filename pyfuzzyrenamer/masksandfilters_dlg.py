@@ -70,13 +70,13 @@ class masksandfiltersPanel(wx.Panel):
             "info.png", icons.Info_16_PNG.GetBitmap(), wx.BITMAP_TYPE_PNG
         )
 
-        html_desc_filters = wx.html.HtmlWindow(page_filters, size=(-1, 135))
+        html_desc_filters = wx.html.HtmlWindow(page_filters, size=(600, 135))
         html_desc_filters.SetPage(
             '<img src="memory:info.png">'
             " These filters, using Python regular expression patterns, are applied to <b>sources</b> and <b>choices</b> strings before matching occurs."
             "It is used to help matching by cleaning strings (removing tags, ...) beforehand.<br><br>"
             "For example, replacing the pattern <font face=\"verdana\">'(\\(\\d{4}\\))'</font> by <font face=\"verdana\">''</font>:<br>"
-            '<ul><li><i><font face="verdana">The Wire <font color="red">(2002)</font></font></i> \u2B62 <i><font face="verdana">The Wire</font></i></li>'
+            '<ul><li><i><font face="verdana">The Wire <font color="red">(2002)</font></font></i> &rarr; <i><font face="verdana">The Wire</font></i></li>'
         )
 
         sizer2 = wx.BoxSizer(wx.HORIZONTAL)
@@ -116,15 +116,15 @@ class masksandfiltersPanel(wx.Panel):
         )
         label22 = wx.StaticText(page_masks, label="Lead-Mid-Trail", size=(80, -1))
 
-        html_desc_masks = wx.html.HtmlWindow(page_masks, size=(-1, 200))
+        html_desc_masks = wx.html.HtmlWindow(page_masks, size=(600, 200))
         html_desc_masks.SetPage(
             '<img src="memory:info.png">'
             " These masks, using Python regular expression patterns, are removed from <b>sources</b> strings before filtering and matching occur."
             "It is used to remove leading and trailing expressions (year, disk#...) before matching and restore them at renaming.<br><br>"
             "For example, masking the pattern <font face=\"verdana\">'(\\s?disk\\d)$'</font>:<br>"
-            '<ol><li>Source\u2B62masked source: <i><font face="verdana">The Wiiire <font color="red"> Disk1</font> \u2B62 The Wiiire</font></i></li>'
-            '<li>Masked source\u2B62best choice: <i><font face="verdana">The Wiiire \u2B62 The Wire</font></i></li>'
-            '<li>Best choice\u2B62renamed unmasked source: <i><font face="verdana">The Wire \u2B62 The Wire<font color="red"> Disk1</font></font></i></li>'
+            '<ol><li>Source&rarr;masked source: <i><font face="verdana">The Wiiire <font color="red"> Disk1</font> &rarr; The Wiiire</font></i></li>'
+            '<li>Masked source&rarr;best choice: <i><font face="verdana">The Wiiire &rarr; The Wire</font></i></li>'
+            '<li>Best choice&rarr;renamed unmasked source: <i><font face="verdana">The Wire &rarr; The Wire<font color="red"> Disk1</font></font></i></li>'
         )
 
         sizer22 = wx.BoxSizer(wx.HORIZONTAL)

@@ -15,7 +15,10 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
                 break
 
         def setFilters():
-            dlg = wx.GetActiveWindow()
+            for tlw in wx.GetTopLevelWindows():
+                if 'masksandfiltersDialog' in type(tlw).__name__:
+                    dlg = tlw
+                    break
             dlg.panel.notebook.SetSelection(1)
             event = wx.KeyEvent(wx.wxEVT_CHAR)
             event.SetKeyCode(wx.WXK_CONTROL_A)
@@ -77,7 +80,10 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
                 break
 
         def setFilters():
-            dlg = wx.GetActiveWindow()
+            for tlw in wx.GetTopLevelWindows():
+                if 'masksandfiltersDialog' in type(tlw).__name__:
+                    dlg = tlw
+                    break
             dlg.panel.notebook.SetSelection(1)
             event = wx.KeyEvent(wx.wxEVT_CHAR)
             event.SetKeyCode(wx.WXK_CONTROL_A)
