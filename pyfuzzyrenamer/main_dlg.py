@@ -881,7 +881,8 @@ class MainFrame(wx.Frame):
                 wx.ID_ANY,
                 "&"
                 + str(i + 1)
-                + (" (# of processors)" if i + 1 == cpu_count() else ""),
+                + ("    (CPU count)" if i + 1 == cpu_count() else "")
+                + ("    (no multiprocessing)" if i == 0 else ""),
                 "",
             )
             self.mnu_procs.append(new_mnu_proc)
