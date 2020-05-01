@@ -6,6 +6,7 @@ from functools import partial
 from pathlib import Path
 
 from pyfuzzyrenamer import config, filters, main_dlg, icons, masks, match, utils
+from pyfuzzyrenamer.config import get_config
 
 
 class PickCandidate(wx.MiniFrame):
@@ -60,8 +61,8 @@ class PickCandidate(wx.MiniFrame):
                 )
                 list_ctrl.listdata[pos][config.D_STATUS] = "User choice"
 
-                Qview_fullpath = config.theConfig["show_fullpath"]
-                Qhide_extension = config.theConfig["hide_extension"]
+                Qview_fullpath = get_config()["show_fullpath"]
+                Qhide_extension = get_config()["hide_extension"]
                 list_ctrl.SetItem(
                     self.row_id,
                     config.D_MATCH_SCORE,
@@ -166,12 +167,12 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.InsertColumn(
                 col,
                 config.default_columns[col][2],
-                width=config.theConfig["col%d_size" % (col + 1)],
+                width=get_config()["col%d_size" % (col + 1)],
             )
 
         if self.HasColumnOrderSupport():
             order = [
-                config.theConfig["col%d_order" % (col + 1)]
+                get_config()["col%d_order" % (col + 1)]
                 for col in range(0, len(config.default_columns))
             ]
             self.SetColumnsOrder(order)
@@ -227,7 +228,11 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             if self.GetSelectedItemCount() == 1:
                 row_id = self.GetFirstSelected()
                 pos_column_match = 0
-                for i in (self.GetColumnsOrder() if self.HasColumnOrderSupport() else range(0, len(config.default_columns))):
+                for i in (
+                    self.GetColumnsOrder()
+                    if self.HasColumnOrderSupport()
+                    else range(0, len(config.default_columns))
+                ):
                     if i == 2:
                         break
                     pos_column_match += self.GetColumnWidth(i)
@@ -435,8 +440,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         )
         self.listdata[pos][config.D_STATUS] = "User choice"
 
-        Qview_fullpath = config.theConfig["show_fullpath"]
-        Qhide_extension = config.theConfig["hide_extension"]
+        Qview_fullpath = get_config()["show_fullpath"]
+        Qhide_extension = get_config()["hide_extension"]
         self.SetItem(
             row_id, config.D_MATCH_SCORE, str(self.listdata[pos][config.D_MATCH_SCORE]),
         )
@@ -475,7 +480,11 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
     def OnBeginLabelEdit(self, event):
         start_match_col = 0
         end_match_col = 0
-        for col in (self.GetColumnsOrder() if self.HasColumnOrderSupport() else range(0, len(config.default_columns))):
+        for col in (
+            self.GetColumnsOrder()
+            if self.HasColumnOrderSupport()
+            else range(0, len(config.default_columns))
+        ):
             end_match_col += self.GetColumnWidth(col)
             if col == 2:
                 break
@@ -493,7 +502,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             dia.text.SetFocus()
         else:
             event.Allow()
-            if config.theConfig["show_fullpath"]:
+            if get_config()["show_fullpath"]:
                 d = Path(event.GetLabel())
                 (self.GetEditControl()).SetValue(d.name)
 
@@ -522,8 +531,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     os.rename(old_file, new_file)
                     wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
 
-                    Qview_fullpath = config.theConfig["show_fullpath"]
-                    Qhide_extension = config.theConfig["hide_extension"]
+                    Qview_fullpath = get_config()["show_fullpath"]
+                    Qhide_extension = get_config()["hide_extension"]
 
                     new_match = match.get_match(new_path)
                     if new_match:
@@ -608,8 +617,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         return self
 
     def RefreshList(self):
-        Qview_fullpath = config.theConfig["show_fullpath"]
-        Qhide_extension = config.theConfig["hide_extension"]
+        Qview_fullpath = get_config()["show_fullpath"]
+        Qhide_extension = get_config()["hide_extension"]
 
         row_id = -1
         while True:
@@ -654,8 +663,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.SetItem(row_id, config.D_PREVIEW, "")
 
     def AddToList(self, newdata):
-        Qview_fullpath = config.theConfig["show_fullpath"]
-        Qhide_extension = config.theConfig["hide_extension"]
+        Qview_fullpath = get_config()["show_fullpath"]
+        Qhide_extension = get_config()["hide_extension"]
 
         index = (
             0 if not self.listdata else sorted(self.listdata.keys())[-1] + 1

@@ -15,6 +15,7 @@ D_STATUS = 4
 D_CHECKED = 5
 D_PREVIOUS_FILENAME = 6
 
+DEFAULT_CONFIG_FILE = os.sep.join([os.getcwd(), "pyfuzzyrenamer.ini"])
 default_columns = [
     [0, 300, "Source Name"],
     [1, 80, "Similarity(%)"],
@@ -48,7 +49,23 @@ default_filters = (
     + "\n"
     + r'" "'
 )
+
+
+def get_config_file():
+    return os.environ.get("PYFUZZYRENAMER_CONFIG_FILE", DEFAULT_CONFIG_FILE)
+
+
+CONFIG_FILE = get_config_file()
+
 theConfig = {}
+
+
+def get_config():
+    return theConfig
+
+
+def get_default_columns():
+    return default_columns
 
 
 def default():
@@ -73,134 +90,100 @@ def default():
         theConfig["col%d_size" % (i + 1)] = default_columns[i][1]
 
 
-def read():
+def read(config_file=None):
     default()
 
-    INI_show_fullpath_val = theConfig["show_fullpath"]
-    INI_hide_extension_val = theConfig["hide_extension"]
-    INI_keep_match_ext_val = theConfig["keep_match_ext"]
-    INI_keep_original_val = theConfig["keep_original"]
-    INI_match_firstletter_val = theConfig["match_firstletter"]
-    INI_folder_sources_val = theConfig["folder_sources"]
-    INI_folder_choices_val = theConfig["folder_choices"]
-    INI_folder_output_val = theConfig["folder_output"]
-    INI_filters_val = theConfig["filters"]
-    INI_masks_val = theConfig["masks"]
-    INI_filters_test_val = theConfig["filters_test"]
-    INI_masks_test_val = theConfig["masks_test"]
-    INI_window_val = theConfig["window"].copy()
-    INI_workers_val = theConfig["workers"]
-    INI_col_val = copy.deepcopy(default_columns)
-    INI_recent_session_val = theConfig["recent_session"].copy()
-
     # read config file
-    INI_global_cat = {}
-    INI_recent_cat = {}
-    INI_matching_cat = {}
-    INI_ui_cat = {}
     try:
         config_file = os.sep.join([os.getcwd(), "config.ini"])
         config = configparser.ConfigParser()
-        cfg_file = config.read(config_file, encoding="utf-8-sig")
+        cfg_file = config.read(CONFIG_FILE or config_file, encoding="utf-8-sig")
         if not len(cfg_file):
             return theConfig
         try:
-            INI_global_cat = config["global"]
-        except KeyError:
-            pass
-        try:
-            INI_recent_cat = config["recent"]
-        except KeyError:
-            pass
-        try:
-            INI_matching_cat = config["matching"]
-        except KeyError:
-            pass
-        try:
-            INI_ui_cat = config["ui"]
-        except KeyError:
-            pass
-
-        try:
-            INI_show_fullpath_val = (
-                True if INI_global_cat["show_fullpath"] == "True" else False
+            theConfig["show_fullpath"] = (
+                True if config["global"]["show_fullpath"] == "True" else False
             )
         except KeyError:
             pass
         try:
-            INI_hide_extension_val = (
-                True if INI_global_cat["hide_extension"] == "True" else False
+            theConfig["hide_extension"] = (
+                True if config["global"]["hide_extension"] == "True" else False
             )
         except KeyError:
             pass
         try:
-            INI_keep_match_ext_val = (
-                True if INI_global_cat["keep_match_ext"] == "True" else False
+            theConfig["keep_match_ext"] = (
+                True if config["global"]["keep_match_ext"] == "True" else False
             )
         except KeyError:
             pass
         try:
-            INI_keep_original_val = (
-                True if INI_global_cat["keep_original"] == "True" else False
+            theConfig["keep_original"] = (
+                True if config["global"]["keep_original"] == "True" else False
             )
         except KeyError:
             pass
         try:
-            INI_match_firstletter_val = (
-                True if INI_global_cat["match_firstletter"] == "True" else False
+            theConfig["match_firstletter"] = (
+                True if config["global"]["match_firstletter"] == "True" else False
             )
         except KeyError:
             pass
         try:
-            INI_folder_sources_val = INI_recent_cat["folder_sources"]
+            theConfig["folder_sources"] = config["recent"]["folder_sources"]
         except KeyError:
             pass
         try:
-            INI_folder_choices_val = INI_recent_cat["folder_choices"]
+            theConfig["folder_choices"] = config["recent"]["folder_choices"]
         except KeyError:
             pass
         try:
-            INI_folder_output_val = INI_recent_cat["folder_output"]
+            theConfig["folder_output"] = config["recent"]["folder_output"]
         except KeyError:
             pass
         for i in range(1, 9):
             try:
-                f = INI_recent_cat["recent_session%d" % i]
+                f = config["recent"]["recent_session%d" % i]
                 if Path(f).is_file():
-                    INI_recent_session_val.append(f)
+                    theConfig["recent_session"].append(f)
             except KeyError:
                 pass
         try:
-            INI_filters_val = INI_matching_cat["filters"]
+            theConfig["filters"] = config["matching"]["filters"]
         except KeyError:
             pass
         try:
-            INI_masks_val = INI_matching_cat["masks"]
+            theConfig["masks"] = config["matching"]["masks"]
         except KeyError:
             pass
         try:
-            INI_masks_test_val = INI_matching_cat["masks_test"]
+            theConfig["masks_test"] = config["matching"]["masks_test"]
         except KeyError:
             pass
         try:
-            INI_filters_test_val = INI_matching_cat["filters_test"]
+            theConfig["filters_test"] = config["matching"]["filters_test"]
         except KeyError:
             pass
         try:
-            INI_workers_val = int(INI_matching_cat["workers"])
+            theConfig["workers"] = int(config["matching"]["workers"])
         except KeyError:
             pass
         for i in range(0, len(default_columns)):
             try:
-                INI_col_val[i][0] = int(INI_ui_cat["col%d_order" % (i + 1)])
-                INI_col_val[i][1] = int(INI_ui_cat["col%d_size" % (i + 1)])
+                theConfig["col%d_order" % (i + 1)] = int(
+                    config["ui"]["col%d_order" % (i + 1)]
+                )
+                theConfig["col%d_size" % (i + 1)] = int(
+                    config["ui"]["col%d_size" % (i + 1)]
+                )
             except KeyError:
                 pass
         try:
-            INI_window_val[0] = int(INI_ui_cat["width"])
-            INI_window_val[1] = int(INI_ui_cat["height"])
-            INI_window_val[2] = int(INI_ui_cat["left"])
-            INI_window_val[3] = int(INI_ui_cat["top"])
+            theConfig["window"][0] = int(config["ui"]["width"])
+            theConfig["window"][1] = int(config["ui"]["height"])
+            theConfig["window"][2] = int(config["ui"]["left"])
+            theConfig["window"][3] = int(config["ui"]["top"])
         except KeyError:
             pass
 
@@ -208,62 +191,47 @@ def read():
         logging.error("%s when reading config file '%s'" % (e.args[0], config_file))
         return theConfig
 
-    theConfig["show_fullpath"] = INI_show_fullpath_val
-    theConfig["hide_extension"] = INI_hide_extension_val
-    theConfig["keep_match_ext"] = INI_keep_match_ext_val
-    theConfig["keep_original"] = INI_keep_original_val
-    theConfig["match_firstletter"] = INI_match_firstletter_val
-    theConfig["folder_sources"] = INI_folder_sources_val
-    theConfig["folder_choices"] = INI_folder_choices_val
-    theConfig["folder_output"] = INI_folder_output_val
-    theConfig["filters"] = INI_filters_val
-    theConfig["masks"] = INI_masks_val
-    theConfig["filters_test"] = INI_filters_test_val
-    theConfig["masks_test"] = INI_masks_test_val
-    for i in range(0, len(default_columns)):
-        theConfig["col%d_order" % (i + 1)] = INI_col_val[i][0]
-        theConfig["col%d_size" % (i + 1)] = INI_col_val[i][1]
-    theConfig["workers"] = INI_workers_val
-    theConfig["window"] = INI_window_val
-    theConfig["recent_session"] = INI_recent_session_val
     masks.FileMasked.masks = masks.CompileMasks(theConfig["masks"])
     filters.FileFiltered.filters = filters.CompileFilters(theConfig["filters"])
 
 
-def write():
-    config_file = os.sep.join([os.getcwd(), "config.ini"])
+def write(config_file=None):
     config = configparser.ConfigParser()
-    config["global"] = {
-        "show_fullpath": theConfig["show_fullpath"],
-        "hide_extension": theConfig["hide_extension"],
-        "keep_match_ext": theConfig["keep_match_ext"],
-        "keep_original": theConfig["keep_original"],
-        "match_firstletter": theConfig["match_firstletter"],
-    }
-    config["matching"] = {
-        "masks": theConfig["masks"],
-        "filters": theConfig["filters"],
-        "masks_test": theConfig["masks_test"],
-        "filters_test": theConfig["filters_test"],
-        "workers": theConfig["workers"],
-    }
-    config["recent"] = {
-        "folder_sources": theConfig["folder_sources"],
-        "folder_choices": theConfig["folder_choices"],
-        "folder_output": theConfig["folder_output"],
-    }
+    config.read_dict(
+        {
+            "global": {
+                "show_fullpath": theConfig["show_fullpath"],
+                "hide_extension": theConfig["hide_extension"],
+                "keep_match_ext": theConfig["keep_match_ext"],
+                "keep_original": theConfig["keep_original"],
+                "match_firstletter": theConfig["match_firstletter"],
+            },
+            "matching": {
+                "masks": theConfig["masks"],
+                "filters": theConfig["filters"],
+                "masks_test": theConfig["masks_test"],
+                "filters_test": theConfig["filters_test"],
+                "workers": theConfig["workers"],
+            },
+            "recent": {
+                "folder_sources": theConfig["folder_sources"],
+                "folder_choices": theConfig["folder_choices"],
+                "folder_output": theConfig["folder_output"],
+            },
+            "ui": {
+                "width": theConfig["window"][0],
+                "height": theConfig["window"][1],
+                "left": theConfig["window"][2],
+                "top": theConfig["window"][3],
+            },
+        }
+    )
     for i in range(0, len(theConfig["recent_session"])):
         config["recent"]["recent_session%d" % (i + 1)] = theConfig["recent_session"][i]
 
-    ui = {}
-    ui["width"] = theConfig["window"][0]
-    ui["height"] = theConfig["window"][1]
-    ui["left"] = theConfig["window"][2]
-    ui["top"] = theConfig["window"][3]
     for i in range(0, len(default_columns)):
-        ui["col%d_order" % (i + 1)] = theConfig["col%d_order" % (i + 1)]
-        ui["col%d_size" % (i + 1)] = theConfig["col%d_size" % (i + 1)]
-    config["ui"] = ui
+        config["ui"]["col%d_order" % (i + 1)] = str(theConfig["col%d_order" % (i + 1)])
+        config["ui"]["col%d_size" % (i + 1)] = str(theConfig["col%d_size" % (i + 1)])
 
-    with open(config_file, "w") as configfile:
+    with open(CONFIG_FILE or config_file, "w") as configfile:
         config.write(configfile)

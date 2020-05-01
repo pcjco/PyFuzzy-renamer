@@ -3,7 +3,8 @@ import fuzzywuzzy.process
 import wx
 from multiprocessing import Pool, active_children
 
-from pyfuzzyrenamer import config, main_dlg, masks
+from pyfuzzyrenamer import main_dlg, masks
+from pyfuzzyrenamer.config import get_config
 
 
 class FileMatch:
@@ -64,10 +65,10 @@ def get_matches(sources):
         | wx.PD_ESTIMATED_TIME
         | wx.PD_REMAINING_TIME,
     )
-    Qmatch_firstletter = config.theConfig["match_firstletter"]
+    Qmatch_firstletter = get_config()["match_firstletter"]
     added = 0
-    if config.theConfig["workers"] > 1:
-        pool = Pool(processes=config.theConfig["workers"])
+    if get_config()["workers"] > 1:
+        pool = Pool(processes=get_config()["workers"])
         for f in sources:
             f_masked = masks.FileMasked(f)
             if not f_masked.masked[1]:
@@ -157,7 +158,7 @@ def get_match(source):
     if not f_masked.masked[1]:
         return ret
 
-    if config.theConfig["match_firstletter"]:
+    if get_config()["match_firstletter"]:
         first_letter = f_masked.masked[1][0]
         if first_letter in main_dlg.candidates.keys():
             ret = fuzzywuzzy.process.extract(

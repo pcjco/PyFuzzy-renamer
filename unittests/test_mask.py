@@ -16,7 +16,7 @@ class mask_Tests(pfr.PyFuzzyRenamerTestCase):
 
         def setMasks():
             for tlw in wx.GetTopLevelWindows():
-                if 'masksandfiltersDialog' in type(tlw).__name__:
+                if "masksandfiltersDialog" in type(tlw).__name__:
                     dlg = tlw
                     break
             dlg.panel.notebook.SetSelection(0)
@@ -86,7 +86,7 @@ class mask_Tests(pfr.PyFuzzyRenamerTestCase):
 
         def setMasks():
             for tlw in wx.GetTopLevelWindows():
-                if 'masksandfiltersDialog' in type(tlw).__name__:
+                if "masksandfiltersDialog" in type(tlw).__name__:
                     dlg = tlw
                     break
             dlg.panel.notebook.SetSelection(0)

@@ -4,7 +4,8 @@ import wx
 import wx.lib.mixins.listctrl as listmix
 from pathlib import Path
 
-from pyfuzzyrenamer import config, masks, utils
+from pyfuzzyrenamer import masks, utils
+from pyfuzzyrenamer.config import get_config
 
 
 class MaskListCtrlDropTarget(wx.DropTarget):
@@ -57,7 +58,7 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         dt.SetDefaultAction(wx.DragMove)
         self.SetDropTarget(dt)
 
-        self.PopulateMasks(config.theConfig["masks"])
+        self.PopulateMasks(get_config()["masks"])
         self.unplug_preview = False
 
     def PopulateMasks(self, s_masks):

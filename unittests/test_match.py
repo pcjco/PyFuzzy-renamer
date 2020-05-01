@@ -6,6 +6,7 @@ from pathlib import Path
 
 from unittests import pfr
 from pyfuzzyrenamer import config
+from pyfuzzyrenamer.config import get_config
 
 # ---------------------------------------------------------------------------
 
@@ -702,7 +703,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
         )
 
     def test_match_rename(self):
-        config.theConfig["keep_original"] = True
+        get_config()["keep_original"] = True
         if os.path.exists(self.outdir):
             shutil.rmtree(self.outdir)
         os.makedirs(self.outdir)
@@ -754,8 +755,8 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
         )
 
     def test_match_rename_keep_ext(self):
-        config.theConfig["keep_original"] = True
-        config.theConfig["keep_match_ext"] = True
+        get_config()["keep_original"] = True
+        get_config()["keep_match_ext"] = True
         if os.path.exists(self.outdir):
             shutil.rmtree(self.outdir)
         os.makedirs(self.outdir)

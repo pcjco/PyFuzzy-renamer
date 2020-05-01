@@ -4,7 +4,8 @@ import wx
 import wx.lib.mixins.listctrl as listmix
 from pathlib import Path
 
-from pyfuzzyrenamer import config, filters, utils
+from pyfuzzyrenamer import filters, utils
+from pyfuzzyrenamer.config import get_config
 
 
 class FilterListCtrlDropTarget(wx.DropTarget):
@@ -58,7 +59,7 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
         dt.SetDefaultAction(wx.DragMove)
         self.SetDropTarget(dt)
 
-        self.PopulateFilters(config.theConfig["filters"])
+        self.PopulateFilters(get_config()["filters"])
         self.unplug_preview = False
 
     def PopulateFilters(self, s_filters):

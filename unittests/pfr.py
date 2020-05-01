@@ -9,9 +9,6 @@ from pyfuzzyrenamer import config, main_dlg
 class PyFuzzyRenamerTestCase(unittest.TestCase):
     def setUp(self):
 
-        # Backup and Reset config file
-        config.read()
-        self.backup_config = copy.deepcopy(config.theConfig)
         config.default()
 
         main_dlg.glob_choices.clear()
@@ -36,9 +33,6 @@ class PyFuzzyRenamerTestCase(unittest.TestCase):
                         wx.CallAfter(tlw.Destroy)
                     else:
                         tlw.Close(force=True)
-            # Restore backup config file
-            config.theConfig = self.backup_config
-            config.write()
             wx.WakeUpIdle()
 
         timer = wx.PyTimer(_cleanup)

@@ -18,6 +18,7 @@ from pyfuzzyrenamer import (
     match,
     utils,
 )
+from pyfuzzyrenamer.config import get_config
 
 candidates = {}
 glob_choices = set()
@@ -26,7 +27,7 @@ glob_choices = set()
 def getRenamePreview(input, match):
     if not match.name:
         return Path()
-    Qkeep_match_ext = config.theConfig["keep_match_ext"]
+    Qkeep_match_ext = get_config()["keep_match_ext"]
     stem, suffix = utils.GetFileStemAndSuffix(match)
     match_clean = utils.strip_extra_whitespace(utils.strip_illegal_chars(stem))
     if Qkeep_match_ext:
@@ -35,8 +36,8 @@ def getRenamePreview(input, match):
     stem, suffix = utils.GetFileStemAndSuffix(input)
     return Path(
         os.path.join(
-            config.theConfig["folder_output"]
-            if config.theConfig["folder_output"]
+            get_config()["folder_output"]
+            if get_config()["folder_output"]
             else input.parent,
             f_masked.masked[0] + match_clean + f_masked.masked[2],
         )
@@ -47,7 +48,7 @@ def getRenamePreview(input, match):
 def RefreshCandidates():
     candidates.clear()
     candidates["all"] = [filters.FileFiltered(f) for f in glob_choices]
-    if config.theConfig["match_firstletter"]:
+    if get_config()["match_firstletter"]:
         for word in candidates["all"]:
             first_letter = word.filtered[0]
             if first_letter in candidates.keys():
@@ -199,18 +200,18 @@ class MainPanel(wx.Panel):
 
     def OnViewFullPath(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        config.theConfig["show_fullpath"] = item.IsChecked()
-        self.parent.mnu_hide_extension.Enable(not config.theConfig["show_fullpath"])
+        get_config()["show_fullpath"] = item.IsChecked()
+        self.parent.mnu_hide_extension.Enable(not get_config()["show_fullpath"])
         self.list_ctrl.RefreshList()
 
     def OnHideExtension(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        config.theConfig["hide_extension"] = item.IsChecked()
+        get_config()["hide_extension"] = item.IsChecked()
         self.list_ctrl.RefreshList()
 
     def OnKeepMatchExtension(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        config.theConfig["keep_match_ext"] = item.IsChecked()
+        get_config()["keep_match_ext"] = item.IsChecked()
         for index in self.list_ctrl.listdata.keys():
             self.list_ctrl.listdata[index][config.D_PREVIEW] = getRenamePreview(
                 self.list_ctrl.listdata[index][config.D_FILENAME],
@@ -220,18 +221,18 @@ class MainPanel(wx.Panel):
 
     def OnKeepOriginal(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        config.theConfig["keep_original"] = item.IsChecked()
+        get_config()["keep_original"] = item.IsChecked()
 
     def OnMatchFirstLetter(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
-        config.theConfig["match_firstletter"] = item.IsChecked()
+        get_config()["match_firstletter"] = item.IsChecked()
         RefreshCandidates()
 
     def OnAddSourceFromDir(self, evt):
         with wx.DirDialog(
             self,
             "Choose source directory",
-            config.theConfig["folder_sources"],
+            get_config()["folder_sources"],
             wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
         ) as dirDialog:
 
@@ -240,7 +241,7 @@ class MainPanel(wx.Panel):
             self.AddSourceFromDir(dirDialog.GetPath())
 
     def AddSourceFromDir(self, directory):
-        config.theConfig["folder_sources"] = directory
+        get_config()["folder_sources"] = directory
         newdata = []
         for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
             try:
@@ -254,7 +255,7 @@ class MainPanel(wx.Panel):
         with wx.FileDialog(
             self,
             "Choose source files",
-            config.theConfig["folder_sources"],
+            get_config()["folder_sources"],
             style=wx.FD_DEFAULT_STYLE | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE,
         ) as self.fileDialog:
 
@@ -272,7 +273,7 @@ class MainPanel(wx.Panel):
                 fp = Path(f)
                 if first:
                     first = False
-                    config.theConfig["folder_sources"] = str(fp.parent)
+                    get_config()["folder_sources"] = str(fp.parent)
                 newdata.append([fp, 0, Path(), Path(), "Not processed", "True", fp])
             except (OSError, IOError):
                 pass
@@ -287,7 +288,7 @@ class MainPanel(wx.Panel):
         with wx.DirDialog(
             self,
             "Choose choice directory",
-            config.theConfig["folder_choices"],
+            get_config()["folder_choices"],
             wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
         ) as dirDialog:
 
@@ -296,7 +297,7 @@ class MainPanel(wx.Panel):
             self.AddChoicesFromDir(dirDialog.GetPath())
 
     def AddChoicesFromDir(self, directory):
-        config.theConfig["folder_choices"] = directory
+        get_config()["folder_choices"] = directory
         for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
             try:
                 if f.is_file():
@@ -309,7 +310,7 @@ class MainPanel(wx.Panel):
         with wx.FileDialog(
             self,
             "Choose choice files",
-            config.theConfig["folder_choices"],
+            get_config()["folder_choices"],
             style=wx.FD_DEFAULT_STYLE | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE,
         ) as fileDialog:
 
@@ -326,7 +327,7 @@ class MainPanel(wx.Panel):
                 fp = Path(f)
                 if first:
                     first = False
-                    config.theConfig["folder_choices"] = str(fp.parent)
+                    get_config()["folder_choices"] = str(fp.parent)
                 glob_choices.add(fp)
             except (OSError, IOError):
                 pass
@@ -345,7 +346,7 @@ class MainPanel(wx.Panel):
         with wx.DirDialog(
             self,
             "Choose output directory",
-            config.theConfig["folder_output"],
+            get_config()["folder_output"],
             wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
         ) as dirDialog:
 
@@ -361,7 +362,7 @@ class MainPanel(wx.Panel):
             self.parent.mnu_same_as_input.Check(True)
 
     def SetOutputDirectory(self, outdir):
-        config.theConfig["folder_output"] = outdir
+        get_config()["folder_output"] = outdir
         for index in self.list_ctrl.listdata.keys():
             self.list_ctrl.listdata[index][config.D_PREVIEW] = getRenamePreview(
                 self.list_ctrl.listdata[index][config.D_FILENAME],
@@ -432,21 +433,21 @@ class MainPanel(wx.Panel):
         dia = masksandfilters_dlg.masksandfiltersDialog(None, "Masks & Filters")
         res = dia.ShowModal()
         if res == wx.ID_OK:
-            config.theConfig["filters"] = dia.panel.filters_list.GetFilters()
+            get_config()["filters"] = dia.panel.filters_list.GetFilters()
             filters.FileFiltered.filters = filters.CompileFilters(
-                config.theConfig["filters"]
+                get_config()["filters"]
             )
-            config.theConfig["masks"] = dia.panel.masks_list.GetMasks()
-            masks.FileMasked.masks = masks.CompileMasks(config.theConfig["masks"])
-            config.theConfig["filters_test"] = dia.panel.preview_filters.GetValue()
-            config.theConfig["masks_test"] = dia.panel.preview_masks.GetValue()
+            get_config()["masks"] = dia.panel.masks_list.GetMasks()
+            masks.FileMasked.masks = masks.CompileMasks(get_config()["masks"])
+            get_config()["filters_test"] = dia.panel.preview_filters.GetValue()
+            get_config()["masks_test"] = dia.panel.preview_masks.GetValue()
 
         dia.Destroy()
 
     def OnRename(self, evt):
-        Qview_fullpath = config.theConfig["show_fullpath"]
-        Qhide_extension = config.theConfig["hide_extension"]
-        Qkeep_original = config.theConfig["keep_original"]
+        Qview_fullpath = get_config()["show_fullpath"]
+        Qhide_extension = get_config()["hide_extension"]
+        Qkeep_original = get_config()["keep_original"]
         row_id = -1
         while True:  # loop all the checked items
             row_id = self.list_ctrl.GetNextItem(row_id)
@@ -582,8 +583,8 @@ class MainPanel(wx.Panel):
                             )
 
     def OnUndo(self, evt):
-        Qview_fullpath = config.theConfig["show_fullpath"]
-        Qhide_extension = config.theConfig["hide_extension"]
+        Qview_fullpath = get_config()["show_fullpath"]
+        Qhide_extension = get_config()["hide_extension"]
         row_id = -1
         while True:  # loop all the checked items
             row_id = self.list_ctrl.GetNextItem(row_id)
@@ -727,8 +728,8 @@ class MainFrame(wx.Frame):
             self,
             None,
             title="PyFuzzy-renamer",
-            pos=wx.Point(config.theConfig["window"][2], config.theConfig["window"][3]),
-            size=wx.Size(config.theConfig["window"][0], config.theConfig["window"][1]),
+            pos=wx.Point(get_config()["window"][2], get_config()["window"][3]),
+            size=wx.Size(get_config()["window"][0], get_config()["window"][1]),
         )
         freeze_support()
 
@@ -833,15 +834,15 @@ class MainFrame(wx.Frame):
         self.files.Append(mnu_save)
         self.files.AppendSeparator()
         self.mnu_recents = []
-        if config.theConfig["recent_session"]:
-            for i in range(0, len(config.theConfig["recent_session"])):
+        if get_config()["recent_session"]:
+            for i in range(0, len(get_config()["recent_session"])):
                 new_mnu_recent = wx.MenuItem(
                     self.files,
                     wx.ID_ANY,
                     "&"
                     + str(i + 1)
                     + ": "
-                    + utils.shorten_path(config.theConfig["recent_session"][i], 64),
+                    + utils.shorten_path(get_config()["recent_session"][i], 64),
                     "",
                 )
                 self.files.Append(new_mnu_recent)
@@ -888,10 +889,10 @@ class MainFrame(wx.Frame):
             self.mnu_procs.append(new_mnu_proc)
         options.Append(workers_)
         if (
-            config.theConfig["workers"] <= len(self.mnu_procs)
-            and config.theConfig["workers"] > 0
+            get_config()["workers"] <= len(self.mnu_procs)
+            and get_config()["workers"] > 0
         ):
-            self.mnu_procs[config.theConfig["workers"] - 1].Check(True)
+            self.mnu_procs[get_config()["workers"] - 1].Check(True)
 
         mnu_doc = wx.MenuItem(help, wx.ID_ANY, "&Help...", "Help")
         mnu_doc.SetBitmap(icons.Help_16_PNG.GetBitmap())
@@ -905,17 +906,17 @@ class MainFrame(wx.Frame):
         menubar.Append(help, "&Help")
         self.SetMenuBar(menubar)
 
-        if config.theConfig["folder_output"]:
+        if get_config()["folder_output"]:
             self.mnu_user_dir.Check(True)
         else:
             self.mnu_same_as_input.Check(True)
 
-        mnu_view_fullpath.Check(config.theConfig["show_fullpath"])
-        self.mnu_hide_extension.Check(config.theConfig["hide_extension"])
-        self.mnu_hide_extension.Enable(not config.theConfig["show_fullpath"])
-        self.mnu_keep_original.Check(config.theConfig["keep_original"])
-        self.mnu_keep_match_ext.Check(config.theConfig["keep_match_ext"])
-        self.mnu_match_firstletter.Check(config.theConfig["match_firstletter"])
+        mnu_view_fullpath.Check(get_config()["show_fullpath"])
+        self.mnu_hide_extension.Check(get_config()["hide_extension"])
+        self.mnu_hide_extension.Enable(not get_config()["show_fullpath"])
+        self.mnu_keep_original.Check(get_config()["keep_original"])
+        self.mnu_keep_match_ext.Check(get_config()["keep_match_ext"])
+        self.mnu_match_firstletter.Check(get_config()["match_firstletter"])
 
         self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromDir, mnu_source_from_dir)
         self.Bind(
@@ -961,7 +962,6 @@ class MainFrame(wx.Frame):
 
     def OnQuit(self, event):
         self.SaveUI()
-        config.write()
         if self.help:
             self.help.Destroy()
         self.panel.mgr.UnInit()
@@ -984,12 +984,12 @@ class MainFrame(wx.Frame):
     def OnNumProc(self, event):
         menu = event.GetEventObject()
         menuItem = menu.FindItemById(event.GetId())
-        config.theConfig["workers"] = self.mnu_procs.index(menuItem) + 1
+        get_config()["workers"] = self.mnu_procs.index(menuItem) + 1
 
     def OnOpenRecent(self, event):
         menu = event.GetEventObject()
         menuItem = menu.FindItemById(event.GetId())
-        pathname = config.theConfig["recent_session"][self.mnu_recents.index(menuItem)]
+        pathname = get_config()["recent_session"][self.mnu_recents.index(menuItem)]
         self.LoadSession(pathname)
 
     def OnOpen(self, event):
@@ -1007,15 +1007,15 @@ class MainFrame(wx.Frame):
             self.LoadSession(fileDialog.GetPath())
 
     def UpdateRecentSession(self, pathname):
-        if pathname in config.theConfig["recent_session"]:
-            idx = config.theConfig["recent_session"].index(pathname)
+        if pathname in get_config()["recent_session"]:
+            idx = get_config()["recent_session"].index(pathname)
             if idx:
-                config.theConfig["recent_session"].insert(
-                    0, config.theConfig["recent_session"].pop(idx)
+                get_config()["recent_session"].insert(
+                    0, get_config()["recent_session"].pop(idx)
                 )
         else:
-            config.theConfig["recent_session"].insert(0, pathname)
-            config.theConfig["recent_session"] = config.theConfig["recent_session"][:8]
+            get_config()["recent_session"].insert(0, pathname)
+            get_config()["recent_session"] = get_config()["recent_session"][:8]
 
         # update file menu
         # - Remove all recent
@@ -1031,14 +1031,14 @@ class MainFrame(wx.Frame):
 
         # - Refresh recents
         self.mnu_recents.clear()
-        for i in range(0, len(config.theConfig["recent_session"])):
+        for i in range(0, len(get_config()["recent_session"])):
             new_mnu_recent = wx.MenuItem(
                 self.files,
                 wx.ID_ANY,
                 "&"
                 + str(i + 1)
                 + ": "
-                + utils.shorten_path(config.theConfig["recent_session"][i], 64),
+                + utils.shorten_path(get_config()["recent_session"][i], 64),
                 "",
             )
             item, pos = self.files.FindChildItem(
@@ -1072,8 +1072,8 @@ class MainFrame(wx.Frame):
         RefreshCandidates()
         list.DeleteAllItems()
         row_id = 0
-        Qview_fullpath = config.theConfig["show_fullpath"]
-        Qhide_extension = config.theConfig["hide_extension"]
+        Qview_fullpath = get_config()["show_fullpath"]
+        Qhide_extension = get_config()["hide_extension"]
         for key, data in list.listdata.items():
             stem, suffix = utils.GetFileStemAndSuffix(data[config.D_FILENAME])
             item_name = (
@@ -1132,9 +1132,11 @@ class MainFrame(wx.Frame):
     def SaveUI(self):
         list = self.panel.list_ctrl
         for col in range(0, len(config.default_columns)):
-            config.theConfig["col%d_order" % (col + 1)] = list.GetColumnOrder(col) if list.HasColumnOrderSupport() else col
-            config.theConfig["col%d_size" % (col + 1)] = list.GetColumnWidth(col)
-        config.theConfig["window"] = [
+            get_config()["col%d_order" % (col + 1)] = (
+                list.GetColumnOrder(col) if list.HasColumnOrderSupport() else col
+            )
+            get_config()["col%d_size" % (col + 1)] = list.GetColumnWidth(col)
+        get_config()["window"] = [
             self.GetSize().x,
             self.GetSize().y,
             self.GetPosition().x,
