@@ -76,6 +76,32 @@ def GetNextSelected(list_control, current):
     return list_control.GetNextItem(current, wx.LIST_NEXT_ALL, wx.LIST_STATE_SELECTED)
 
 
+def get_focused_items(list_control):
+    """
+    Gets the focused items for the list control.
+    Selection is returned as a list of focused indices,
+    low to high.
+    """
+
+    selection = []
+
+    # start at -1 to get the first selected item
+    current = -1
+    while True:
+        next = GetNextFocused(list_control, current)
+        if next == -1:
+            return selection
+
+        selection.append(next)
+        current = next
+
+
+def GetNextFocused(list_control, current):
+    """Returns next selected item, or -1 when no more"""
+
+    return list_control.GetNextItem(current, wx.LIST_NEXT_ALL, wx.LIST_STATE_FOCUSED)
+
+
 def ClipBoardFiles():
     ret = []
     try:

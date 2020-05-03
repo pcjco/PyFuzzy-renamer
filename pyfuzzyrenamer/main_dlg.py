@@ -665,7 +665,7 @@ class aboutDialog(wx.Dialog):
         html = wxHTML(self)
 
         html.SetPage(
-            '<font size="30">PyFuzzy-renamer ' +  __version__ + '</font><br><br>'
+            '<font size="30">PyFuzzy-renamer ' + __version__ + "</font><br><br>"
             "<u>Authors</u><br>"
             "<ul><li>pcjco</li></ul>"
             "<u>Credits</u><br>"
