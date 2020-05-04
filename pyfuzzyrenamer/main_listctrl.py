@@ -4,8 +4,6 @@ import wx
 import wx.lib.mixins.listctrl as listmix
 from functools import partial
 from pathlib import Path
-import random
-import string
 
 from pyfuzzyrenamer import config, filters, main_dlg, icons, masks, match, utils
 from pyfuzzyrenamer.config import get_config
@@ -189,6 +187,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.DeleteSelectionCb(None)
         elif keycode == wx.WXK_CONTROL_R:
             self.NoMatchSelectionCb(None)
+        elif keycode == wx.WXK_CONTROL_B:
+            self.ReMatchSelectionCb(None)
 
         if keycode:
             event.Skip()
@@ -220,10 +220,16 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             menu, wx.ID_ANY, "&Reset choice\tCtrl+R", "Reset choice"
         )
         mnu_nomatch.SetBitmap(icons.NoMatch_16_PNG.GetBitmap())
+        mnu_rematch = wx.MenuItem(
+            menu, wx.ID_ANY, "&Best choice\tCtrl+B", "Best choice"
+        )
+        mnu_rematch.SetBitmap(icons.ProcessMatch_16_PNG.GetBitmap())
         menu.Append(mnu_delete)
         menu.Append(mnu_nomatch)
+        menu.Append(mnu_rematch)
         self.Bind(wx.EVT_MENU, self.DeleteSelectionCb, mnu_delete)
         self.Bind(wx.EVT_MENU, self.NoMatchSelectionCb, mnu_nomatch)
+        self.Bind(wx.EVT_MENU, self.ReMatchSelectionCb, mnu_rematch)
 
         if self.GetSelectedItemCount() == 1 and main_dlg.candidates:
             row_id = event.GetIndex()
@@ -342,6 +348,87 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.SetItem(
                 row_id, config.D_STATUS, str(self.listdata[pos][config.D_STATUS])
             )
+
+    def ReMatchSelectionCb(self, event):
+        selected = utils.get_selected_items(self)
+
+        sources = []
+        for row_id in selected:
+            pos = self.GetItemData(row_id)  # 0-based unsorted index
+            sources.append(self.listdata[pos][config.D_FILENAME])
+
+        matches = match.get_matches(sources)
+
+        Qview_fullpath = get_config()["show_fullpath"]
+        Qhide_extension = get_config()["hide_extension"]
+        count = 0
+        for row_id in selected:
+            if len(matches) < count + 1:
+                break
+            f = self.GetItemFont(row_id)
+            if not f.IsOk():
+                f = self.list_ctrl.GetFont()
+            font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+            font.SetWeight(wx.FONTWEIGHT_NORMAL)
+            font.SetStyle(f.GetStyle())
+            self.SetItemFont(row_id, font)
+
+            pos = self.GetItemData(row_id)  # 0-based unsorted index
+            if matches[count]:
+                self.listdata[pos][config.D_MATCH_SCORE] = matches[count].match_results[
+                    0
+                ][1]
+                self.listdata[pos][config.D_MATCHNAME] = (
+                    matches[count].match_results[0][0].file
+                )
+                self.listdata[pos][config.D_PREVIEW] = main_dlg.getRenamePreview(
+                    self.listdata[pos][config.D_FILENAME],
+                    self.listdata[pos][config.D_MATCHNAME],
+                )
+                self.listdata[pos][config.D_STATUS] = "Matched"
+            else:
+                self.listdata[pos][config.D_MATCH_SCORE] = 0
+                self.listdata[pos][config.D_MATCHNAME] = Path()
+                self.listdata[pos][config.D_PREVIEW] = Path()
+                self.listdata[pos][config.D_STATUS] = "No match"
+
+            self.SetItem(
+                row_id,
+                config.D_MATCH_SCORE,
+                str(self.listdata[pos][config.D_MATCH_SCORE]),
+            )
+            stem, suffix = utils.GetFileStemAndSuffix(
+                self.listdata[pos][config.D_MATCHNAME]
+            )
+            self.SetItem(
+                row_id,
+                config.D_MATCHNAME,
+                str(self.listdata[pos][config.D_MATCHNAME])
+                if Qview_fullpath
+                else (
+                    stem
+                    if Qhide_extension
+                    else self.listdata[pos][config.D_MATCHNAME].name
+                ),
+            )
+            stem, suffix = utils.GetFileStemAndSuffix(
+                self.listdata[pos][config.D_PREVIEW]
+            )
+            self.SetItem(
+                row_id,
+                config.D_PREVIEW,
+                str(self.listdata[pos][config.D_PREVIEW])
+                if Qview_fullpath
+                else (
+                    stem
+                    if Qhide_extension
+                    else self.listdata[pos][config.D_PREVIEW].name
+                ),
+            )
+            self.SetItem(
+                row_id, config.D_STATUS, str(self.listdata[pos][config.D_STATUS]),
+            )
+            count += 1
 
     def MenuForceMatchCb(self, row_id, forced_match, event):
         pos = self.GetItemData(row_id)  # 0-based unsorted index
