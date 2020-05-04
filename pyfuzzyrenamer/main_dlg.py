@@ -661,7 +661,7 @@ class MainPanel(wx.Panel):
 
 class aboutDialog(wx.Dialog):
     def __init__(self, parent):
-        wx.Dialog.__init__(self, parent, title="About PyFuzzy-renamer", size=(600, 300))
+        wx.Dialog.__init__(self, parent, title="About PyFuzzy-renamer")
         html = wxHTML(self)
 
         html.SetPage(
@@ -671,7 +671,8 @@ class aboutDialog(wx.Dialog):
             "<u>Credits</u><br>"
             '<ul><li><a href ="https://wxpython.org">wxPython</a></li>'
             '<li><a href ="https://becrisdesign.com">Becris Design</a> (icons)</li>'
-            '<li><a href ="https://www.waste.org/~winkles/fuzzyRename/">Fuzzy Rename</a> (original by jeff@silent.net)</li></ul>'
+            '<li><a href ="https://www.waste.org/~winkles/fuzzyRename/">Fuzzy Rename</a> (original by jeff@silent.net)</li>'
+            '<li><a href ="http://bitbucket.org/raz/wxautocompletectrl/">wxautocompletectrl</a> (by Toni Ruža &lt;toni.ruza@gmail.com&gt;)</li></ul>'
             "<u>License</u><br>"
             "<ul><li>MIT License</li>"
             "<li>Copyright (c) 2020 pcjco</li></ul>"
@@ -688,7 +689,7 @@ class aboutDialog(wx.Dialog):
 
 class wxHTML(wx.html.HtmlWindow):
     def __init__(self, parent):
-        wx.html.HtmlWindow.__init__(self, parent, size=(400, 250))
+        wx.html.HtmlWindow.__init__(self, parent, size=(400, 300))
 
     def OnLinkClicked(self, link):
         wx.LaunchDefaultBrowser(link.GetHref())
@@ -1278,4 +1279,51 @@ def getDoc():
         "<p>The current list of <b>sources</b> and <b>choices</b> as well as the current <b>most similar choice</b> can be saved to a file by using <code><b>File->Save Session</b></code>.</p>"
         "<p>A saved session is restored by using <code><b>File->Load Session</b></code>. When restoring a session, the current list of sources and choices is resetted first.</p>"
         "<p>The list of the 8 most recent saved session files can be loaded directly from the <code><b>File</b></code> menu.</p>"
+        "<h3>Licenses</h3>"
+        "PyFuzzy-renamer is licensed under MIT license:"
+        "<pre>Copyright (c) 2020 pcjco\n"
+        "\n"
+        "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
+        'of this software and associated documentation files (the "Software"), to deal\n'
+        "in the Software without restriction, including without limitation the rights\n"
+        "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
+        "copies of the Software, and to permit persons to whom the Software is\n"
+        "furnished to do so, subject to the following conditions:\n"
+        "\n"
+        "The above copyright notice and this permission notice shall be included in all\n"
+        "copies or substantial portions of the Software.\n"
+        "\n"
+        'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n'
+        "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
+        "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
+        "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
+        "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
+        "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
+        "SOFTWARE.\n"
+        "</pre>"
+        "PyFuzzy-renamer includes works from third-party software<br>"
+        '<ul><li><a href ="http://bitbucket.org/raz/wxautocompletectrl/">wxautocompletectrl</a> (by Toni Ruža &lt;toni.ruza@gmail.com&gt;)</li></ul>'
+        "<pre>"
+        "Copyright (c) 2008-2019, Toni Ruža, All rights reserved.\n"
+        "Redistribution and use in source and binary forms, with or without\n"
+        "modification, are permitted provided that the following conditions are met:\n"
+        "\n"
+        "* Redistributions of source code must retain the above copyright notice,\n"
+        "  this list of conditions and the following disclaimer.\n"
+        "* Redistributions in binary form must reproduce the above copyright notice,\n"
+        "  this list of conditions and the following disclaimer in the documentation\n"
+        "  and/or other materials provided with the distribution.\n"
+        "\n"
+        "THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS'\n"
+        "AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE\n"
+        "IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE\n"
+        "ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE\n"
+        "LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR\n"
+        "CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF\n"
+        "SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS\n"
+        "INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN\n"
+        "CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)\n"
+        "ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE\n"
+        "POSSIBILITY OF SUCH DAMAGE.\n"
+        "</pre>"
     )

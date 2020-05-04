@@ -4,9 +4,32 @@ import wx
 import wx.lib.mixins.listctrl as listmix
 from functools import partial
 from pathlib import Path
+import random
+import string
 
 from pyfuzzyrenamer import config, filters, main_dlg, icons, masks, match, utils
 from pyfuzzyrenamer.config import get_config
+from wxautocompletectrl.wxautocompletectrl import AutocompleteTextCtrl
+
+
+def list_completer(a_list):
+    def completer(query):
+        formatted, unformatted = list(), list()
+        if query:
+            unformatted = [
+                item.file.name
+                for item in a_list
+                if query.lower() in item.file.name.lower()
+            ]
+            for item in unformatted:
+                s = item.lower().find(query.lower())
+                formatted.append(
+                    "%s<b><u>%s</b></u>%s" % (item[:s], query, item[s + len(query) :])
+                )
+
+        return formatted, unformatted
+
+    return completer
 
 
 class PickCandidate(wx.MiniFrame):
@@ -14,8 +37,10 @@ class PickCandidate(wx.MiniFrame):
         wx.MiniFrame.__init__(
             self, parent, title="", pos=position, style=wx.RESIZE_BORDER
         )
-        self.text = wx.TextCtrl(self, size=(100, -1), style=wx.TE_PROCESS_ENTER)
-        self.text.SetMinSize((200, -1))
+        self.text = AutocompleteTextCtrl(
+            self, size=(400, -1), completer=list_completer(main_dlg.candidates["all"])
+        )
+        self.text.SetMinSize((400, -1))
         self.row_id = row_id
         panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
         panel_sizer.Add(self.text, 1, wx.EXPAND | wx.ALL, 0)
@@ -27,7 +52,6 @@ class PickCandidate(wx.MiniFrame):
         self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
         self.Bind(wx.EVT_CLOSE, self.OnCloseWindow)
         self.text.Bind(wx.EVT_TEXT_ENTER, self.OnEnter)
-        self.text.AutoComplete(CandidateCompleter())
         self.MakeModal()
 
     def OnCloseWindow(self, event):
@@ -56,35 +80,6 @@ class PickCandidate(wx.MiniFrame):
             self._disabler = wx.WindowDisabler(self)
         if not modal and hasattr(self, "_disabler"):
             del self._disabler
-
-
-class CandidateCompleter(wx.TextCompleter):
-    def __init__(self):
-        wx.TextCompleter.__init__(self)
-        self._iLastReturned = wx.NOT_FOUND
-        self._sPrefix = ""
-        self.possibleValues = main_dlg.candidates["all"]
-        self.lcPossibleValues = [
-            x.file.name.lower() for x in main_dlg.candidates["all"]
-        ]
-
-    def Start(self, prefix):
-        self._sPrefix = prefix.lower()
-        self._iLastReturned = wx.NOT_FOUND
-        for index, item in enumerate(self.lcPossibleValues):
-            if item.startswith(self._sPrefix):
-                self._iLastReturned = index
-                return True
-        # Nothing found
-        return False
-
-    def GetNext(self):
-        for i in range(self._iLastReturned, len(self.lcPossibleValues)):
-            if self.lcPossibleValues[i].startswith(self._sPrefix):
-                self._iLastReturned = i + 1
-                return self.possibleValues[i].file.name
-        # No more corresponding item
-        return ""
 
 
 class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
@@ -125,7 +120,11 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             if self.GetSelectedItemCount() > 1:
                 selected = utils.get_selected_items(self)
                 focused = utils.get_focused_items(self)
-                check = not self.IsItemChecked(selected[0]) if (not selected[0] in focused) else self.IsItemChecked(selected[0])
+                check = (
+                    not self.IsItemChecked(selected[0])
+                    if (not selected[0] in focused)
+                    else self.IsItemChecked(selected[0])
+                )
                 for index in selected:
                     self.Focus(index)
                     if not index in focused:
@@ -611,3 +610,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.CheckItem(row_id, True)
             row_id += 1
             index += 1
+
+    def OnSortOrderChanged(self):
+        row_id = self.GetFirstSelected()
+        if row_id != -1:
+            self.EnsureVisible(row_id)
