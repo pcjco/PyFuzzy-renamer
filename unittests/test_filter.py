@@ -27,12 +27,8 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
             event.SetKeyCode(wx.WXK_DELETE)
             dlg.panel.filters_list.GetEventHandler().ProcessEvent(event)
 
-            self.addFilter(
-                dlg.panel.filters_list, "my filter", "(^(the)\\b|, the)", " ", True
-            )
-            self.addFilter(
-                dlg.panel.filters_list, "my filter 2", "(wire)", "foo", False
-            )
+            self.addFilter(dlg.panel.filters_list, "my filter", "(^(the)\\b|, the)", " ", True)
+            self.addFilter(dlg.panel.filters_list, "my filter 2", "(wire)", "foo", False)
 
             event = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_OK)
             dlg.panel.filters_list.GetEventHandler().ProcessEvent(event)
@@ -67,10 +63,7 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
         item = lst.GetNextItem(item)
         self.assertEqual(
             ["The wiire", "89", "Wire, The", "Wire, The", "Matched", "True"],
-            [
-                lst.GetItemText(item, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 
     def test_filter2(self):
@@ -93,9 +86,7 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
             dlg.panel.filters_list.GetEventHandler().ProcessEvent(event)
 
             self.addFilter(dlg.panel.filters_list, "my filter", "(wire)", "foo", True)
-            self.addFilter(
-                dlg.panel.filters_list, "my filter 2", "(^(the)\\b|, the)", " ", True
-            )
+            self.addFilter(dlg.panel.filters_list, "my filter 2", "(^(the)\\b|, the)", " ", True)
 
             event = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_OK)
             dlg.panel.filters_list.GetEventHandler().ProcessEvent(event)
@@ -130,10 +121,7 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
         item = lst.GetNextItem(item)
         self.assertEqual(
             ["The foo", "100", "Wire, The", "Wire, The", "Matched", "True"],
-            [
-                lst.GetItemText(item, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 
     def addFilter(self, lst, name, regexp, repl, active):

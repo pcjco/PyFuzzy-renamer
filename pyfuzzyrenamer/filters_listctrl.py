@@ -34,9 +34,7 @@ class FilterListCtrlDropTarget(wx.DropTarget):
 
 
 class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
-    def __init__(
-        self, parent, panel, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0
-    ):
+    def __init__(self, parent, panel, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
         wx.ListCtrl.__init__(self, parent, pos=pos, size=size, style=style)
         listmix.TextEditMixin.__init__(self)
         self.EnableCheckBoxes()
@@ -149,38 +147,30 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                 s_filters += self.GetItemText(row_id0, 1) + "\n"
                 if row_id == row_id0:
                     if col_id == 2:
-                        regexp = self.GetItemText(row_id, 2)
+                        regexp = event.GetText()
                         s_filters += '"' + regexp + '"\n'
                         s_filters += '"' + self.GetItemText(row_id, 3) + '"\n'
                         try:
                             re.compile(regexp)
-                            self.SetItemBackgroundColour(
-                                row_id0, wx.Colour(153, 255, 153)
-                            )
+                            self.SetItemBackgroundColour(row_id0, wx.Colour(153, 255, 153))
                         except re.error:
-                            self.SetItemBackgroundColour(
-                                row_id0, wx.Colour(255, 153, 153)
-                            )
+                            self.SetItemBackgroundColour(row_id0, wx.Colour(255, 153, 153))
                     elif col_id == 3:
                         s_filters += '"' + self.GetItemText(row_id, 2) + '"\n'
-                        s_filters += '"' + self.GetItemText(row_id, 3) + '"\n'
+                        s_filters += '"' + event.GetText() + '"\n'
                 else:
                     s_filters += '"' + self.GetItemText(row_id0, 2) + '"\n'
                     s_filters += '"' + self.GetItemText(row_id0, 3) + '"\n'
 
             re_filters = filters.CompileFilters(s_filters)
             self.panel.result_preview_filters.SetValue(
-                filters.filter_processed(
-                    Path(self.panel.preview_filters.GetValue() + ".txt"), re_filters
-                )
+                filters.filter_processed(Path(self.panel.preview_filters.GetValue() + ".noext"), re_filters)
             )
 
     def getItemInfo(self, idx):
         """Collect all relevant data of a listitem, and put it in a list"""
         collect = []
-        collect.append(
-            idx
-        )  # We need the original index, so it is easier to eventualy delete it
+        collect.append(idx)  # We need the original index, so it is easier to eventualy delete it
         collect.append(self.IsItemChecked(idx))  # check
         collect.append(self.GetItemText(idx))  # Text first column
         for i in range(1, self.GetColumnCount()):  # Possible extra columns

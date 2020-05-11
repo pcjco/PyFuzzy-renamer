@@ -33,9 +33,7 @@ __url__ = "http://bitbucket.org/raz/wxautocompletectrl"
 class SuggestionsPopup(wx.Frame):
     def __init__(self, parent):
         wx.Frame.__init__(
-            self,
-            parent,
-            style=(wx.FRAME_NO_TASKBAR | wx.FRAME_FLOAT_ON_PARENT | wx.STAY_ON_TOP),
+            self, parent, style=(wx.FRAME_NO_TASKBAR | wx.FRAME_FLOAT_ON_PARENT | wx.STAY_ON_TOP),
         )
         self.suggestions = self._ListBox(self)
         self.suggestions.SetItemCount(0)
@@ -108,9 +106,7 @@ class AutocompleteTextCtrl(wx.TextCtrl):
         style = style | wx.TE_PROCESS_ENTER
         if multiline:
             style = style | wx.TE_MULTILINE
-        wx.TextCtrl.__init__(
-            self, parent, id_, value, pos, size, style, validator, name
-        )
+        wx.TextCtrl.__init__(self, parent, id_, value, pos, size, style, validator, name)
         self.height = height
         self.frequency = frequency
         self.append_mode = append_mode

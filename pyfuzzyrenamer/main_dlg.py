@@ -2,6 +2,7 @@ import os
 import os.path
 import pickle as pickle
 import shutil
+import operator
 import wx
 import wx.aui
 import wx.html
@@ -37,9 +38,7 @@ def getRenamePreview(input, match):
     stem, suffix = utils.GetFileStemAndSuffix(input)
     return Path(
         os.path.join(
-            get_config()["folder_output"]
-            if get_config()["folder_output"]
-            else input.parent,
+            get_config()["folder_output"] if get_config()["folder_output"] else input.parent,
             f_masked.masked[0] + match_clean + f_masked.masked[2],
         )
         + suffix
@@ -48,7 +47,20 @@ def getRenamePreview(input, match):
 
 def RefreshCandidates():
     candidates.clear()
-    candidates["all"] = [filters.FileFiltered(f) for f in glob_choices]
+    # get suffix counters
+    suffix_counts = dict()
+    for f in glob_choices:
+        suffix_counts[f.suffix] = suffix_counts.get(f.suffix, 0) + 1
+    # get most common suffix
+    frequent_suffix = max(suffix_counts.items(), key=operator.itemgetter(1))[0]
+
+    candidates["all"] = []
+    for f in glob_choices:
+        if not f.suffix or f.suffix == frequent_suffix:
+            candidates["all"].append(filters.FileFiltered(f))
+        else:
+            candidates["all"].append(filters.FileFiltered(Path(str(f) + ".noext")))
+
     if get_config()["match_firstletter"]:
         for word in candidates["all"]:
             first_letter = word.filtered[0]
@@ -84,14 +96,9 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
         return True
 
     def SourcesOrChoices(
-        self,
-        parent,
-        question="Add the files to source or choice list?",
-        caption="Drag&Drop question",
+        self, parent, question="Add the files to source or choice list?", caption="Drag&Drop question",
     ):
-        dlg = wx.GenericMessageDialog(
-            parent, question, caption, wx.YES_NO | wx.ICON_QUESTION
-        )
+        dlg = wx.GenericMessageDialog(parent, question, caption, wx.YES_NO | wx.ICON_QUESTION)
         dlg.SetYesNoLabels("Sources", "Choices")
         result = dlg.ShowModal() == wx.ID_YES
         dlg.Destroy()
@@ -143,20 +150,23 @@ class MainPanel(wx.Panel):
         btn_undo.SetBitmap(icons.Undo_16_PNG.GetBitmap(), wx.LEFT)
         btn_undo.SetToolTip("Undo last rename")
 
+        btn_doublon = wx.Button(panel_listbutton, label="Doublon")
+        btn_doublon.SetBitmap(icons.Exclamation_16_PNG.GetBitmap(), wx.LEFT)
+        btn_doublon.SetToolTip("Log renamed doublons")
+
         panel_listbutton_sizer = wx.BoxSizer(wx.HORIZONTAL)
         panel_listbutton_sizer.Add(btn_add_source_from_files, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_add_choice_from_file, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_filters, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_run, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_reset, 0, wx.ALL, 1)
+        panel_listbutton_sizer.Add(btn_doublon, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_ren, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_undo, 0, wx.ALL, 1)
         panel_listbutton.SetSizer(panel_listbutton_sizer)
 
         self.list_ctrl = main_listctrl.FuzzyRenamerListCtrl(
-            panel_list,
-            size=(-1, -1),
-            style=wx.LC_REPORT | wx.BORDER_SUNKEN | wx.LC_EDIT_LABELS,
+            panel_list, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN | wx.LC_EDIT_LABELS,
         )
 
         file_drop_target = FuzzyRenamerFileDropTarget(self)
@@ -169,9 +179,7 @@ class MainPanel(wx.Panel):
 
         panel_log = wx.Panel(parent=self)
 
-        log = wx.TextCtrl(
-            panel_log, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL
-        )
+        log = wx.TextCtrl(panel_log, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
         wx.Log.SetActiveTarget(wx.LogTextCtrl(log))
 
         log_sizer = wx.BoxSizer()
@@ -192,6 +200,7 @@ class MainPanel(wx.Panel):
         )
         self.mgr.Update()
         btn_run.Bind(wx.EVT_BUTTON, self.OnRun)
+        btn_doublon.Bind(wx.EVT_BUTTON, self.OnLogDoublon)
         btn_ren.Bind(wx.EVT_BUTTON, self.OnRename)
         btn_reset.Bind(wx.EVT_BUTTON, self.OnReset)
         btn_filters.Bind(wx.EVT_BUTTON, self.OnFilters)
@@ -215,8 +224,7 @@ class MainPanel(wx.Panel):
         get_config()["keep_match_ext"] = item.IsChecked()
         for index in self.list_ctrl.listdata.keys():
             self.list_ctrl.listdata[index][config.D_PREVIEW] = getRenamePreview(
-                self.list_ctrl.listdata[index][config.D_FILENAME],
-                self.list_ctrl.listdata[index][config.D_MATCHNAME],
+                self.list_ctrl.listdata[index][config.D_FILENAME], self.list_ctrl.listdata[index][config.D_MATCHNAME],
             )
         self.list_ctrl.RefreshList()
 
@@ -231,10 +239,7 @@ class MainPanel(wx.Panel):
 
     def OnAddSourceFromDir(self, evt):
         with wx.DirDialog(
-            self,
-            "Choose source directory",
-            get_config()["folder_sources"],
-            wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
+            self, "Choose source directory", get_config()["folder_sources"], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
         ) as dirDialog:
 
             if dirDialog.ShowModal() == wx.ID_CANCEL:
@@ -287,10 +292,7 @@ class MainPanel(wx.Panel):
 
     def OnAddChoicesFromDir(self, evt):
         with wx.DirDialog(
-            self,
-            "Choose choice directory",
-            get_config()["folder_choices"],
-            wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
+            self, "Choose choice directory", get_config()["folder_choices"], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
         ) as dirDialog:
 
             if dirDialog.ShowModal() == wx.ID_CANCEL:
@@ -345,10 +347,7 @@ class MainPanel(wx.Panel):
         else:
             self.parent.mnu_user_dir.Check(True)
         with wx.DirDialog(
-            self,
-            "Choose output directory",
-            get_config()["folder_output"],
-            wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
+            self, "Choose output directory", get_config()["folder_output"], wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
         ) as dirDialog:
 
             if dirDialog.ShowModal() == wx.ID_CANCEL:
@@ -366,8 +365,7 @@ class MainPanel(wx.Panel):
         get_config()["folder_output"] = outdir
         for index in self.list_ctrl.listdata.keys():
             self.list_ctrl.listdata[index][config.D_PREVIEW] = getRenamePreview(
-                self.list_ctrl.listdata[index][config.D_FILENAME],
-                self.list_ctrl.listdata[index][config.D_MATCHNAME],
+                self.list_ctrl.listdata[index][config.D_FILENAME], self.list_ctrl.listdata[index][config.D_MATCHNAME],
             )
         self.list_ctrl.RefreshList()
 
@@ -405,15 +403,10 @@ class MainPanel(wx.Panel):
 
                 pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
                 if matches[count]:
-                    self.list_ctrl.listdata[pos][config.D_MATCH_SCORE] = matches[
-                        count
-                    ].match_results[0][1]
-                    self.list_ctrl.listdata[pos][config.D_MATCHNAME] = (
-                        matches[count].match_results[0][0].file
-                    )
+                    self.list_ctrl.listdata[pos][config.D_MATCH_SCORE] = matches[count].match_results[0][1]
+                    self.list_ctrl.listdata[pos][config.D_MATCHNAME] = matches[count].match_results[0][0].file
                     self.list_ctrl.listdata[pos][config.D_PREVIEW] = getRenamePreview(
-                        self.list_ctrl.listdata[pos][config.D_FILENAME],
-                        self.list_ctrl.listdata[pos][config.D_MATCHNAME],
+                        self.list_ctrl.listdata[pos][config.D_FILENAME], self.list_ctrl.listdata[pos][config.D_MATCHNAME],
                     )
                     self.list_ctrl.listdata[pos][config.D_STATUS] = "Matched"
                 else:
@@ -435,9 +428,7 @@ class MainPanel(wx.Panel):
         res = dia.ShowModal()
         if res == wx.ID_OK:
             get_config()["filters"] = dia.panel.filters_list.GetFilters()
-            filters.FileFiltered.filters = filters.CompileFilters(
-                get_config()["filters"]
-            )
+            filters.FileFiltered.filters = filters.CompileFilters(get_config()["filters"])
             get_config()["masks"] = dia.panel.masks_list.GetMasks()
             masks.FileMasked.masks = masks.CompileMasks(get_config()["masks"])
             get_config()["filters_test"] = dia.panel.preview_filters.GetValue()
@@ -454,134 +445,84 @@ class MainPanel(wx.Panel):
             row_id = self.list_ctrl.GetNextItem(row_id)
             if row_id == -1:
                 break
-            if self.list_ctrl.IsItemChecked(row_id):
-                pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
+            if not self.list_ctrl.IsItemChecked(row_id):
+                continue
+            pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
 
-                old_path = self.list_ctrl.listdata[pos][config.D_FILENAME]
-                preview_path = self.list_ctrl.listdata[pos][config.D_PREVIEW]
-                if preview_path:
-                    if old_path != preview_path:
-                        old_file = str(old_path)
-                        new_file = str(preview_path)
-                        try:
-                            if old_path.is_file():
-                                if Qkeep_original:
-                                    shutil.copy2(old_file, new_file)
-                                    wx.LogMessage(
-                                        "Copying : %s --> %s" % (old_file, new_file)
-                                    )
-                                else:
-                                    os.rename(old_file, new_file)
-                                    wx.LogMessage(
-                                        "Renaming : %s --> %s" % (old_file, new_file)
-                                    )
-                                new_path = Path(new_file)
-                                new_match = match.get_match(new_path)
-                                if new_match:
-                                    self.list_ctrl.listdata[pos] = [
-                                        new_path,
-                                        new_match[0][1],
-                                        new_match[0][0].file,
-                                        getRenamePreview(
-                                            new_path, new_match[0][0].file
-                                        ),
-                                        "Matched",
-                                        self.list_ctrl.listdata[pos][config.D_CHECKED],
-                                        old_path if not Qkeep_original else None,
-                                    ]
-                                    self.list_ctrl.SetItem(
-                                        row_id,
-                                        config.D_MATCH_SCORE,
-                                        str(
-                                            self.list_ctrl.listdata[pos][
-                                                config.D_MATCH_SCORE
-                                            ]
-                                        ),
-                                    )
-                                    stem, suffix = utils.GetFileStemAndSuffix(
-                                        self.list_ctrl.listdata[pos][config.D_MATCHNAME]
-                                    )
-                                    self.list_ctrl.SetItem(
-                                        row_id,
-                                        config.D_MATCHNAME,
-                                        str(
-                                            self.list_ctrl.listdata[pos][
-                                                config.D_MATCHNAME
-                                            ]
-                                        )
-                                        if Qview_fullpath
-                                        else (
-                                            stem
-                                            if Qhide_extension
-                                            else self.list_ctrl.listdata[pos][
-                                                config.D_MATCHNAME
-                                            ].name
-                                        ),
-                                    )
-                                    stem, suffix = utils.GetFileStemAndSuffix(
-                                        self.list_ctrl.listdata[pos][config.D_PREVIEW]
-                                    )
-                                    self.list_ctrl.SetItem(
-                                        row_id,
-                                        config.D_PREVIEW,
-                                        str(
-                                            self.list_ctrl.listdata[pos][
-                                                config.D_PREVIEW
-                                            ]
-                                        )
-                                        if Qview_fullpath
-                                        else (
-                                            stem
-                                            if Qhide_extension
-                                            else self.list_ctrl.listdata[pos][
-                                                config.D_PREVIEW
-                                            ].name
-                                        ),
-                                    )
-                                else:
-                                    self.list_ctrl.listdata[pos] = [
-                                        new_path,
-                                        0,
-                                        Path(),
-                                        Path(),
-                                        "No match",
-                                        self.listdata[pos][config.D_CHECKED],
-                                        old_path if not Qkeep_original else None,
-                                    ]
-                                    self.list_ctrl.SetItem(
-                                        row_id, config.D_MATCH_SCORE, ""
-                                    )
-                                    self.list_ctrl.SetItem(
-                                        row_id, config.D_MATCHNAME, ""
-                                    )
-                                    self.list_ctrl.SetItem(row_id, config.D_PREVIEW, "")
+            old_path = self.list_ctrl.listdata[pos][config.D_FILENAME]
+            preview_path = self.list_ctrl.listdata[pos][config.D_PREVIEW]
+            if not preview_path:
+                continue
+            if old_path == preview_path:
+                continue
+            old_file = str(old_path)
+            new_file = str(preview_path)
+            try:
+                if not old_path.is_file():
+                    continue
+                if Qkeep_original:
+                    shutil.copy2(old_file, new_file)
+                    wx.LogMessage("Copying : %s --> %s" % (old_file, new_file))
+                else:
+                    os.rename(old_file, new_file)
+                    wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
+                new_path = Path(new_file)
+                new_match = match.get_match(new_path)
+                if new_match:
+                    self.list_ctrl.listdata[pos] = [
+                        new_path,
+                        new_match[0][1],
+                        new_match[0][0].file,
+                        getRenamePreview(new_path, new_match[0][0].file),
+                        "Matched",
+                        self.list_ctrl.listdata[pos][config.D_CHECKED],
+                        old_path if not Qkeep_original else None,
+                    ]
+                    self.list_ctrl.SetItem(
+                        row_id, config.D_MATCH_SCORE, str(self.list_ctrl.listdata[pos][config.D_MATCH_SCORE]),
+                    )
+                    parent, stem, suffix = utils.GetFileParentStemAndSuffix(self.list_ctrl.listdata[pos][config.D_MATCHNAME])
+                    self.list_ctrl.SetItem(
+                        row_id,
+                        config.D_MATCHNAME,
+                        parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix),
+                    )
+                    stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                    self.list_ctrl.SetItem(
+                        row_id,
+                        config.D_PREVIEW,
+                        str(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                        if Qview_fullpath
+                        else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_PREVIEW].name),
+                    )
+                else:
+                    self.list_ctrl.listdata[pos] = [
+                        new_path,
+                        0,
+                        Path(),
+                        Path(),
+                        "No match",
+                        self.listdata[pos][config.D_CHECKED],
+                        old_path if not Qkeep_original else None,
+                    ]
+                    self.list_ctrl.SetItem(row_id, config.D_MATCH_SCORE, "")
+                    self.list_ctrl.SetItem(row_id, config.D_MATCHNAME, "")
+                    self.list_ctrl.SetItem(row_id, config.D_PREVIEW, "")
 
-                                stem, suffix = utils.GetFileStemAndSuffix(
-                                    self.list_ctrl.listdata[pos][config.D_FILENAME]
-                                )
-                                self.list_ctrl.SetItem(
-                                    row_id,
-                                    config.D_FILENAME,
-                                    str(self.list_ctrl.listdata[pos][config.D_FILENAME])
-                                    if Qview_fullpath
-                                    else (
-                                        stem
-                                        if Qhide_extension
-                                        else self.list_ctrl.listdata[pos][
-                                            config.D_FILENAME
-                                        ].name
-                                    ),
-                                )
-                                self.list_ctrl.SetItem(
-                                    row_id,
-                                    config.D_STATUS,
-                                    self.list_ctrl.listdata[pos][config.D_STATUS],
-                                )
+                stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_FILENAME])
+                self.list_ctrl.SetItem(
+                    row_id,
+                    config.D_FILENAME,
+                    str(self.list_ctrl.listdata[pos][config.D_FILENAME])
+                    if Qview_fullpath
+                    else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_FILENAME].name),
+                )
+                self.list_ctrl.SetItem(
+                    row_id, config.D_STATUS, self.list_ctrl.listdata[pos][config.D_STATUS],
+                )
 
-                        except (OSError, IOError):
-                            wx.LogMessage(
-                                "Error when renaming : %s --> %s" % (old_file, new_file)
-                            )
+            except (OSError, IOError):
+                wx.LogMessage("Error when renaming : %s --> %s" % (old_file, new_file))
 
     def OnUndo(self, evt):
         Qview_fullpath = get_config()["show_fullpath"]
@@ -598,65 +539,53 @@ class MainPanel(wx.Panel):
                 continue
 
             current_path = self.list_ctrl.listdata[pos][config.D_FILENAME]
-            if current_path != previous_path:
-                old_file = str(current_path)
-                new_file = str(previous_path)
+            if current_path == previous_path:
+                continue
+            old_file = str(current_path)
+            new_file = str(previous_path)
 
-                try:
-                    if current_path.is_file():
-                        os.rename(old_file, new_file)
-                    wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
-                    new_path = Path(new_file)
-                    similarity = match.mySimilarityScorer(
-                        masks.FileMasked(new_path).masked[1],
-                        filters.FileFiltered(
-                            self.list_ctrl.listdata[pos][config.D_MATCHNAME]
-                        ).filtered,
-                    )
-                    self.list_ctrl.listdata[pos][config.D_FILENAME] = new_path
-                    self.list_ctrl.listdata[pos][config.D_MATCH_SCORE] = similarity
-                    self.list_ctrl.listdata[pos][config.D_PREVIEW] = getRenamePreview(
-                        new_path, self.list_ctrl.listdata[pos][config.D_MATCHNAME]
-                    )
-                    self.list_ctrl.listdata[pos][config.D_PREVIOUS_FILENAME] = new_path
-                    stem, suffix = utils.GetFileStemAndSuffix(
-                        self.list_ctrl.listdata[pos][config.D_FILENAME]
-                    )
-                    self.list_ctrl.SetItem(
-                        row_id,
-                        config.D_FILENAME,
-                        str(self.list_ctrl.listdata[pos][config.D_FILENAME])
-                        if Qview_fullpath
-                        else (
-                            stem
-                            if Qhide_extension
-                            else self.list_ctrl.listdata[pos][config.D_FILENAME].name
-                        ),
-                    )
-                    self.list_ctrl.SetItem(
-                        row_id,
-                        config.D_MATCH_SCORE,
-                        str(self.list_ctrl.listdata[pos][config.D_MATCH_SCORE]),
-                    )
-                    stem, suffix = utils.GetFileStemAndSuffix(
-                        self.list_ctrl.listdata[pos][config.D_PREVIEW]
-                    )
-                    self.list_ctrl.SetItem(
-                        row_id,
-                        config.D_PREVIEW,
-                        str(self.list_ctrl.listdata[pos][config.D_PREVIEW])
-                        if Qview_fullpath
-                        else (
-                            stem
-                            if Qhide_extension
-                            else self.list_ctrl.listdata[pos][config.D_PREVIEW].name
-                        ),
-                    )
+            try:
+                if current_path.is_file():
+                    os.rename(old_file, new_file)
+                wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
+                new_path = Path(new_file)
+                similarity = match.mySimilarityScorer(
+                    masks.FileMasked(new_path).masked[1],
+                    filters.FileFiltered(self.list_ctrl.listdata[pos][config.D_MATCHNAME]).filtered,
+                )
+                self.list_ctrl.listdata[pos][config.D_FILENAME] = new_path
+                self.list_ctrl.listdata[pos][config.D_MATCH_SCORE] = similarity
+                self.list_ctrl.listdata[pos][config.D_PREVIEW] = getRenamePreview(
+                    new_path, self.list_ctrl.listdata[pos][config.D_MATCHNAME]
+                )
+                self.list_ctrl.listdata[pos][config.D_PREVIOUS_FILENAME] = new_path
+                stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_FILENAME])
+                self.list_ctrl.SetItem(
+                    row_id,
+                    config.D_FILENAME,
+                    str(self.list_ctrl.listdata[pos][config.D_FILENAME])
+                    if Qview_fullpath
+                    else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_FILENAME].name),
+                )
+                self.list_ctrl.SetItem(
+                    row_id, config.D_MATCH_SCORE, str(self.list_ctrl.listdata[pos][config.D_MATCH_SCORE]),
+                )
+                stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                self.list_ctrl.SetItem(
+                    row_id,
+                    config.D_PREVIEW,
+                    str(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                    if Qview_fullpath
+                    else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_PREVIEW].name),
+                )
 
-                except (OSError, IOError):
-                    wx.LogMessage(
-                        "Error when renaming : %s --> %s" % (old_file, new_file)
-                    )
+            except (OSError, IOError):
+                wx.LogMessage("Error when renaming : %s --> %s" % (old_file, new_file))
+
+    def OnLogDoublon(self, evt):
+        l = [x[config.D_PREVIEW] for x in self.list_ctrl.listdata.values()]
+        for x in set([x for x in l if x and x.stem and l.count(x) > 1]):
+            wx.LogMessage(x.stem)
 
 
 class aboutDialog(wx.Dialog):
@@ -698,11 +627,7 @@ class wxHTML(wx.html.HtmlWindow):
 class helpDialog(wx.Dialog):
     def __init__(self, parent, label):
         wx.Dialog.__init__(
-            self,
-            parent,
-            title=label,
-            size=(600, 300),
-            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+            self, parent, title=label, size=(600, 300), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
         )
 
         self.Bind(wx.EVT_CLOSE, self.OnClose)
@@ -752,80 +677,54 @@ class MainFrame(wx.Frame):
         help = wx.Menu()
 
         sources = wx.Menu()
-        sources_ = wx.MenuItem(
-            self.files, wx.ID_ANY, "&Sources", "Select sources (to rename)"
-        )
+        sources_ = wx.MenuItem(self.files, wx.ID_ANY, "&Sources", "Select sources (to rename)")
         sources_.SetSubMenu(sources)
 
         mnu_source_from_dir = wx.MenuItem(
-            sources,
-            wx.ID_ANY,
-            "Sources from &Directory...\tCtrl+D",
-            "Select sources from directory",
+            sources, wx.ID_ANY, "Sources from &Directory...\tCtrl+D", "Select sources from directory",
         )
         mnu_source_from_dir.SetBitmap(icons.AddFolder_16_PNG.GetBitmap())
         sources.Append(mnu_source_from_dir)
 
         mnu_source_from_clipboard = wx.MenuItem(
-            sources,
-            wx.ID_ANY,
-            "Sources from &Clipboard",
-            "Select sources from clipboard",
+            sources, wx.ID_ANY, "Sources from &Clipboard", "Select sources from clipboard",
         )
         mnu_source_from_clipboard.SetBitmap(icons.Clipboard_16_PNG.GetBitmap())
         sources.Append(mnu_source_from_clipboard)
 
         choices = wx.Menu()
-        choices_ = wx.MenuItem(
-            self.files, wx.ID_ANY, "&Choices", "Select choices (to match)"
-        )
+        choices_ = wx.MenuItem(self.files, wx.ID_ANY, "&Choices", "Select choices (to match)")
         choices_.SetSubMenu(choices)
 
         mnu_target_from_dir = wx.MenuItem(
-            choices,
-            wx.ID_ANY,
-            "Choices from &Directory...\tCtrl+T",
-            "Select choices from directory",
+            choices, wx.ID_ANY, "Choices from &Directory...\tCtrl+T", "Select choices from directory",
         )
         mnu_target_from_dir.SetBitmap(icons.AddFolder_16_PNG.GetBitmap())
         choices.Append(mnu_target_from_dir)
 
         mnu_choices_from_clipboard = wx.MenuItem(
-            choices,
-            wx.ID_ANY,
-            "Choices from &Clipboard",
-            "Select choices from clipboard",
+            choices, wx.ID_ANY, "Choices from &Clipboard", "Select choices from clipboard",
         )
         mnu_choices_from_clipboard.SetBitmap(icons.Clipboard_16_PNG.GetBitmap())
         choices.Append(mnu_choices_from_clipboard)
 
         output_dir = wx.Menu()
-        output_dir_ = wx.MenuItem(
-            self.files, wx.ID_ANY, "&Output Directory", "Select output directory"
-        )
+        output_dir_ = wx.MenuItem(self.files, wx.ID_ANY, "&Output Directory", "Select output directory")
         output_dir_.SetBitmap(icons.Folder_16_PNG.GetBitmap())
         output_dir_.SetSubMenu(output_dir)
 
-        self.mnu_same_as_input = output_dir.AppendCheckItem(
-            wx.ID_ANY, "&Same as source", "Same as source"
-        )
+        self.mnu_same_as_input = output_dir.AppendCheckItem(wx.ID_ANY, "&Same as source", "Same as source")
         self.mnu_user_dir = output_dir.AppendCheckItem(
             wx.ID_ANY, "&User-defined directory...", "Select User-defined directory"
         )
 
-        mnu_open = wx.MenuItem(
-            self.files, wx.ID_ANY, "&Load Session...\tCtrl+O", "Open..."
-        )
+        mnu_open = wx.MenuItem(self.files, wx.ID_ANY, "&Load Session...\tCtrl+O", "Open...")
         mnu_open.SetBitmap(icons.Open_16_PNG.GetBitmap())
 
-        mnu_save = wx.MenuItem(
-            self.files, wx.ID_ANY, "&Save Session\tCtrl+S", "Save..."
-        )
+        mnu_save = wx.MenuItem(self.files, wx.ID_ANY, "&Save Session\tCtrl+S", "Save...")
         mnu_save.SetBitmap(icons.Save_16_PNG.GetBitmap())
 
-        self.mnu_quit = wx.MenuItem(
-            self.files, wx.ID_ANY, "&Exit\tAlt+F4", "Exit the Application"
-        )
+        self.mnu_quit = wx.MenuItem(self.files, wx.ID_ANY, "&Exit\tAlt+F4", "Exit the Application")
         self.mnu_quit.SetBitmap(icons.Quit_16_PNG.GetBitmap())
 
         self.files.Append(sources_)
@@ -841,10 +740,7 @@ class MainFrame(wx.Frame):
                 new_mnu_recent = wx.MenuItem(
                     self.files,
                     wx.ID_ANY,
-                    "&"
-                    + str(i + 1)
-                    + ": "
-                    + utils.shorten_path(get_config()["recent_session"][i], 64),
+                    "&" + str(i + 1) + ": " + utils.shorten_path(get_config()["recent_session"][i], 64),
                     "",
                 )
                 self.files.Append(new_mnu_recent)
@@ -852,22 +748,12 @@ class MainFrame(wx.Frame):
             self.files.AppendSeparator()
         self.files.Append(self.mnu_quit)
 
-        mnu_view_fullpath = options.AppendCheckItem(
-            wx.ID_ANY, "&View full path", "View full path"
-        )
-        self.mnu_hide_extension = options.AppendCheckItem(
-            wx.ID_ANY, "&Hide suffix", "Hide suffix"
-        )
-        self.mnu_keep_original = options.AppendCheckItem(
-            wx.ID_ANY, "Keep &original on renaming", "Keep original on renaming"
-        )
-        self.mnu_keep_match_ext = options.AppendCheckItem(
-            wx.ID_ANY, "&Keep matched file suffix", "Keep matched file suffix"
-        )
+        mnu_view_fullpath = options.AppendCheckItem(wx.ID_ANY, "&View full path", "View full path")
+        self.mnu_hide_extension = options.AppendCheckItem(wx.ID_ANY, "&Hide suffix", "Hide suffix")
+        self.mnu_keep_original = options.AppendCheckItem(wx.ID_ANY, "Keep &original on renaming", "Keep original on renaming")
+        self.mnu_keep_match_ext = options.AppendCheckItem(wx.ID_ANY, "&Keep matched file suffix", "Keep matched file suffix")
         self.mnu_match_firstletter = options.AppendCheckItem(
-            wx.ID_ANY,
-            "&Always match first letter",
-            "Enforce choices that match the first letter of the source",
+            wx.ID_ANY, "&Always match first letter", "Enforce choices that match the first letter of the source",
         )
 
         workers = wx.Menu()
@@ -890,10 +776,7 @@ class MainFrame(wx.Frame):
             )
             self.mnu_procs.append(new_mnu_proc)
         options.Append(workers_)
-        if (
-            get_config()["workers"] <= len(self.mnu_procs)
-            and get_config()["workers"] > 0
-        ):
+        if get_config()["workers"] <= len(self.mnu_procs) and get_config()["workers"] > 0:
             self.mnu_procs[get_config()["workers"] - 1].Check(True)
 
         mnu_doc = wx.MenuItem(help, wx.ID_ANY, "&Help...", "Help")
@@ -921,23 +804,17 @@ class MainFrame(wx.Frame):
         self.mnu_match_firstletter.Check(get_config()["match_firstletter"])
 
         self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromDir, mnu_source_from_dir)
-        self.Bind(
-            wx.EVT_MENU, self.panel.OnAddSourceFromClipboard, mnu_source_from_clipboard
-        )
+        self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromClipboard, mnu_source_from_clipboard)
         self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromDir, mnu_target_from_dir)
         self.Bind(
-            wx.EVT_MENU,
-            self.panel.OnAddChoicesFromClipboard,
-            mnu_choices_from_clipboard,
+            wx.EVT_MENU, self.panel.OnAddChoicesFromClipboard, mnu_choices_from_clipboard,
         )
         self.Bind(wx.EVT_MENU, self.panel.OnOutputDirectory, self.mnu_user_dir)
         self.Bind(wx.EVT_MENU, self.panel.OnSameOutputDirectory, self.mnu_same_as_input)
         self.Bind(wx.EVT_MENU, self.panel.OnViewFullPath, mnu_view_fullpath)
         self.Bind(wx.EVT_MENU, self.panel.OnHideExtension, self.mnu_hide_extension)
         self.Bind(wx.EVT_MENU, self.panel.OnKeepMatchExtension, self.mnu_keep_match_ext)
-        self.Bind(
-            wx.EVT_MENU, self.panel.OnMatchFirstLetter, self.mnu_match_firstletter
-        )
+        self.Bind(wx.EVT_MENU, self.panel.OnMatchFirstLetter, self.mnu_match_firstletter)
         self.Bind(wx.EVT_MENU, self.panel.OnKeepOriginal, self.mnu_keep_original)
         self.Bind(wx.EVT_MENU, self.OnOpen, mnu_open)
         self.Bind(wx.EVT_MENU, self.OnSaveAs, mnu_save)
@@ -971,10 +848,7 @@ class MainFrame(wx.Frame):
 
     def OnSaveAs(self, event):
         with wx.FileDialog(
-            self,
-            "Save file",
-            wildcard="SAVE files (*.sav)|*.sav",
-            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
+            self, "Save file", wildcard="SAVE files (*.sav)|*.sav", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
         ) as fileDialog:
 
             if fileDialog.ShowModal() == wx.ID_CANCEL:
@@ -996,10 +870,7 @@ class MainFrame(wx.Frame):
 
     def OnOpen(self, event):
         with wx.FileDialog(
-            self,
-            "Open SAVE file",
-            wildcard="SAVE files (*.sav)|*.sav",
-            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+            self, "Open SAVE file", wildcard="SAVE files (*.sav)|*.sav", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
         ) as fileDialog:
 
             if fileDialog.ShowModal() == wx.ID_CANCEL:
@@ -1012,9 +883,7 @@ class MainFrame(wx.Frame):
         if pathname in get_config()["recent_session"]:
             idx = get_config()["recent_session"].index(pathname)
             if idx:
-                get_config()["recent_session"].insert(
-                    0, get_config()["recent_session"].pop(idx)
-                )
+                get_config()["recent_session"].insert(0, get_config()["recent_session"].pop(idx))
         else:
             get_config()["recent_session"].insert(0, pathname)
             get_config()["recent_session"] = get_config()["recent_session"][:8]
@@ -1026,26 +895,16 @@ class MainFrame(wx.Frame):
             found_recent = True
             self.files.Delete(mnu_recent)
         if not found_recent:
-            item, pos = self.files.FindChildItem(
-                self.mnu_quit.GetId()
-            )  # Searh Exit button
+            item, pos = self.files.FindChildItem(self.mnu_quit.GetId())  # Searh Exit button
             self.files.InsertSeparator(pos)
 
         # - Refresh recents
         self.mnu_recents.clear()
         for i in range(0, len(get_config()["recent_session"])):
             new_mnu_recent = wx.MenuItem(
-                self.files,
-                wx.ID_ANY,
-                "&"
-                + str(i + 1)
-                + ": "
-                + utils.shorten_path(get_config()["recent_session"][i], 64),
-                "",
+                self.files, wx.ID_ANY, "&" + str(i + 1) + ": " + utils.shorten_path(get_config()["recent_session"][i], 64), "",
             )
-            item, pos = self.files.FindChildItem(
-                self.mnu_quit.GetId()
-            )  # Searh Exit button
+            item, pos = self.files.FindChildItem(self.mnu_quit.GetId())  # Searh Exit button
             self.files.Insert(pos - 1, new_mnu_recent)
             self.mnu_recents.append(new_mnu_recent)
             self.Bind(wx.EVT_MENU, self.OnOpenRecent, new_mnu_recent)
@@ -1079,22 +938,16 @@ class MainFrame(wx.Frame):
         for key, data in list.listdata.items():
             stem, suffix = utils.GetFileStemAndSuffix(data[config.D_FILENAME])
             item_name = (
-                str(data[config.D_FILENAME])
-                if Qview_fullpath
-                else (stem if Qhide_extension else data[config.D_FILENAME].name)
+                str(data[config.D_FILENAME]) if Qview_fullpath else (stem if Qhide_extension else data[config.D_FILENAME].name)
             )
             list.InsertItem(row_id, item_name)
             if data[config.D_MATCHNAME].name:
-                list.SetItem(
-                    row_id, config.D_MATCH_SCORE, str(data[config.D_MATCH_SCORE])
-                )
-                stem, suffix = utils.GetFileStemAndSuffix(data[config.D_MATCHNAME])
+                list.SetItem(row_id, config.D_MATCH_SCORE, str(data[config.D_MATCH_SCORE]))
+                parent, stem, suffix = utils.GetFileParentStemAndSuffix(data[config.D_MATCHNAME])
                 list.SetItem(
                     row_id,
                     config.D_MATCHNAME,
-                    str(data[config.D_MATCHNAME])
-                    if Qview_fullpath
-                    else (stem if Qhide_extension else data[config.D_MATCHNAME].name),
+                    parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix),
                 )
                 stem, suffix = utils.GetFileStemAndSuffix(data[config.D_PREVIEW])
                 list.SetItem(
@@ -1134,9 +987,7 @@ class MainFrame(wx.Frame):
     def SaveUI(self):
         list = self.panel.list_ctrl
         for col in range(0, len(config.default_columns)):
-            get_config()["col%d_order" % (col + 1)] = (
-                list.GetColumnOrder(col) if list.HasColumnOrderSupport() else col
-            )
+            get_config()["col%d_order" % (col + 1)] = list.GetColumnOrder(col) if list.HasColumnOrderSupport() else col
             get_config()["col%d_size" % (col + 1)] = list.GetColumnWidth(col)
         get_config()["window"] = [
             self.GetSize().x,

@@ -9,13 +9,9 @@ from unittests import pfr
 
 class check_Tests(pfr.PyFuzzyRenamerTestCase):
     def test_check(self):
-        sourcesDir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "./data/sources")
-        )
+        sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
         self.frame.panel.AddSourceFromDir(sourcesDir)
-        choicesDir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "./data/choices")
-        )
+        choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
         for each in self.button_panel.GetChildren():

@@ -26,9 +26,7 @@ class add_choices_Tests(pfr.PyFuzzyRenamerTestCase):
         self.add_choices(drop=True)
 
     def add_choices(self, dir=False, singles=False, clipboard=False, drop=False):
-        choicesDir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "./data/choices")
-        )
+        choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         if dir:
             self.frame.panel.AddChoicesFromDir(choicesDir)
         else:
@@ -47,9 +45,7 @@ class add_choices_Tests(pfr.PyFuzzyRenamerTestCase):
 
                     def clickNO():
                         dlg = wx.GetActiveWindow()
-                        clickEvent = wx.CommandEvent(
-                            wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_NO
-                        )
+                        clickEvent = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_NO)
                         dlg.ProcessEvent(clickEvent)
 
                     droptarget = self.frame.panel.GetDropTarget()

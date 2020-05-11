@@ -10,13 +10,9 @@ from pyfuzzyrenamer import config, main_listctrl
 
 class action_Tests(pfr.PyFuzzyRenamerTestCase):
     def test_pickchoice(self):
-        sourcesDir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "./data/sources")
-        )
+        sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
         self.frame.panel.AddSourceFromDir(sourcesDir)
-        choicesDir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "./data/choices")
-        )
+        choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
         for each in self.button_panel.GetChildren():
@@ -46,10 +42,7 @@ class action_Tests(pfr.PyFuzzyRenamerTestCase):
                             "User choice",
                             "True",
                         ],
-                        [
-                            lst.GetItemText(item, col)
-                            for col in range(0, len(config.default_columns))
-                        ],
+                        [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
                     )
 
         lst.Select(item)
@@ -59,13 +52,9 @@ class action_Tests(pfr.PyFuzzyRenamerTestCase):
         lst.GetEventHandler().ProcessEvent(event)
 
     def test_resetmatch(self):
-        sourcesDir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "./data/sources")
-        )
+        sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
         self.frame.panel.AddSourceFromDir(sourcesDir)
-        choicesDir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "./data/choices")
-        )
+        choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
         for each in self.button_panel.GetChildren():
@@ -87,17 +76,11 @@ class action_Tests(pfr.PyFuzzyRenamerTestCase):
         lst.GetEventHandler().ProcessEvent(event)
         self.assertEqual(
             ["Abutilon à feuilles marbrées.txt", "", "", "", "No match", "True"],
-            [
-                lst.GetItemText(item1, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            [lst.GetItemText(item1, col) for col in range(0, len(config.default_columns))],
         )
         self.assertEqual(
             ["Acanthe à feuilles molles.txt", "", "", "", "No match", "True"],
-            [
-                lst.GetItemText(item2, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            [lst.GetItemText(item2, col) for col in range(0, len(config.default_columns))],
         )
 
 

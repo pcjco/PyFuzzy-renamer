@@ -9,16 +9,13 @@ from pyfuzzyrenamer import (
     masks,
     masks_listctrl,
 )
+from pyfuzzyrenamer.config import get_config
 
 
 class masksandfiltersDialog(wx.Dialog):
     def __init__(self, parent, label):
         wx.Dialog.__init__(
-            self,
-            parent,
-            title=label,
-            size=(350, 300),
-            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+            self, parent, title=label, size=(350, 300), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
         )
 
         self.panel = masksandfiltersPanel(self)
@@ -54,21 +51,13 @@ class masksandfiltersPanel(wx.Panel):
             page_filters, self, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN
         )
         label1 = wx.StaticText(page_filters, label="Test String", size=(60, -1))
-        self.preview_filters = wx.TextCtrl(
-            page_filters,
-            value="Hitchhiker's Guide to the Galaxy, The (AGA)",
-            size=(300, -1),
-        )
+        self.preview_filters = wx.TextCtrl(page_filters, value=get_config()["filters_test"], size=(300, -1),)
         label2 = wx.StaticText(page_filters, label="Result", size=(60, -1))
-        self.result_preview_filters = wx.TextCtrl(
-            page_filters, value="", size=(300, -1), style=wx.TE_READONLY
-        )
+        self.result_preview_filters = wx.TextCtrl(page_filters, value="", size=(300, -1), style=wx.TE_READONLY)
 
         wx.FileSystem.AddHandler(wx.MemoryFSHandler())
         image_Info = wx.MemoryFSHandler()
-        image_Info.AddFile(
-            "info.png", icons.Info_16_PNG.GetBitmap(), wx.BITMAP_TYPE_PNG
-        )
+        image_Info.AddFile("info.png", icons.Info_16_PNG.GetBitmap(), wx.BITMAP_TYPE_PNG)
 
         html_desc_filters = wx.html.HtmlWindow(page_filters, size=(600, 135))
         html_desc_filters.SetPage(
@@ -96,24 +85,12 @@ class masksandfiltersPanel(wx.Panel):
         sizer_filters.Add(html_desc_filters, 0, wx.EXPAND | wx.ALL)
         page_filters.SetSizer(sizer_filters)
 
-        self.masks_list = masks_listctrl.MaskListCtrl(
-            page_masks, self, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN
-        )
+        self.masks_list = masks_listctrl.MaskListCtrl(page_masks, self, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN)
         label21 = wx.StaticText(page_masks, label="Test String", size=(80, -1))
-        self.preview_masks = wx.TextCtrl(
-            page_masks,
-            value="(1986) Hitchhiker's Guide to the Galaxy, The (AGA) Disk1",
-            size=(300, -1),
-        )
-        self.result_preview_masks_lead = wx.TextCtrl(
-            page_masks, value="", size=(40, -1), style=wx.TE_READONLY
-        )
-        self.result_preview_masks_mid = wx.TextCtrl(
-            page_masks, value="", size=(220, -1), style=wx.TE_READONLY
-        )
-        self.result_preview_masks_trail = wx.TextCtrl(
-            page_masks, value="", size=(40, -1), style=wx.TE_READONLY
-        )
+        self.preview_masks = wx.TextCtrl(page_masks, value=get_config()["masks_test"], size=(300, -1),)
+        self.result_preview_masks_lead = wx.TextCtrl(page_masks, value="", size=(40, -1), style=wx.TE_READONLY)
+        self.result_preview_masks_mid = wx.TextCtrl(page_masks, value="", size=(220, -1), style=wx.TE_READONLY)
+        self.result_preview_masks_trail = wx.TextCtrl(page_masks, value="", size=(40, -1), style=wx.TE_READONLY)
         label22 = wx.StaticText(page_masks, label="Lead-Mid-Trail", size=(80, -1))
 
         html_desc_masks = wx.html.HtmlWindow(page_masks, size=(600, 200))
@@ -169,19 +146,14 @@ class masksandfiltersPanel(wx.Panel):
     def UpdateFilterPreview(self):
         re_filters = filters.CompileFilters(self.filters_list.GetFilters())
         self.result_preview_filters.SetValue(
-            filters.filter_processed(
-                Path(self.preview_filters.GetValue() + ".txt"), re_filters
-            )
+            filters.filter_processed(Path(self.preview_filters.GetValue() + ".noext"), re_filters)
         )
 
     def UpdateMaskPreview(self):
         re_masks = masks.CompileMasks(self.masks_list.GetMasks())
         re_filters = []
         pre, middle, post = masks.mask_processed(
-            Path(self.preview_masks.GetValue() + ".txt"),
-            re_masks,
-            re_filters,
-            applyFilters=False,
+            Path(self.preview_masks.GetValue() + ".noext"), re_masks, re_filters, applyFilters=False,
         )
         self.result_preview_masks_lead.SetValue(pre)
         self.result_preview_masks_mid.SetValue(middle)

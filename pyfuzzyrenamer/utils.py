@@ -9,11 +9,14 @@ illegal_chars = r'/?<>\:*|"' if (sys.platform == "win32") else r":"
 
 def GetFileStemAndSuffix(file):
     stem = file.stem
-    suffix = file.suffix
-    if not file.suffix[1:].isalnum():
-        stem = file.name
-        suffix = ""
+    suffix = file.suffix if file.suffix != ".noext" else ""
     return stem, suffix
+
+
+def GetFileParentStemAndSuffix(file):
+    p = str(file.parent)
+    parent = (p + os.sep) if p != "." else ""
+    return (parent,) + GetFileStemAndSuffix(file)
 
 
 def group(L):

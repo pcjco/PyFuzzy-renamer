@@ -25,13 +25,7 @@ def fuzz_processor(file):
 
 
 def match_process(idx, f_masked, f_candidates):
-    data = fuzzywuzzy.process.extract(
-        f_masked,
-        f_candidates,
-        scorer=mySimilarityScorer,
-        processor=fuzz_processor,
-        limit=10,
-    )
+    data = fuzzywuzzy.process.extract(f_masked, f_candidates, scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,)
     m = FileMatch(f_masked.file, data)
     return idx, m
 
@@ -50,20 +44,14 @@ def get_matches(sources):
         ret[data[0]] = data[1]
 
     def progress_msg(added, processed, total):
-        return "Processed sources %d%%\nAdded sources %d%%" % (
-            100 * (processed / total),
-            100 * (added / total),
-        )
+        return "Processed sources %d%%\nAdded sources %d%%" % (100 * (processed / total), 100 * (added / total),)
 
     progress = wx.ProgressDialog(
         "Match Progress",
         "Processed sources    %\nAdded sources    %",
         maximum=len(sources),
         parent=None,
-        style=wx.PD_AUTO_HIDE
-        | wx.PD_CAN_ABORT
-        | wx.PD_ESTIMATED_TIME
-        | wx.PD_REMAINING_TIME,
+        style=wx.PD_AUTO_HIDE | wx.PD_CAN_ABORT | wx.PD_ESTIMATED_TIME | wx.PD_REMAINING_TIME,
     )
     Qmatch_firstletter = get_config()["match_firstletter"]
     added = 0
@@ -78,34 +66,26 @@ def get_matches(sources):
                 first_letter = f_masked.masked[1][0]
                 if first_letter in main_dlg.candidates.keys():
                     pool.apply_async(
-                        match_process,
-                        (added, f_masked, main_dlg.candidates[first_letter],),
-                        callback=callback_processed,
+                        match_process, (added, f_masked, main_dlg.candidates[first_letter],), callback=callback_processed,
                     )
                 else:
                     ret[added] = None
             else:
                 pool.apply_async(
-                    match_process,
-                    (added, f_masked, main_dlg.candidates["all"],),
-                    callback=callback_processed,
+                    match_process, (added, f_masked, main_dlg.candidates["all"],), callback=callback_processed,
                 )
             added += 1
-            cancelled = not progress.Update(
-                processed, progress_msg(added, processed, total)
-            )[0]
+            cancelled = not progress.Update(processed, progress_msg(added, processed, total))[0]
             if cancelled:
                 pool.terminate()
                 break
         pool.close()
         while len(active_children()) > 0:
-            cancelled = not progress.Update(
-                processed, progress_msg(added, processed, total)
-            )[0]
+            cancelled = not progress.Update(processed, progress_msg(added, processed, total))[0]
             if cancelled:
                 pool.terminate()
                 break
-            wx.MilliSleep(1000)
+            wx.MilliSleep(10)
         pool.join()
     else:
         for f in sources:
@@ -132,18 +112,12 @@ def get_matches(sources):
                 ret[added] = FileMatch(
                     f_masked.file,
                     fuzzywuzzy.process.extract(
-                        f_masked,
-                        main_dlg.candidates["all"],
-                        scorer=mySimilarityScorer,
-                        processor=fuzz_processor,
-                        limit=10,
+                        f_masked, main_dlg.candidates["all"], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
                     ),
                 )
             added += 1
             processed += 1
-            cancelled = not progress.Update(
-                processed, progress_msg(added, processed, total)
-            )[0]
+            cancelled = not progress.Update(processed, progress_msg(added, processed, total))[0]
             if cancelled:
                 break
 
@@ -162,18 +136,10 @@ def get_match(source):
         first_letter = f_masked.masked[1][0]
         if first_letter in main_dlg.candidates.keys():
             ret = fuzzywuzzy.process.extract(
-                f_masked,
-                main_dlg.candidates[first_letter],
-                scorer=mySimilarityScorer,
-                processor=fuzz_processor,
-                limit=10,
+                f_masked, main_dlg.candidates[first_letter], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
             )
     else:
         ret = fuzzywuzzy.process.extract(
-            f_masked,
-            main_dlg.candidates["all"],
-            scorer=mySimilarityScorer,
-            processor=fuzz_processor,
-            limit=10,
+            f_masked, main_dlg.candidates["all"], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
         )
     return ret

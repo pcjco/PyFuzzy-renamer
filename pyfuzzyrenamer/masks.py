@@ -13,10 +13,7 @@ def mask_processed(file, masks, re_filters, applyFilters=True):
         if matches:
             for groupNum in range(0, len(matches.groups())):
                 groupNum = groupNum + 1
-                interval = set.union(
-                    interval,
-                    {*range(matches.start(groupNum), matches.end(groupNum) + 1)},
-                )
+                interval = set.union(interval, {*range(matches.start(groupNum), matches.end(groupNum) + 1)},)
     interval_lst = sorted(interval)
     post = ""
     pre = ""
@@ -40,7 +37,10 @@ def mask_processed(file, masks, re_filters, applyFilters=True):
         middle = middle.strip()
         # apply filters
         for re_filter in re_filters:
-            middle = re_filter[0].sub(re_filter[1], middle)
+            try:
+                middle = re_filter[0].sub(re_filter[1], middle)
+            except re.error:
+                pass
         middle = " ".join(middle.split())
     return pre, middle, post
 
@@ -63,6 +63,4 @@ class FileMasked:
 
     def __init__(self, file):
         self.file = file
-        self.masked = mask_processed(
-            file, FileMasked.masks, filters.FileFiltered.filters
-        )
+        self.masked = mask_processed(file, FileMasked.masks, filters.FileFiltered.filters)

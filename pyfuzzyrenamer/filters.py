@@ -12,7 +12,10 @@ def filter_processed(file, re_filters):
     ret = ret.strip()
     # apply filters
     for re_filter in re_filters:
-        ret = re_filter[0].sub(re_filter[1], ret)
+        try:
+            ret = re_filter[0].sub(re_filter[1], ret)
+        except re.error:
+            pass
     ret = " ".join(ret.split())
     return ret
 
@@ -24,9 +27,7 @@ def CompileFilters(filters):
     for l1, l2, l3 in zip(it, it, it):
         if l1.startswith("+"):
             try:
-                ret.append(
-                    (re.compile(l2.strip()[1:-1]), l3.strip()[1:-1], re.IGNORECASE)
-                )
+                ret.append((re.compile(l2.strip()[1:-1]), l3.strip()[1:-1], re.IGNORECASE))
             except re.error:
                 pass
     return ret

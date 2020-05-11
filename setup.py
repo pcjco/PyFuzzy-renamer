@@ -23,10 +23,6 @@ setup(
     packages=["pyfuzzyrenamer"],
     include_package_data=False,
     python_requires=">=3.6",
-    install_requires=[
-        "wxPython>=4.1.0",
-        "python-Levenshtein>=0.12.0",
-        "fuzzywuzzy>=0.17.0",
-    ],
+    install_requires=["wxPython>=4.1.0", "python-Levenshtein>=0.12.0", "fuzzywuzzy>=0.17.0",],
     entry_points={"gui_scripts": ["pyfuzzyrenamer = pyfuzzyrenamer.__main__:main"]},
 )

@@ -17,12 +17,8 @@ class PyFuzzyRenamerTestCase(unittest.TestCase):
         self.frame = main_dlg.MainFrame()
         self.frame.Show()
         self.frame.PostSizeEvent()
-        self.button_panel = (
-            self.frame.panel.GetChildren()[1].GetChildren()[0].GetChildren()[0]
-        )
-        self.outdir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "./outdir")
-        )
+        self.button_panel = self.frame.panel.GetChildren()[1].GetChildren()[0].GetChildren()[0]
+        self.outdir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./outdir"))
 
     def tearDown(self):
         def _cleanup():

@@ -34,9 +34,7 @@ class MaskListCtrlDropTarget(wx.DropTarget):
 
 
 class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
-    def __init__(
-        self, parent, panel, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0
-    ):
+    def __init__(self, parent, panel, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
         wx.ListCtrl.__init__(self, parent, pos=pos, size=size, style=style)
         listmix.TextEditMixin.__init__(self)
         self.EnableCheckBoxes()
@@ -145,7 +143,7 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                 s_masks += "+" if self.IsItemChecked(row_id0) else "-"
                 s_masks += self.GetItemText(row_id0, 1) + "\n"
                 if row_id == row_id0:
-                    regexp = self.GetItemText(row_id, 2)
+                    regexp = event.GetText()
                     s_masks += '"' + regexp + '"\n'
                     try:
                         re.compile(regexp)
@@ -158,10 +156,7 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
             re_masks = masks.CompileMasks(s_masks)
             re_filters = []
             pre, middle, post = masks.mask_processed(
-                Path(self.panel.preview_masks.GetValue() + ".txt"),
-                re_masks,
-                re_filters,
-                applyFilters=False,
+                Path(self.panel.preview_masks.GetValue() + ".noext"), re_masks, re_filters, applyFilters=False,
             )
             self.panel.result_preview_masks_lead.SetValue(pre)
             self.panel.result_preview_masks_mid.SetValue(middle)
@@ -170,9 +165,7 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
     def getItemInfo(self, idx):
         """Collect all relevant data of a listitem, and put it in a list"""
         collect = []
-        collect.append(
-            idx
-        )  # We need the original index, so it is easier to eventualy delete it
+        collect.append(idx)  # We need the original index, so it is easier to eventualy delete it
         collect.append(self.IsItemChecked(idx))  # check
         collect.append(self.GetItemText(idx))  # Text first column
         for i in range(1, self.GetColumnCount()):  # Possible extra columns

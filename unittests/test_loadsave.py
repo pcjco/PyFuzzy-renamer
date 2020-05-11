@@ -14,13 +14,9 @@ class loadsave_Tests(pfr.PyFuzzyRenamerTestCase):
         if os.path.exists(self.outdir):
             shutil.rmtree(self.outdir)
         os.makedirs(self.outdir)
-        sourcesDir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "./data/sources")
-        )
+        sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
         self.frame.panel.AddSourceFromDir(sourcesDir)
-        choicesDir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "./data/choices")
-        )
+        choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
         for each in self.button_panel.GetChildren():
@@ -84,63 +80,27 @@ class loadsave_Tests(pfr.PyFuzzyRenamerTestCase):
         item = lst.GetNextItem(item)
         self.assertEqual(
             ["Acanthe à feuilles molles.txt", "", "", "", "No match", "True"],
-            [
-                lst.GetItemText(item, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
             ["Acanthe épineuse.txt", "", "", "", "No match", "True"],
-            [
-                lst.GetItemText(item, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            [
-                "Abutilon à feuilles marbrées.txt",
-                "86",
-                "Abutilon hybridum.txt",
-                "Abutilon hybridum.txt",
-                "Matched",
-                "True",
-            ],
-            [
-                lst.GetItemText(item, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            ["Abutilon à feuilles marbrées.txt", "86", "Abutilon hybridum.txt", "Abutilon hybridum.txt", "Matched", "True",],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            [
-                "Aconit vénéneux.txt",
-                "52",
-                "Aconitum anthora.txt",
-                "Aconitum anthora.txt",
-                "Matched",
-                "False",
-            ],
-            [
-                lst.GetItemText(item, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "Matched", "False",],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            [
-                "Violette cornue.txt",
-                "71",
-                "Viola cornuta.txt",
-                "Viola cornuta.txt",
-                "Matched",
-                "True",
-            ],
-            [
-                lst.GetItemText(item, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "Matched", "True",],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
@@ -152,10 +112,7 @@ class loadsave_Tests(pfr.PyFuzzyRenamerTestCase):
                 "Matched",
                 "True",
             ],
-            [
-                lst.GetItemText(item, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 
         shutil.rmtree(self.outdir)

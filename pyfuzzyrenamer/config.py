@@ -32,6 +32,9 @@ default_masks = (
     + "\n"
     + "+Starting (Year)\n"
     + r'"^(\(\d{4}\)\s?)"'
+    + "\n"
+    + "+Language (En,Fr,...)\n"
+    + r"(\s\((Fr|En|De|Es|It|Nl|Pt|Sv|No|Da).*?\))"
 )
 default_filters = (
     "+Strip brackets\n"
@@ -101,33 +104,23 @@ def read(config_file=None):
         if not len(cfg_file):
             return theConfig
         try:
-            theConfig["show_fullpath"] = (
-                True if config["global"]["show_fullpath"] == "True" else False
-            )
+            theConfig["show_fullpath"] = True if config["global"]["show_fullpath"] == "True" else False
         except KeyError:
             pass
         try:
-            theConfig["hide_extension"] = (
-                True if config["global"]["hide_extension"] == "True" else False
-            )
+            theConfig["hide_extension"] = True if config["global"]["hide_extension"] == "True" else False
         except KeyError:
             pass
         try:
-            theConfig["keep_match_ext"] = (
-                True if config["global"]["keep_match_ext"] == "True" else False
-            )
+            theConfig["keep_match_ext"] = True if config["global"]["keep_match_ext"] == "True" else False
         except KeyError:
             pass
         try:
-            theConfig["keep_original"] = (
-                True if config["global"]["keep_original"] == "True" else False
-            )
+            theConfig["keep_original"] = True if config["global"]["keep_original"] == "True" else False
         except KeyError:
             pass
         try:
-            theConfig["match_firstletter"] = (
-                True if config["global"]["match_firstletter"] == "True" else False
-            )
+            theConfig["match_firstletter"] = True if config["global"]["match_firstletter"] == "True" else False
         except KeyError:
             pass
         try:
@@ -171,12 +164,8 @@ def read(config_file=None):
             pass
         for i in range(0, len(default_columns)):
             try:
-                theConfig["col%d_order" % (i + 1)] = int(
-                    config["ui"]["col%d_order" % (i + 1)]
-                )
-                theConfig["col%d_size" % (i + 1)] = int(
-                    config["ui"]["col%d_size" % (i + 1)]
-                )
+                theConfig["col%d_order" % (i + 1)] = int(config["ui"]["col%d_order" % (i + 1)])
+                theConfig["col%d_size" % (i + 1)] = int(config["ui"]["col%d_size" % (i + 1)])
             except KeyError:
                 pass
         try:

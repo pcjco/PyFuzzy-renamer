@@ -26,9 +26,7 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
         self.add_sources(drop=True)
 
     def add_sources(self, dir=False, singles=False, clipboard=False, drop=False):
-        sourcesDir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "./data/sources")
-        )
+        sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
         if dir:
             self.frame.panel.AddSourceFromDir(sourcesDir)
         else:
@@ -47,9 +45,7 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
 
                     def clickYES():
                         dlg = wx.GetActiveWindow()
-                        clickEvent = wx.CommandEvent(
-                            wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_YES
-                        )
+                        clickEvent = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_YES)
                         dlg.ProcessEvent(clickEvent)
 
                     droptarget = self.frame.panel.GetDropTarget()
@@ -70,19 +66,13 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
         self.assertEqual(6, lst.GetItemCount())
         self.assertEqual(
             ["Abutilon à feuilles marbrées.txt", "", "", "", "Not processed", "True"],
-            [
-                lst.GetItemText(item, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         for i in range(0, 5):
             item = lst.GetNextItem(item)
         self.assertEqual(
             ["Volutaire à fleurs tubulées.txt", "", "", "", "Not processed", "True"],
-            [
-                lst.GetItemText(item, col)
-                for col in range(0, len(config.default_columns))
-            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 
 
