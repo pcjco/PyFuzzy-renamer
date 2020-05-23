@@ -6,11 +6,13 @@ import operator
 import wx
 import wx.aui
 import wx.html
+import wx.lib.busy
 from multiprocessing import cpu_count, freeze_support
 from pathlib import Path
 
 from . import __version__
 from pyfuzzyrenamer import (
+    bottom_notebook,
     config,
     filters,
     main_listctrl,
@@ -150,9 +152,9 @@ class MainPanel(wx.Panel):
         btn_undo.SetBitmap(icons.Undo_16_PNG.GetBitmap(), wx.LEFT)
         btn_undo.SetToolTip("Undo last rename")
 
-        btn_doublon = wx.Button(panel_listbutton, label="Doublon")
-        btn_doublon.SetBitmap(icons.Exclamation_16_PNG.GetBitmap(), wx.LEFT)
-        btn_doublon.SetToolTip("Log renamed doublons")
+        btn_duplicate = wx.Button(panel_listbutton, label="Duplicate")
+        btn_duplicate.SetBitmap(icons.Exclamation_16_PNG.GetBitmap(), wx.LEFT)
+        btn_duplicate.SetToolTip("Log renamed duplicates")
 
         panel_listbutton_sizer = wx.BoxSizer(wx.HORIZONTAL)
         panel_listbutton_sizer.Add(btn_add_source_from_files, 0, wx.ALL, 1)
@@ -160,7 +162,7 @@ class MainPanel(wx.Panel):
         panel_listbutton_sizer.Add(btn_filters, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_run, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_reset, 0, wx.ALL, 1)
-        panel_listbutton_sizer.Add(btn_doublon, 0, wx.ALL, 1)
+        panel_listbutton_sizer.Add(btn_duplicate, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_ren, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_undo, 0, wx.ALL, 1)
         panel_listbutton.SetSizer(panel_listbutton_sizer)
@@ -177,22 +179,16 @@ class MainPanel(wx.Panel):
         panel_list_sizer.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 0)
         panel_list.SetSizer(panel_list_sizer)
 
-        panel_log = wx.Panel(parent=self)
-
-        log = wx.TextCtrl(panel_log, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
-        wx.Log.SetActiveTarget(wx.LogTextCtrl(log))
-
-        log_sizer = wx.BoxSizer()
-        log_sizer.Add(log, 1, wx.EXPAND | wx.ALL, 5)
-        panel_log.SetSizer(log_sizer)
+        self.bottom_notebook = bottom_notebook.bottomNotebook(self)
+        self.bottom_notebook.AddPage(bottom_notebook.TabLog(parent=self.bottom_notebook), "Log")
 
         self.mgr.AddPane(panel_top, wx.aui.AuiPaneInfo().Name("pane_list").CenterPane())
         self.mgr.AddPane(
-            panel_log,
+            self.bottom_notebook,
             wx.aui.AuiPaneInfo()
-            .CloseButton(True)
-            .Name("pane_log")
-            .Caption("Log")
+            .CloseButton(False)
+            .Name("pane_output")
+            .Caption("Output")
             .FloatingSize(-1, 200)
             .BestSize(-1, 200)
             .MinSize(-1, 120)
@@ -200,7 +196,7 @@ class MainPanel(wx.Panel):
         )
         self.mgr.Update()
         btn_run.Bind(wx.EVT_BUTTON, self.OnRun)
-        btn_doublon.Bind(wx.EVT_BUTTON, self.OnLogDoublon)
+        btn_duplicate.Bind(wx.EVT_BUTTON, self.OnLogDuplicate)
         btn_ren.Bind(wx.EVT_BUTTON, self.OnRename)
         btn_reset.Bind(wx.EVT_BUTTON, self.OnReset)
         btn_filters.Bind(wx.EVT_BUTTON, self.OnFilters)
@@ -247,15 +243,16 @@ class MainPanel(wx.Panel):
             self.AddSourceFromDir(dirDialog.GetPath())
 
     def AddSourceFromDir(self, directory):
-        get_config()["folder_sources"] = directory
-        newdata = []
-        for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
-            try:
-                if f.is_file():
-                    newdata.append([f, 0, Path(), Path(), "Not processed", "True", f])
-            except (OSError, IOError):
-                pass
-        self.list_ctrl.AddToList(newdata)
+        with wx.lib.busy.BusyInfo("Please wait..."):
+            get_config()["folder_sources"] = directory
+            newdata = []
+            for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
+                try:
+                    if f.is_file():
+                        newdata.append([f, 0, Path(), Path(), "Not processed", "True", f])
+                except (OSError, IOError):
+                    pass
+            self.list_ctrl.AddToList(newdata)
 
     def OnAddSourceFromFiles(self, evt):
         with wx.FileDialog(
@@ -270,20 +267,21 @@ class MainPanel(wx.Panel):
             self.AddSourceFromFiles(self.fileDialog.GetPaths())
 
     def AddSourceFromFiles(self, files):
-        newdata = []
-        first = True
-        for f in files:
-            if not f:
-                continue
-            try:
-                fp = Path(f)
-                if first:
-                    first = False
-                    get_config()["folder_sources"] = str(fp.parent)
-                newdata.append([fp, 0, Path(), Path(), "Not processed", "True", fp])
-            except (OSError, IOError):
-                pass
-        self.list_ctrl.AddToList(newdata)
+        with wx.lib.busy.BusyInfo("Please wait..."):
+            newdata = []
+            first = True
+            for f in files:
+                if not f:
+                    continue
+                try:
+                    fp = Path(f)
+                    if first:
+                        first = False
+                        get_config()["folder_sources"] = str(fp.parent)
+                    newdata.append([fp, 0, Path(), Path(), "Not processed", "True", fp])
+                except (OSError, IOError):
+                    pass
+            self.list_ctrl.AddToList(newdata)
 
     def OnAddSourceFromClipboard(self, evt):
         files = utils.ClipBoardFiles()
@@ -300,14 +298,15 @@ class MainPanel(wx.Panel):
             self.AddChoicesFromDir(dirDialog.GetPath())
 
     def AddChoicesFromDir(self, directory):
-        get_config()["folder_choices"] = directory
-        for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
-            try:
-                if f.is_file():
-                    glob_choices.add(f)
-            except (OSError, IOError):
-                pass
-        RefreshCandidates()
+        with wx.lib.busy.BusyInfo("Please wait..."):
+            get_config()["folder_choices"] = directory
+            for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
+                try:
+                    if f.is_file():
+                        glob_choices.add(f)
+                except (OSError, IOError):
+                    pass
+            RefreshCandidates()
 
     def OnAddChoicesFromFiles(self, evt):
         with wx.FileDialog(
@@ -322,19 +321,20 @@ class MainPanel(wx.Panel):
             self.AddChoicesFromFiles(fileDialog.GetPaths())
 
     def AddChoicesFromFiles(self, files):
-        first = True
-        for f in files:
-            if not f:
-                continue
-            try:
-                fp = Path(f)
-                if first:
-                    first = False
-                    get_config()["folder_choices"] = str(fp.parent)
-                glob_choices.add(fp)
-            except (OSError, IOError):
-                pass
-        RefreshCandidates()
+        with wx.lib.busy.BusyInfo("Please wait..."):
+            first = True
+            for f in files:
+                if not f:
+                    continue
+                try:
+                    fp = Path(f)
+                    if first:
+                        first = False
+                        get_config()["folder_choices"] = str(fp.parent)
+                    glob_choices.add(fp)
+                except (OSError, IOError):
+                    pass
+            RefreshCandidates()
 
     def OnAddChoicesFromClipboard(self, evt):
         files = utils.ClipBoardFiles()
@@ -441,88 +441,91 @@ class MainPanel(wx.Panel):
         Qhide_extension = get_config()["hide_extension"]
         Qkeep_original = get_config()["keep_original"]
         row_id = -1
-        while True:  # loop all the checked items
-            row_id = self.list_ctrl.GetNextItem(row_id)
-            if row_id == -1:
-                break
-            if not self.list_ctrl.IsItemChecked(row_id):
-                continue
-            pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
-
-            old_path = self.list_ctrl.listdata[pos][config.D_FILENAME]
-            preview_path = self.list_ctrl.listdata[pos][config.D_PREVIEW]
-            if not preview_path:
-                continue
-            if old_path == preview_path:
-                continue
-            old_file = str(old_path)
-            new_file = str(preview_path)
-            try:
-                if not old_path.is_file():
+        with wx.lib.busy.BusyInfo("Please wait..."):
+            while True:  # loop all the checked items
+                row_id = self.list_ctrl.GetNextItem(row_id)
+                if row_id == -1:
+                    break
+                if not self.list_ctrl.IsItemChecked(row_id):
                     continue
-                if Qkeep_original:
-                    shutil.copy2(old_file, new_file)
-                    wx.LogMessage("Copying : %s --> %s" % (old_file, new_file))
-                else:
-                    os.rename(old_file, new_file)
-                    wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
-                new_path = Path(new_file)
-                new_match = match.get_match(new_path)
-                if new_match:
-                    self.list_ctrl.listdata[pos] = [
-                        new_path,
-                        new_match[0][1],
-                        new_match[0][0].file,
-                        getRenamePreview(new_path, new_match[0][0].file),
-                        "Matched",
-                        self.list_ctrl.listdata[pos][config.D_CHECKED],
-                        old_path if not Qkeep_original else None,
-                    ]
-                    self.list_ctrl.SetItem(
-                        row_id, config.D_MATCH_SCORE, str(self.list_ctrl.listdata[pos][config.D_MATCH_SCORE]),
-                    )
-                    parent, stem, suffix = utils.GetFileParentStemAndSuffix(self.list_ctrl.listdata[pos][config.D_MATCHNAME])
+                pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
+
+                old_path = self.list_ctrl.listdata[pos][config.D_FILENAME]
+                preview_path = self.list_ctrl.listdata[pos][config.D_PREVIEW]
+                if not preview_path:
+                    continue
+                if old_path == preview_path:
+                    continue
+                old_file = str(old_path)
+                new_file = str(preview_path)
+                try:
+                    if not old_path.is_file():
+                        continue
+                    if Qkeep_original:
+                        shutil.copy2(old_file, new_file)
+                        wx.LogMessage("Copying : %s --> %s" % (old_file, new_file))
+                    else:
+                        os.rename(old_file, new_file)
+                        wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
+                    new_path = Path(new_file)
+                    new_match = match.get_match(new_path)
+                    if new_match:
+                        self.list_ctrl.listdata[pos] = [
+                            new_path,
+                            new_match[0][1],
+                            new_match[0][0].file,
+                            getRenamePreview(new_path, new_match[0][0].file),
+                            "Matched",
+                            self.list_ctrl.listdata[pos][config.D_CHECKED],
+                            old_path if not Qkeep_original else None,
+                        ]
+                        self.list_ctrl.SetItem(
+                            row_id, config.D_MATCH_SCORE, str(self.list_ctrl.listdata[pos][config.D_MATCH_SCORE]),
+                        )
+                        parent, stem, suffix = utils.GetFileParentStemAndSuffix(
+                            self.list_ctrl.listdata[pos][config.D_MATCHNAME]
+                        )
+                        self.list_ctrl.SetItem(
+                            row_id,
+                            config.D_MATCHNAME,
+                            parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix),
+                        )
+                        stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                        self.list_ctrl.SetItem(
+                            row_id,
+                            config.D_PREVIEW,
+                            str(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                            if Qview_fullpath
+                            else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_PREVIEW].name),
+                        )
+                    else:
+                        self.list_ctrl.listdata[pos] = [
+                            new_path,
+                            0,
+                            Path(),
+                            Path(),
+                            "No match",
+                            self.listdata[pos][config.D_CHECKED],
+                            old_path if not Qkeep_original else None,
+                        ]
+                        self.list_ctrl.SetItem(row_id, config.D_MATCH_SCORE, "")
+                        self.list_ctrl.SetItem(row_id, config.D_MATCHNAME, "")
+                        self.list_ctrl.SetItem(row_id, config.D_PREVIEW, "")
+
+                    stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_FILENAME])
                     self.list_ctrl.SetItem(
                         row_id,
-                        config.D_MATCHNAME,
-                        parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix),
-                    )
-                    stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_PREVIEW])
-                    self.list_ctrl.SetItem(
-                        row_id,
-                        config.D_PREVIEW,
-                        str(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                        config.D_FILENAME,
+                        str(self.list_ctrl.listdata[pos][config.D_FILENAME])
                         if Qview_fullpath
-                        else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_PREVIEW].name),
+                        else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_FILENAME].name),
                     )
-                else:
-                    self.list_ctrl.listdata[pos] = [
-                        new_path,
-                        0,
-                        Path(),
-                        Path(),
-                        "No match",
-                        self.listdata[pos][config.D_CHECKED],
-                        old_path if not Qkeep_original else None,
-                    ]
-                    self.list_ctrl.SetItem(row_id, config.D_MATCH_SCORE, "")
-                    self.list_ctrl.SetItem(row_id, config.D_MATCHNAME, "")
-                    self.list_ctrl.SetItem(row_id, config.D_PREVIEW, "")
+                    self.list_ctrl.SetItem(
+                        row_id, config.D_STATUS, self.list_ctrl.listdata[pos][config.D_STATUS],
+                    )
 
-                stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_FILENAME])
-                self.list_ctrl.SetItem(
-                    row_id,
-                    config.D_FILENAME,
-                    str(self.list_ctrl.listdata[pos][config.D_FILENAME])
-                    if Qview_fullpath
-                    else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_FILENAME].name),
-                )
-                self.list_ctrl.SetItem(
-                    row_id, config.D_STATUS, self.list_ctrl.listdata[pos][config.D_STATUS],
-                )
-
-            except (OSError, IOError):
-                wx.LogMessage("Error when renaming : %s --> %s" % (old_file, new_file))
+                except (OSError, IOError):
+                    wx.LogMessage("Error when renaming : %s --> %s" % (old_file, new_file))
 
     def OnUndo(self, evt):
         Qview_fullpath = get_config()["show_fullpath"]
@@ -582,10 +585,31 @@ class MainPanel(wx.Panel):
             except (OSError, IOError):
                 wx.LogMessage("Error when renaming : %s --> %s" % (old_file, new_file))
 
-    def OnLogDoublon(self, evt):
-        l = [x[config.D_PREVIEW] for x in self.list_ctrl.listdata.values()]
-        for x in set([x for x in l if x and x.stem and l.count(x) > 1]):
-            wx.LogMessage(x.stem)
+    def OnLogDuplicate(self, evt):
+        with wx.lib.busy.BusyInfo("Please wait..."):
+            values = [x[config.D_PREVIEW] for x in self.list_ctrl.listdata.values()]
+            keys = [x for x in self.list_ctrl.listdata.keys()]
+            duplicates = {value: key for (key, value) in zip(keys, values) if value and value.stem and values.count(value) > 1}
+            duplicates_key = [duplicates[sorted_key] for sorted_key in sorted(duplicates.keys())]
+
+        duplicateTabIdx = -1
+        for idx in range(0, self.bottom_notebook.GetPageCount()):
+            if self.bottom_notebook.GetPageText(idx) == "Duplicates":
+                duplicateTabIdx = idx
+                break
+
+        if len(duplicates_key):
+            wx.LogMessage("Found %d duplicate(s)" % (len(duplicates_key)))
+            if duplicateTabIdx != -1:
+                self.bottom_notebook.SetSelection(duplicateTabIdx)
+            else:
+                self.tab_duplicates = bottom_notebook.TabDuplicates(parent=self.bottom_notebook, mlist=self.list_ctrl)
+                self.bottom_notebook.AddPage(self.tab_duplicates, "Duplicates", select=True)
+            self.tab_duplicates.SetDuplicates(duplicates_key)
+        else:
+            wx.LogMessage("No duplicate found")
+            if duplicateTabIdx != -1:
+                self.bottom_notebook.DeletePage(duplicateTabIdx)
 
 
 class aboutDialog(wx.Dialog):
@@ -935,53 +959,58 @@ class MainFrame(wx.Frame):
         row_id = 0
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
-        for key, data in list.listdata.items():
-            stem, suffix = utils.GetFileStemAndSuffix(data[config.D_FILENAME])
-            item_name = (
-                str(data[config.D_FILENAME]) if Qview_fullpath else (stem if Qhide_extension else data[config.D_FILENAME].name)
-            )
-            list.InsertItem(row_id, item_name)
-            if data[config.D_MATCHNAME].name:
-                list.SetItem(row_id, config.D_MATCH_SCORE, str(data[config.D_MATCH_SCORE]))
-                parent, stem, suffix = utils.GetFileParentStemAndSuffix(data[config.D_MATCHNAME])
-                list.SetItem(
-                    row_id,
-                    config.D_MATCHNAME,
-                    parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix),
-                )
-                stem, suffix = utils.GetFileStemAndSuffix(data[config.D_PREVIEW])
-                list.SetItem(
-                    row_id,
-                    config.D_PREVIEW,
-                    str(data[config.D_PREVIEW])
+        with wx.lib.busy.BusyInfo("Please wait..."):
+            list.Freeze()
+            for key, data in list.listdata.items():
+                stem, suffix = utils.GetFileStemAndSuffix(data[config.D_FILENAME])
+                item_name = (
+                    str(data[config.D_FILENAME])
                     if Qview_fullpath
-                    else (stem if Qhide_extension else data[config.D_PREVIEW].name),
+                    else (stem if Qhide_extension else data[config.D_FILENAME].name)
                 )
-            else:
-                list.SetItem(row_id, config.D_MATCH_SCORE, "")
-                list.SetItem(row_id, config.D_MATCHNAME, "")
-                list.SetItem(row_id, config.D_PREVIEW, "")
-            list.SetItem(row_id, config.D_STATUS, data[config.D_STATUS])
-            list.SetItem(row_id, config.D_CHECKED, data[config.D_CHECKED])
-            list.SetItemData(row_id, key)
-            list.CheckItem(row_id, True if data[config.D_CHECKED] == "True" else False)
-            if data[config.D_CHECKED] == "False":
-                f = list.GetItemFont(row_id)
-                if not f.IsOk():
-                    f = list.GetFont()
-                font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-                font.SetStyle(wx.FONTSTYLE_ITALIC)
-                font.SetWeight(f.GetWeight())
-                list.SetItemFont(row_id, font)
-            if data[config.D_STATUS] == "User choice":
-                f = list.GetItemFont(row_id)
-                if not f.IsOk():
-                    f = list.GetFont()
-                font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-                font.SetWeight(wx.FONTWEIGHT_BOLD)
-                font.SetStyle(f.GetStyle())
-                list.SetItemFont(row_id, font)
-            row_id += 1
+                list.InsertItem(row_id, item_name)
+                if data[config.D_MATCHNAME].name:
+                    list.SetItem(row_id, config.D_MATCH_SCORE, str(data[config.D_MATCH_SCORE]))
+                    parent, stem, suffix = utils.GetFileParentStemAndSuffix(data[config.D_MATCHNAME])
+                    list.SetItem(
+                        row_id,
+                        config.D_MATCHNAME,
+                        parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix),
+                    )
+                    stem, suffix = utils.GetFileStemAndSuffix(data[config.D_PREVIEW])
+                    list.SetItem(
+                        row_id,
+                        config.D_PREVIEW,
+                        str(data[config.D_PREVIEW])
+                        if Qview_fullpath
+                        else (stem if Qhide_extension else data[config.D_PREVIEW].name),
+                    )
+                else:
+                    list.SetItem(row_id, config.D_MATCH_SCORE, "")
+                    list.SetItem(row_id, config.D_MATCHNAME, "")
+                    list.SetItem(row_id, config.D_PREVIEW, "")
+                list.SetItem(row_id, config.D_STATUS, data[config.D_STATUS])
+                list.SetItem(row_id, config.D_CHECKED, data[config.D_CHECKED])
+                list.SetItemData(row_id, key)
+                list.CheckItem(row_id, True if data[config.D_CHECKED] == "True" else False)
+                if data[config.D_CHECKED] == "False":
+                    f = list.GetItemFont(row_id)
+                    if not f.IsOk():
+                        f = list.GetFont()
+                    font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+                    font.SetStyle(wx.FONTSTYLE_ITALIC)
+                    font.SetWeight(f.GetWeight())
+                    list.SetItemFont(row_id, font)
+                if data[config.D_STATUS] == "User choice":
+                    f = list.GetItemFont(row_id)
+                    if not f.IsOk():
+                        f = list.GetFont()
+                    font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+                    font.SetWeight(wx.FONTWEIGHT_BOLD)
+                    font.SetStyle(f.GetStyle())
+                    list.SetItemFont(row_id, font)
+                row_id += 1
+            list.Thaw()
         list.itemDataMap = list.listdata
 
     def SaveUI(self):

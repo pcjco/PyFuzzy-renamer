@@ -115,12 +115,14 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             if self.GetSelectedItemCount() == 1:
                 index = self.GetFirstSelected()
         elif keycode == wx.WXK_CONTROL_A:
+            self.Freeze()
             item = -1
             while 1:
                 item = self.GetNextItem(item)
                 if item == -1:
                     break
                 self.SetItemState(item, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
+            self.Thaw()
         elif keycode == wx.WXK_DELETE:
             if event.GetModifiers() == wx.MOD_SHIFT:
                 self.DeleteSelectionCb(None)
@@ -519,6 +521,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
 
+        self.Freeze()
         row_id = -1
         while True:
             row_id = self.GetNextItem(row_id)
@@ -554,6 +557,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.SetItem(row_id, config.D_MATCH_SCORE, "")
                 self.SetItem(row_id, config.D_MATCHNAME, "")
                 self.SetItem(row_id, config.D_PREVIEW, "")
+        self.Thaw()
 
     def AddToList(self, newdata):
         Qview_fullpath = get_config()["show_fullpath"]
@@ -562,6 +566,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         index = 0 if not self.listdata else sorted(self.listdata.keys())[-1] + 1  # start indexing after max index
         row_id = self.GetItemCount()
 
+        self.Freeze()
         for data in newdata:
 
             # Treat duplicate file
@@ -581,6 +586,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.CheckItem(row_id, True)
             row_id += 1
             index += 1
+        self.Thaw()
 
     def OnSortOrderChanged(self):
         row_id = self.GetFirstSelected()
