@@ -4,7 +4,8 @@ import pickle as pickle
 import shutil
 import operator
 import wx
-import wx.aui
+import wx.lib.agw.aui as aui
+import wx.lib.agw.persist as PM
 import wx.html
 import wx.lib.busy
 from multiprocessing import cpu_count, freeze_support
@@ -109,11 +110,11 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
 
 class MainPanel(wx.Panel):
     def __init__(self, parent):
-        wx.Panel.__init__(self, parent, style=wx.WANTS_CHARS)
+        wx.Panel.__init__(self, parent, name="mainpanel", style=wx.WANTS_CHARS)
 
         self.parent = parent
 
-        self.mgr = wx.aui.AuiManager()
+        self.mgr = aui.AuiManager()
         self.mgr.SetManagedWindow(self)
 
         panel_top = wx.Panel(parent=self)
@@ -182,19 +183,14 @@ class MainPanel(wx.Panel):
         self.bottom_notebook = bottom_notebook.bottomNotebook(self)
         self.bottom_notebook.AddPage(bottom_notebook.TabLog(parent=self.bottom_notebook), "Log")
 
-        self.mgr.AddPane(panel_top, wx.aui.AuiPaneInfo().Name("pane_list").CenterPane())
+        self.mgr.AddPane(panel_top, aui.AuiPaneInfo().Name("pane_list").CenterPane())
         self.mgr.AddPane(
             self.bottom_notebook,
-            wx.aui.AuiPaneInfo()
-            .CloseButton(False)
-            .Name("pane_output")
-            .Caption("Output")
-            .FloatingSize(-1, 200)
-            .BestSize(-1, 200)
-            .MinSize(-1, 120)
-            .Bottom(),
+            aui.AuiPaneInfo().CloseButton(True).Name("pane_output").Caption("Output").BestSize(-1, 200).Bottom(),
         )
         self.mgr.Update()
+
+        self.mgr.Bind(aui.EVT_AUI_PANE_CLOSE, self.OnClosePane)
         btn_run.Bind(wx.EVT_BUTTON, self.OnRun)
         btn_duplicate.Bind(wx.EVT_BUTTON, self.OnLogDuplicate)
         btn_ren.Bind(wx.EVT_BUTTON, self.OnRename)
@@ -203,6 +199,30 @@ class MainPanel(wx.Panel):
         btn_undo.Bind(wx.EVT_BUTTON, self.OnUndo)
         btn_add_source_from_files.Bind(wx.EVT_BUTTON, self.OnAddSourceFromFiles)
         btn_add_choice_from_file.Bind(wx.EVT_BUTTON, self.OnAddChoicesFromFiles)
+
+    def OnToggleBottom(self, evt):
+        item = self.parent.GetMenuBar().FindItemById(evt.GetId())
+        get_config()["view_bottom"] = item.IsChecked()
+        self.ToggleBottom()
+
+    def ToggleBottom(self):
+        # Show pane if hidden
+        if get_config()["view_bottom"] and not self.mgr.GetPane(self.bottom_notebook).IsShown():
+            self.mgr.ShowPane(self.bottom_notebook, show=True)
+        # Hide pane if shown
+        elif not get_config()["view_bottom"] and self.mgr.GetPane(self.bottom_notebook).IsShown():
+            self.mgr.ShowPane(self.bottom_notebook, show=False)
+        self.parent.mnu_show_log.Enable(get_config()["view_bottom"])
+
+    def OnToggleLog(self, evt):
+        item = self.parent.GetMenuBar().FindItemById(evt.GetId())
+        get_config()["show_log"] = item.IsChecked()
+        self.bottom_notebook.ToggleLog()
+
+    def OnClosePane(self, evt):
+        get_config()["view_bottom"] = False
+        self.ToggleBottom()
+        self.parent.mnu_view_bottom.Check(False)
 
     def OnViewFullPath(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
@@ -409,11 +429,13 @@ class MainPanel(wx.Panel):
                         self.list_ctrl.listdata[pos][config.D_FILENAME], self.list_ctrl.listdata[pos][config.D_MATCHNAME],
                     )
                     self.list_ctrl.listdata[pos][config.D_STATUS] = "Matched"
-                else:
+                elif matches[count] is not None:
                     self.list_ctrl.listdata[pos][config.D_MATCH_SCORE] = 0
                     self.list_ctrl.listdata[pos][config.D_MATCHNAME] = Path()
                     self.list_ctrl.listdata[pos][config.D_PREVIEW] = Path()
                     self.list_ctrl.listdata[pos][config.D_STATUS] = "No match"
+                else:
+                    break
                 count += 1
         self.list_ctrl.RefreshList()
 
@@ -678,9 +700,10 @@ class MainFrame(wx.Frame):
         wx.Frame.__init__(
             self,
             None,
+            name="mainFrame",
             title="PyFuzzy-renamer " + __version__,
-            pos=wx.Point(get_config()["window"][2], get_config()["window"][3]),
-            size=wx.Size(get_config()["window"][0], get_config()["window"][1]),
+            pos=wx.Point(-10, 0),
+            size=wx.Size(1000, 800),
         )
         freeze_support()
 
@@ -697,6 +720,7 @@ class MainFrame(wx.Frame):
 
         menubar = wx.MenuBar()
         self.files = wx.Menu()
+        view = wx.Menu()
         options = wx.Menu()
         help = wx.Menu()
 
@@ -772,6 +796,9 @@ class MainFrame(wx.Frame):
             self.files.AppendSeparator()
         self.files.Append(self.mnu_quit)
 
+        self.mnu_view_bottom = view.AppendCheckItem(wx.ID_ANY, "&View Output Pane", "View Output Pane")
+        self.mnu_show_log = view.AppendCheckItem(wx.ID_ANY, "&Show log", "Show log")
+
         mnu_view_fullpath = options.AppendCheckItem(wx.ID_ANY, "&View full path", "View full path")
         self.mnu_hide_extension = options.AppendCheckItem(wx.ID_ANY, "&Hide suffix", "Hide suffix")
         self.mnu_keep_original = options.AppendCheckItem(wx.ID_ANY, "Keep &original on renaming", "Keep original on renaming")
@@ -811,6 +838,7 @@ class MainFrame(wx.Frame):
         help.Append(mnu_about)
 
         menubar.Append(self.files, "&File")
+        menubar.Append(view, "&View")
         menubar.Append(options, "&Options")
         menubar.Append(help, "&Help")
         self.SetMenuBar(menubar)
@@ -820,12 +848,29 @@ class MainFrame(wx.Frame):
         else:
             self.mnu_same_as_input.Check(True)
 
+        self.mnu_view_bottom.Check(get_config()["view_bottom"])
+        self.mnu_show_log.Check(get_config()["show_log"])
+
         mnu_view_fullpath.Check(get_config()["show_fullpath"])
         self.mnu_hide_extension.Check(get_config()["hide_extension"])
         self.mnu_hide_extension.Enable(not get_config()["show_fullpath"])
         self.mnu_keep_original.Check(get_config()["keep_original"])
         self.mnu_keep_match_ext.Check(get_config()["keep_match_ext"])
         self.mnu_match_firstletter.Check(get_config()["match_firstletter"])
+
+        # Show/Hide the bottom pane according to config
+        self.panel.ToggleBottom()
+
+        # Show/Hide the log according to config
+        self.panel.bottom_notebook.ToggleLog()
+
+        # Persistent window config
+        self.persistMgr = PM.PersistenceManager.Get()
+        self.persistMgr.SetConfigurationHandler(config.get_persistent_config())
+        self.persistMgr.Register(self)
+        self.persistMgr.Register(self.panel)
+        self.persistMgr.Restore(self)
+        self.persistMgr.Restore(self.panel)
 
         self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromDir, mnu_source_from_dir)
         self.Bind(wx.EVT_MENU, self.panel.OnAddSourceFromClipboard, mnu_source_from_clipboard)
@@ -835,6 +880,8 @@ class MainFrame(wx.Frame):
         )
         self.Bind(wx.EVT_MENU, self.panel.OnOutputDirectory, self.mnu_user_dir)
         self.Bind(wx.EVT_MENU, self.panel.OnSameOutputDirectory, self.mnu_same_as_input)
+        self.Bind(wx.EVT_MENU, self.panel.OnToggleBottom, self.mnu_view_bottom)
+        self.Bind(wx.EVT_MENU, self.panel.OnToggleLog, self.mnu_show_log)
         self.Bind(wx.EVT_MENU, self.panel.OnViewFullPath, mnu_view_fullpath)
         self.Bind(wx.EVT_MENU, self.panel.OnHideExtension, self.mnu_hide_extension)
         self.Bind(wx.EVT_MENU, self.panel.OnKeepMatchExtension, self.mnu_keep_match_ext)
@@ -1014,16 +1061,11 @@ class MainFrame(wx.Frame):
         list.itemDataMap = list.listdata
 
     def SaveUI(self):
+        self.persistMgr.SaveAndUnregister()
         list = self.panel.list_ctrl
         for col in range(0, len(config.default_columns)):
             get_config()["col%d_order" % (col + 1)] = list.GetColumnOrder(col) if list.HasColumnOrderSupport() else col
             get_config()["col%d_size" % (col + 1)] = list.GetColumnWidth(col)
-        get_config()["window"] = [
-            self.GetSize().x,
-            self.GetSize().y,
-            self.GetPosition().x,
-            self.GetPosition().y,
-        ]
 
 
 def getDoc():

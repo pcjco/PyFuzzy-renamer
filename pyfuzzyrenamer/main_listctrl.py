@@ -30,6 +30,7 @@ class PickCandidate(wx.MiniFrame):
         self.text = AutocompleteTextCtrl(self, size=(400, -1), completer=list_completer(main_dlg.candidates["all"]))
         self.text.SetMinSize((400, -1))
         self.row_id = row_id
+        self.firstLose = False
         panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
         panel_sizer.Add(self.text, 1, wx.EXPAND | wx.ALL, 0)
         self.SetSizerAndFit(panel_sizer)
@@ -37,11 +38,16 @@ class PickCandidate(wx.MiniFrame):
         self.SetSizeHints(minW=size.GetWidth(), minH=size.GetHeight(), maxH=size.GetHeight())
         self.Bind(wx.EVT_CHAR_HOOK, self.OnKeyUP)
         self.Bind(wx.EVT_CLOSE, self.OnCloseWindow)
+        self.text.Bind(wx.EVT_KILL_FOCUS, self.OnLoseFocus)
         self.text.Bind(wx.EVT_TEXT_ENTER, self.OnEnter)
-        self.MakeModal()
+
+    def OnLoseFocus(self, event):
+        if not self.firstLose:
+            self.firstLose = True
+        else:
+            self.OnCloseWindow(None)
 
     def OnCloseWindow(self, event):
-        self.MakeModal(False)
         self.Destroy()
 
     def OnKeyUP(self, event):
@@ -60,12 +66,6 @@ class PickCandidate(wx.MiniFrame):
                 list_ctrl.MenuForceMatchCb(self.row_id, forced_match, None)
 
         self.Close(True)
-
-    def MakeModal(self, modal=True):
-        if modal and not hasattr(self, "_disabler"):
-            self._disabler = wx.WindowDisabler(self)
-        if not modal and hasattr(self, "_disabler"):
-            del self._disabler
 
 
 class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):

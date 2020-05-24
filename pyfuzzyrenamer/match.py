@@ -60,7 +60,7 @@ def get_matches(sources):
         for f in sources:
             f_masked = masks.FileMasked(f)
             if not f_masked.masked[1]:
-                ret[added] = None
+                ret[added] = []
                 continue
             if Qmatch_firstletter:
                 first_letter = f_masked.masked[1][0]
@@ -69,7 +69,7 @@ def get_matches(sources):
                         match_process, (added, f_masked, main_dlg.candidates[first_letter],), callback=callback_processed,
                     )
                 else:
-                    ret[added] = None
+                    ret[added] = []
             else:
                 pool.apply_async(
                     match_process, (added, f_masked, main_dlg.candidates["all"],), callback=callback_processed,
@@ -91,7 +91,7 @@ def get_matches(sources):
         for f in sources:
             f_masked = masks.FileMasked(f)
             if not f_masked.masked[1]:
-                ret[added] = None
+                ret[added] = []
                 continue
             if Qmatch_firstletter:
                 first_letter = f_masked.masked[1][0]
@@ -107,7 +107,7 @@ def get_matches(sources):
                         ),
                     )
                 else:
-                    ret[added] = None
+                    ret[added] = []
             else:
                 ret[added] = FileMatch(
                     f_masked.file,

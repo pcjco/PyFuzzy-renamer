@@ -63,8 +63,27 @@ CONFIG_FILE = get_config_file()
 theConfig = {}
 
 
+class CustomWindowConfigHandler:
+    def __init__(self):
+        self.dict = {}
+
+    def SaveValue(self, key, value):
+        self.dict[key] = value
+        return True
+
+    def RestoreValue(self, key):
+        return self.dict.get(key.lower())
+
+
+thePersistentConfig = CustomWindowConfigHandler()
+
+
 def get_config():
     return theConfig
+
+
+def get_persistent_config():
+    return thePersistentConfig
 
 
 def get_default_columns():
@@ -73,6 +92,8 @@ def get_default_columns():
 
 def default():
     theConfig.clear()
+    theConfig["view_bottom"] = False
+    theConfig["show_log"] = False
     theConfig["show_fullpath"] = False
     theConfig["hide_extension"] = False
     theConfig["match_firstletter"] = False
@@ -85,7 +106,6 @@ def default():
     theConfig["masks"] = default_masks
     theConfig["masks_test"] = default_masks_teststring
     theConfig["filters_test"] = default_filters_teststring
-    theConfig["window"] = [1000, 800, -10, 0]
     theConfig["workers"] = cpu_count()
     theConfig["recent_session"] = []
     for i in range(0, len(default_columns)):
@@ -103,6 +123,14 @@ def read(config_file=None):
         cfg_file = config.read(CONFIG_FILE or config_file, encoding="utf-8-sig")
         if not len(cfg_file):
             return theConfig
+        try:
+            theConfig["view_bottom"] = True if config["ui"]["view_bottom"] == "True" else False
+        except KeyError:
+            pass
+        try:
+            theConfig["show_log"] = True if config["ui"]["show_log"] == "True" else False
+        except KeyError:
+            pass
         try:
             theConfig["show_fullpath"] = True if config["global"]["show_fullpath"] == "True" else False
         except KeyError:
@@ -168,16 +196,14 @@ def read(config_file=None):
                 theConfig["col%d_size" % (i + 1)] = int(config["ui"]["col%d_size" % (i + 1)])
             except KeyError:
                 pass
+
         try:
-            theConfig["window"][0] = int(config["ui"]["width"])
-            theConfig["window"][1] = int(config["ui"]["height"])
-            theConfig["window"][2] = int(config["ui"]["left"])
-            theConfig["window"][3] = int(config["ui"]["top"])
-        except KeyError:
+            get_persistent_config().dict = {key: value for key, value in config.items("window")}
+        except configparser.NoSectionError:
             pass
 
     except configparser.Error as e:
-        logging.error("%s when reading config file '%s'" % (e.args[0], config_file))
+        logging.error("%s when reading config file '%s'" % (e.args[0], CONFIG_FILE or config_file))
         return theConfig
 
     masks.FileMasked.masks = masks.CompileMasks(theConfig["masks"])
@@ -207,12 +233,8 @@ def write(config_file=None):
                 "folder_choices": theConfig["folder_choices"],
                 "folder_output": theConfig["folder_output"],
             },
-            "ui": {
-                "width": theConfig["window"][0],
-                "height": theConfig["window"][1],
-                "left": theConfig["window"][2],
-                "top": theConfig["window"][3],
-            },
+            "ui": {"view_bottom": theConfig["view_bottom"], "show_log": theConfig["show_log"],},
+            "window": {},
         }
     )
     for i in range(0, len(theConfig["recent_session"])):
@@ -221,6 +243,9 @@ def write(config_file=None):
     for i in range(0, len(default_columns)):
         config["ui"]["col%d_order" % (i + 1)] = str(theConfig["col%d_order" % (i + 1)])
         config["ui"]["col%d_size" % (i + 1)] = str(theConfig["col%d_size" % (i + 1)])
+
+    for key, value in get_persistent_config().dict.items():
+        config["window"][key] = value
 
     with open(CONFIG_FILE or config_file, "w") as configfile:
         config.write(configfile)

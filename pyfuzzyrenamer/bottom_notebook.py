@@ -1,6 +1,7 @@
 import wx
 import wx.lib.agw.aui as aui
 from pyfuzzyrenamer import config, utils
+from pyfuzzyrenamer.config import get_config
 
 
 class bottomNotebook(aui.AuiNotebook):
@@ -9,21 +10,44 @@ class bottomNotebook(aui.AuiNotebook):
         parent,
         pos=wx.DefaultPosition,
         size=wx.DefaultSize,
-        style=wx.aui.AUI_NB_BOTTOM
-        | wx.aui.AUI_NB_TAB_SPLIT
-        | wx.aui.AUI_NB_TAB_MOVE
-        | wx.aui.AUI_NB_SCROLL_BUTTONS
-        | wx.aui.AUI_NB_CLOSE_ON_ACTIVE_TAB
-        | wx.aui.AUI_NB_MIDDLE_CLICK_CLOSE,
-        agwStyle=wx.aui.AUI_NB_DEFAULT_STYLE,
+        style=aui.AUI_NB_BOTTOM
+        | aui.AUI_NB_TAB_SPLIT
+        | aui.AUI_NB_TAB_MOVE
+        | aui.AUI_NB_SCROLL_BUTTONS
+        | aui.AUI_NB_CLOSE_ON_ACTIVE_TAB
+        | aui.AUI_NB_MIDDLE_CLICK_CLOSE,
+        agwStyle=aui.AUI_NB_DEFAULT_STYLE,
     ):
         aui.AuiNotebook.__init__(self, parent, pos=pos, size=size, style=style, agwStyle=agwStyle)
+        self.Bind(aui.EVT_AUINOTEBOOK_PAGE_CLOSE, self.OnAuiNotebookPageClose)
 
     def __getitem__(self, index):
         if index < self.GetPageCount():
             return self.GetPage(index)
         else:
             raise IndexError
+
+    def OnAuiNotebookPageClose(self, event):
+        # prevent Log to be closed , hide it instead
+        page_idx = event.GetSelection()
+        if self.GetPageText(page_idx) == "Log":
+            event.Veto()
+            self.HidePage(page_idx, hidden=True)
+            get_config()["show_log"] = False
+            self.GetParent().GetParent().mnu_show_log.Check(False)
+
+    def ToggleLog(self):
+        logTabIdx = -1
+        for idx in range(0, self.GetPageCount()):
+            if self.GetPageText(idx) == "Log":
+                logTabIdx = idx
+                break
+        # Show log tab if hidden
+        if get_config()["show_log"] and logTabIdx != -1 and self.GetHidden(logTabIdx):
+            self.HidePage(logTabIdx, hidden=False)
+        # Hide log tab if shown
+        elif not get_config()["show_log"] and logTabIdx != -1 and not self.GetHidden(logTabIdx):
+            self.HidePage(logTabIdx, hidden=True)
 
 
 class TabLog(wx.Panel):
