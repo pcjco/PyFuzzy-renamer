@@ -26,11 +26,14 @@ class action_Tests(pfr.PyFuzzyRenamerTestCase):
         lst = self.frame.panel.list_ctrl
         item = -1
         item = lst.GetNextItem(item)
+        self.passed = False
 
         def Pick():
+            if self.passed:
+                return
             for dlg in lst.GetChildren():
                 if isinstance(dlg, main_listctrl.PickCandidate):
-                    dlg.text.SetValue("Volutaria tubuliflora.txt")
+                    dlg.text.SetValue("Volutaria tubuliflora")
                     event = wx.CommandEvent(wx.wxEVT_TEXT_ENTER, dlg.text.GetId())
                     dlg.text.GetEventHandler().ProcessEvent(event)
                     self.assertEqual(
@@ -44,12 +47,15 @@ class action_Tests(pfr.PyFuzzyRenamerTestCase):
                         ],
                         [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
                     )
+                    self.passed = True
 
         lst.Select(item)
         event = wx.KeyEvent(wx.wxEVT_CHAR)
         event.SetKeyCode(wx.WXK_CONTROL_P)
         wx.CallAfter(Pick)
         lst.GetEventHandler().ProcessEvent(event)
+        wx.Yield()
+        self.assertEqual(self.passed, True)
 
     def test_resetmatch(self):
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))

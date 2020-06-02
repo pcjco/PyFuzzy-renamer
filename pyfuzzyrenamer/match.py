@@ -1,9 +1,7 @@
 import fuzzywuzzy.fuzz
 import fuzzywuzzy.process
-import wx
-from multiprocessing import Pool, active_children
 
-from pyfuzzyrenamer import main_dlg, masks
+from pyfuzzyrenamer import main_dlg, masks, taskserver
 from pyfuzzyrenamer.config import get_config
 
 
@@ -24,122 +22,84 @@ def fuzz_processor(file):
         return file.masked[1]
 
 
-def match_process(idx, f_masked, f_candidates):
-    data = fuzzywuzzy.process.extract(f_masked, f_candidates, scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,)
-    m = FileMatch(f_masked.file, data)
-    return idx, m
+class TaskMatch:
+    def __init__(self, args):
+        pass
+
+    def calculate(self, args):
+        if not args:
+            return []
+        f_masked, f_candidates = args
+        data = fuzzywuzzy.process.extract(
+            f_masked, f_candidates, scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
+        )
+        return FileMatch(f_masked.file, data)
+
+
+def progress_msg(j, numtasks, output):
+    try:
+        return "Processed sources %d%%" % (100.0 * (float(j + 1) / float(numtasks)),)
+    except ZeroDivisionError:
+        return "Processed sources..."
 
 
 def get_matches(sources):
-    global processed
-    processed = 0
-    total = len(sources)
-    ret = [None for i in range(total)]
+
+    numtasks = len(sources)
+
+    # Create the task list
+    Tasks = [((), ()) for i in range(numtasks)]
+    Results = [None for i in range(numtasks)]
     if not main_dlg.candidates:
-        return ret
+        return Results
 
-    def callback_processed(data):
-        global processed
-        processed += 1
-        ret[data[0]] = data[1]
-
-    def progress_msg(added, processed, total):
-        return "Processed sources %d%%\nAdded sources %d%%" % (100 * (processed / total), 100 * (added / total),)
-
-    progress = wx.ProgressDialog(
-        "Match Progress",
-        "Processed sources    %\nAdded sources    %",
-        maximum=len(sources),
-        parent=None,
-        style=wx.PD_AUTO_HIDE | wx.PD_CAN_ABORT | wx.PD_ESTIMATED_TIME | wx.PD_REMAINING_TIME,
-    )
     Qmatch_firstletter = get_config()["match_firstletter"]
-    added = 0
-    if get_config()["workers"] > 1:
-        pool = Pool(processes=get_config()["workers"])
-        for f in sources:
-            f_masked = masks.FileMasked(f)
-            if not f_masked.masked[1]:
-                ret[added] = []
-                continue
+    for i in range(numtasks):
+        f_masked = masks.FileMasked(sources[i])
+        if f_masked.masked[1]:
             if Qmatch_firstletter:
                 first_letter = f_masked.masked[1][0]
                 if first_letter in main_dlg.candidates.keys():
-                    pool.apply_async(
-                        match_process, (added, f_masked, main_dlg.candidates[first_letter],), callback=callback_processed,
+                    Tasks[i] = (
+                        (),
+                        (f_masked, main_dlg.candidates[first_letter],),
                     )
-                else:
-                    ret[added] = []
             else:
-                pool.apply_async(
-                    match_process, (added, f_masked, main_dlg.candidates["all"],), callback=callback_processed,
+                Tasks[i] = (
+                    (),
+                    (f_masked, main_dlg.candidates["all"],),
                 )
-            added += 1
-            cancelled = not progress.Update(processed, progress_msg(added, processed, total))[0]
-            if cancelled:
-                pool.terminate()
-                break
-        pool.close()
-        while len(active_children()) > 0:
-            cancelled = not progress.Update(processed, progress_msg(added, processed, total))[0]
-            if cancelled:
-                pool.terminate()
-                break
-            wx.MilliSleep(10)
-        pool.join()
-    else:
-        for f in sources:
-            f_masked = masks.FileMasked(f)
-            if not f_masked.masked[1]:
-                ret[added] = []
-                continue
-            if Qmatch_firstletter:
-                first_letter = f_masked.masked[1][0]
-                if first_letter in main_dlg.candidates.keys():
-                    ret[added] = FileMatch(
-                        f_masked.file,
-                        fuzzywuzzy.process.extract(
-                            f_masked,
-                            main_dlg.candidates[first_letter],
-                            scorer=mySimilarityScorer,
-                            processor=fuzz_processor,
-                            limit=10,
-                        ),
-                    )
-                else:
-                    ret[added] = []
-            else:
-                ret[added] = FileMatch(
-                    f_masked.file,
-                    fuzzywuzzy.process.extract(
-                        f_masked, main_dlg.candidates["all"], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
-                    ),
-                )
-            added += 1
-            processed += 1
-            cancelled = not progress.Update(processed, progress_msg(added, processed, total))[0]
-            if cancelled:
-                break
 
-    return ret
+    numproc = get_config()["workers"]
+
+    ts = taskserver.TaskServerMP(
+        processCls=TaskMatch, numprocesses=numproc, tasks=Tasks, results=Results, msgfunc=progress_msg, title="Match Progress"
+    )
+    ts.run()
+
+    return Results
 
 
-def get_match(source):
+def get_match_standalone(source, candidates, match_firstletter):
     ret = None
-    if not main_dlg.candidates:
+    if not candidates:
         return ret
     f_masked = masks.FileMasked(source)
     if not f_masked.masked[1]:
         return ret
 
-    if get_config()["match_firstletter"]:
+    if match_firstletter:
         first_letter = f_masked.masked[1][0]
-        if first_letter in main_dlg.candidates.keys():
+        if first_letter in candidates.keys():
             ret = fuzzywuzzy.process.extract(
-                f_masked, main_dlg.candidates[first_letter], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
+                f_masked, candidates[first_letter], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
             )
     else:
         ret = fuzzywuzzy.process.extract(
-            f_masked, main_dlg.candidates["all"], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
+            f_masked, candidates["all"], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
         )
     return ret
+
+
+def get_match(source):
+    return get_match_standalone(source, main_dlg.candidates, get_config()["match_firstletter"])

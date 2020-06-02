@@ -1,7 +1,6 @@
 import os
 import os.path
 import pickle as pickle
-import shutil
 import operator
 import wx
 import wx.lib.agw.aui as aui
@@ -21,6 +20,8 @@ from pyfuzzyrenamer import (
     masks,
     masksandfilters_dlg,
     match,
+    rename,
+    undo,
     utils,
 )
 from pyfuzzyrenamer.config import get_config
@@ -462,78 +463,158 @@ class MainPanel(wx.Panel):
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
         Qkeep_original = get_config()["keep_original"]
+
+        old = []
+        preview = []
         row_id = -1
-        with wx.lib.busy.BusyInfo("Please wait..."):
-            while True:  # loop all the checked items
-                row_id = self.list_ctrl.GetNextItem(row_id)
-                if row_id == -1:
-                    break
-                if not self.list_ctrl.IsItemChecked(row_id):
-                    continue
+        while True:  # loop all the checked items
+            row_id = self.list_ctrl.GetNextItem(row_id)
+            if row_id == -1:
+                break
+            if self.list_ctrl.IsItemChecked(row_id):
                 pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
-
-                old_path = self.list_ctrl.listdata[pos][config.D_FILENAME]
-                preview_path = self.list_ctrl.listdata[pos][config.D_PREVIEW]
-                if not preview_path:
-                    continue
-                if old_path == preview_path:
-                    continue
-                old_file = str(old_path)
-                new_file = str(preview_path)
-                try:
-                    if not old_path.is_file():
-                        continue
-                    if Qkeep_original:
-                        shutil.copy2(old_file, new_file)
-                        wx.LogMessage("Copying : %s --> %s" % (old_file, new_file))
-                    else:
-                        os.rename(old_file, new_file)
-                        wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
-                    new_path = Path(new_file)
-                    new_match = match.get_match(new_path)
-                    if new_match:
-                        self.list_ctrl.listdata[pos] = [
-                            new_path,
-                            new_match[0][1],
-                            new_match[0][0].file,
-                            getRenamePreview(new_path, new_match[0][0].file),
-                            "Matched",
-                            self.list_ctrl.listdata[pos][config.D_CHECKED],
-                            old_path if not Qkeep_original else None,
-                        ]
-                        self.list_ctrl.SetItem(
-                            row_id, config.D_MATCH_SCORE, str(self.list_ctrl.listdata[pos][config.D_MATCH_SCORE]),
-                        )
-                        parent, stem, suffix = utils.GetFileParentStemAndSuffix(
-                            self.list_ctrl.listdata[pos][config.D_MATCHNAME]
-                        )
+                old.append(self.list_ctrl.listdata[pos][config.D_FILENAME])
+                preview.append(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+        renames = rename.get_renames(old, preview)
+        row_id = -1
+        count = 0
+        errors = {}
+        while True:  # loop all the checked items
+            if len(renames) < count + 1:
+                break
+            row_id = self.list_ctrl.GetNextItem(row_id)
+            if row_id == -1:
+                break
+            if self.list_ctrl.IsItemChecked(row_id):
+                pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
+                if renames[count]:
+                    old_path = self.list_ctrl.listdata[pos][config.D_FILENAME]
+                    retcode = renames[count]["retcode"]
+                    if retcode == 0:
+                        # No error
+                        new_path = renames[count]["new_path"]
+                        new_match = renames[count]["new_match"]
+                        if new_match:
+                            self.list_ctrl.listdata[pos] = [
+                                new_path,
+                                new_match[0][1],
+                                new_match[0][0].file,
+                                getRenamePreview(new_path, new_match[0][0].file),
+                                "Matched",
+                                self.list_ctrl.listdata[pos][config.D_CHECKED],
+                                old_path if not Qkeep_original else None,
+                            ]
+                            self.list_ctrl.SetItem(
+                                row_id, config.D_MATCH_SCORE, str(self.list_ctrl.listdata[pos][config.D_MATCH_SCORE]),
+                            )
+                            parent, stem, suffix = utils.GetFileParentStemAndSuffix(
+                                self.list_ctrl.listdata[pos][config.D_MATCHNAME]
+                            )
+                            self.list_ctrl.SetItem(
+                                row_id,
+                                config.D_MATCHNAME,
+                                parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix),
+                            )
+                            stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                            self.list_ctrl.SetItem(
+                                row_id,
+                                config.D_PREVIEW,
+                                str(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                                if Qview_fullpath
+                                else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_PREVIEW].name),
+                            )
+                        else:
+                            self.list_ctrl.listdata[pos] = [
+                                new_path,
+                                0,
+                                Path(),
+                                Path(),
+                                "No match",
+                                self.listdata[pos][config.D_CHECKED],
+                                old_path if not Qkeep_original else None,
+                            ]
+                            self.list_ctrl.SetItem(row_id, config.D_MATCH_SCORE, "")
+                            self.list_ctrl.SetItem(row_id, config.D_MATCHNAME, "")
+                            self.list_ctrl.SetItem(row_id, config.D_PREVIEW, "")
+                        stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_FILENAME])
                         self.list_ctrl.SetItem(
                             row_id,
-                            config.D_MATCHNAME,
-                            parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix),
-                        )
-                        stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_PREVIEW])
-                        self.list_ctrl.SetItem(
-                            row_id,
-                            config.D_PREVIEW,
-                            str(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                            config.D_FILENAME,
+                            str(self.list_ctrl.listdata[pos][config.D_FILENAME])
                             if Qview_fullpath
-                            else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_PREVIEW].name),
+                            else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_FILENAME].name),
                         )
+                        self.list_ctrl.SetItem(
+                            row_id, config.D_STATUS, self.list_ctrl.listdata[pos][config.D_STATUS],
+                        )
+                        wx.LogMessage(renames[count]["msg"])
+                    elif retcode == 2:
+                        wx.LogMessage("No renaming : %s" % (old_path,))
                     else:
-                        self.list_ctrl.listdata[pos] = [
-                            new_path,
-                            0,
-                            Path(),
-                            Path(),
-                            "No match",
-                            self.listdata[pos][config.D_CHECKED],
-                            old_path if not Qkeep_original else None,
-                        ]
-                        self.list_ctrl.SetItem(row_id, config.D_MATCH_SCORE, "")
-                        self.list_ctrl.SetItem(row_id, config.D_MATCHNAME, "")
-                        self.list_ctrl.SetItem(row_id, config.D_PREVIEW, "")
+                        # add error
+                        errors[pos] = renames[count]["msg"]
+                else:
+                    break
+                count += 1
 
+                # Log errors in bottom tab
+                errorTabIdx = -1
+                for idx in range(0, self.bottom_notebook.GetPageCount()):
+                    if self.bottom_notebook.GetPageText(idx) == "Errors":
+                        errorTabIdx = idx
+                        break
+
+                if len(errors):
+                    if errorTabIdx != -1:
+                        self.bottom_notebook.SetSelection(errorTabIdx)
+                    else:
+                        self.tab_errors = bottom_notebook.TabListItemError(parent=self.bottom_notebook, mlist=self.list_ctrl)
+                        self.bottom_notebook.AddPage(self.tab_errors, "Errors", select=True)
+                    self.tab_errors.SetItemsWithError(errors)
+                else:
+                    if errorTabIdx != -1:
+                        self.bottom_notebook.DeletePage(errorTabIdx)
+
+    def OnUndo(self, evt):
+        Qview_fullpath = get_config()["show_fullpath"]
+        Qhide_extension = get_config()["hide_extension"]
+        row_id = -1
+
+        old = []
+        new = []
+        matchnames = []
+        row_id = -1
+        while True:  # loop all the checked items
+            row_id = self.list_ctrl.GetNextItem(row_id)
+            if row_id == -1:
+                break
+            pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
+
+            old.append(self.list_ctrl.listdata[pos][config.D_FILENAME])
+            new.append(self.list_ctrl.listdata[pos][config.D_PREVIOUS_FILENAME])
+            matchnames.append(self.list_ctrl.listdata[pos][config.D_MATCHNAME])
+        undos = undo.get_undos(old, new, matchnames)
+
+        row_id = -1
+        count = 0
+        errors = {}
+        while True:  # loop all the checked items
+            if len(undos) < count + 1:
+                break
+            row_id = self.list_ctrl.GetNextItem(row_id)
+            if row_id == -1:
+                break
+            pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
+            if undos[count]:
+                retcode = undos[count]["retcode"]
+                old_path = self.list_ctrl.listdata[pos][config.D_FILENAME]
+                if retcode == 0:
+                    new_path = self.list_ctrl.listdata[pos][config.D_PREVIOUS_FILENAME]
+                    self.list_ctrl.listdata[pos][config.D_FILENAME] = new_path
+                    self.list_ctrl.listdata[pos][config.D_MATCH_SCORE] = undos[count]["similarity"]
+                    self.list_ctrl.listdata[pos][config.D_PREVIEW] = getRenamePreview(
+                        new_path, self.list_ctrl.listdata[pos][config.D_MATCHNAME]
+                    )
                     stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_FILENAME])
                     self.list_ctrl.SetItem(
                         row_id,
@@ -543,69 +624,43 @@ class MainPanel(wx.Panel):
                         else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_FILENAME].name),
                     )
                     self.list_ctrl.SetItem(
-                        row_id, config.D_STATUS, self.list_ctrl.listdata[pos][config.D_STATUS],
+                        row_id, config.D_MATCH_SCORE, str(self.list_ctrl.listdata[pos][config.D_MATCH_SCORE]),
                     )
-
-                except (OSError, IOError):
-                    wx.LogMessage("Error when renaming : %s --> %s" % (old_file, new_file))
-
-    def OnUndo(self, evt):
-        Qview_fullpath = get_config()["show_fullpath"]
-        Qhide_extension = get_config()["hide_extension"]
-        row_id = -1
-        while True:  # loop all the checked items
-            row_id = self.list_ctrl.GetNextItem(row_id)
-            if row_id == -1:
+                    stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                    self.list_ctrl.SetItem(
+                        row_id,
+                        config.D_PREVIEW,
+                        str(self.list_ctrl.listdata[pos][config.D_PREVIEW])
+                        if Qview_fullpath
+                        else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_PREVIEW].name),
+                    )
+                    wx.LogMessage(undos[count]["msg"])
+                elif retcode == 2:
+                    wx.LogMessage("No renaming : %s" % (old_path,))
+                else:
+                    # add error
+                    errors[pos] = renames[count]["msg"]
+            else:
                 break
-            pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
+            count += 1
 
-            previous_path = self.list_ctrl.listdata[pos][config.D_PREVIOUS_FILENAME]
-            if not previous_path:
-                continue
+            # Log errors in bottom tab
+            errorTabIdx = -1
+            for idx in range(0, self.bottom_notebook.GetPageCount()):
+                if self.bottom_notebook.GetPageText(idx) == "Errors":
+                    errorTabIdx = idx
+                    break
 
-            current_path = self.list_ctrl.listdata[pos][config.D_FILENAME]
-            if current_path == previous_path:
-                continue
-            old_file = str(current_path)
-            new_file = str(previous_path)
-
-            try:
-                if current_path.is_file():
-                    os.rename(old_file, new_file)
-                wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
-                new_path = Path(new_file)
-                similarity = match.mySimilarityScorer(
-                    masks.FileMasked(new_path).masked[1],
-                    filters.FileFiltered(self.list_ctrl.listdata[pos][config.D_MATCHNAME]).filtered,
-                )
-                self.list_ctrl.listdata[pos][config.D_FILENAME] = new_path
-                self.list_ctrl.listdata[pos][config.D_MATCH_SCORE] = similarity
-                self.list_ctrl.listdata[pos][config.D_PREVIEW] = getRenamePreview(
-                    new_path, self.list_ctrl.listdata[pos][config.D_MATCHNAME]
-                )
-                self.list_ctrl.listdata[pos][config.D_PREVIOUS_FILENAME] = new_path
-                stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_FILENAME])
-                self.list_ctrl.SetItem(
-                    row_id,
-                    config.D_FILENAME,
-                    str(self.list_ctrl.listdata[pos][config.D_FILENAME])
-                    if Qview_fullpath
-                    else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_FILENAME].name),
-                )
-                self.list_ctrl.SetItem(
-                    row_id, config.D_MATCH_SCORE, str(self.list_ctrl.listdata[pos][config.D_MATCH_SCORE]),
-                )
-                stem, suffix = utils.GetFileStemAndSuffix(self.list_ctrl.listdata[pos][config.D_PREVIEW])
-                self.list_ctrl.SetItem(
-                    row_id,
-                    config.D_PREVIEW,
-                    str(self.list_ctrl.listdata[pos][config.D_PREVIEW])
-                    if Qview_fullpath
-                    else (stem if Qhide_extension else self.list_ctrl.listdata[pos][config.D_PREVIEW].name),
-                )
-
-            except (OSError, IOError):
-                wx.LogMessage("Error when renaming : %s --> %s" % (old_file, new_file))
+            if len(errors):
+                if errorTabIdx != -1:
+                    self.bottom_notebook.SetSelection(errorTabIdx)
+                else:
+                    self.tab_errors = bottom_notebook.TabListItemError(parent=self.bottom_notebook, mlist=self.list_ctrl)
+                    self.bottom_notebook.AddPage(self.tab_errors, "Errors", select=True)
+                self.tab_errors.SetItemsWithError(errors)
+            else:
+                if errorTabIdx != -1:
+                    self.bottom_notebook.DeletePage(errorTabIdx)
 
     def OnLogDuplicate(self, evt):
         with wx.lib.busy.BusyInfo("Please wait..."):
