@@ -33,7 +33,7 @@ class action_Tests(pfr.PyFuzzyRenamerTestCase):
                 return
             for dlg in lst.GetChildren():
                 if isinstance(dlg, main_listctrl.PickCandidate):
-                    dlg.text.SetValue("Volutaria tubuliflora")
+                    dlg.text.SetValue("volutaria tubuliflora")
                     event = wx.CommandEvent(wx.wxEVT_TEXT_ENTER, dlg.text.GetId())
                     dlg.text.GetEventHandler().ProcessEvent(event)
                     self.assertEqual(
@@ -42,6 +42,7 @@ class action_Tests(pfr.PyFuzzyRenamerTestCase):
                             "35",
                             "Volutaria tubuliflora.txt",
                             "Volutaria tubuliflora.txt",
+                            "1",
                             "User choice",
                             "True",
                         ],
@@ -81,11 +82,11 @@ class action_Tests(pfr.PyFuzzyRenamerTestCase):
         event.SetKeyCode(wx.WXK_CONTROL_R)
         lst.GetEventHandler().ProcessEvent(event)
         self.assertEqual(
-            ["Abutilon à feuilles marbrées.txt", "", "", "", "No match", "True"],
+            ["Abutilon à feuilles marbrées.txt", "", "", "", "", "", "True"],
             [lst.GetItemText(item1, col) for col in range(0, len(config.default_columns))],
         )
         self.assertEqual(
-            ["Acanthe à feuilles molles.txt", "", "", "", "No match", "True"],
+            ["Acanthe à feuilles molles.txt", "", "", "", "", "", "True"],
             [lst.GetItemText(item2, col) for col in range(0, len(config.default_columns))],
         )
 

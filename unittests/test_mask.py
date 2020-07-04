@@ -62,7 +62,7 @@ class mask_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["[1984] The wiire_disk1", "68", "Wire, The", "Wire, The_disk1", "Matched", "True",],
+            ["[1984] The wiire_disk1", "68", "Wire, The", "Wire, The_disk1", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 
@@ -120,7 +120,7 @@ class mask_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["[1984] The wiire_disk1", "89", "Wire, The", "[1984] Wire, The_disk1", "Matched", "True",],
+            ["[1984] The wiire_disk1", "89", "Wire, The", "[1984] Wire, The_disk1", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 
@@ -179,7 +179,7 @@ class mask_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["[1984] The wiire (Nl)_disk1", "89", "Wire, The", "[1984] Wire, The (Nl)_disk1", "Matched", "True",],
+            ["[1984] The wiire (Nl)_disk1", "89", "Wire, The", "[1984] Wire, The (Nl)_disk1", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 

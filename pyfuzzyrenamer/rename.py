@@ -2,8 +2,10 @@ import os
 import shutil
 from pathlib import Path
 
-from pyfuzzyrenamer import main_dlg, taskserver, match
+from pyfuzzyrenamer import taskserver, main_dlg, match, masks, utils
 from pyfuzzyrenamer.config import get_config
+
+history = []
 
 
 class TaskRename:
@@ -11,28 +13,37 @@ class TaskRename:
         pass
 
     def calculate(self, args):
-        retcode = 0
-        new_match = None
-        new_path = None
-        msg = ""
-        if not args:
-            retcode = 2
-            return {"retcode": retcode, "msg": msg, "new_path": new_path, "new_match": new_match}
-
-        old_file, new_file, Qkeep_original, Qmatch_firstletter, candidates = args
-        try:
-            if Qkeep_original:
-                shutil.copy2(old_file, new_file)
-                msg = "Copying : %s --> %s" % (old_file, new_file)
-            else:
-                os.rename(old_file, new_file)
-                msg = "Renaming : %s --> %s" % (old_file, new_file)
-            new_path = Path(new_file)
-            new_match = match.get_match_standalone(new_path, candidates, Qmatch_firstletter)
-        except (OSError, IOError):
-            retcode = 1
-            msg = "Error when renaming : %s --> %s" % (old_file, new_file)
-        return {"retcode": retcode, "msg": msg, "new_path": new_path, "new_match": new_match}
+        retcode = []
+        msg = []
+        history = []
+        old_pathes, previews_pathes, Qkeep_original = args
+        for old_path, preview_pathes in zip(old_pathes, previews_pathes):
+            old_file = str(old_path)
+            if not old_path.is_file():
+                retcode.append(1)
+                msg.append("Cannot find file : %s" % old_file)
+                history.append(None)
+                continue
+            Qrenamed = False
+            for preview_path in preview_pathes:
+                new_file = str(preview_path)
+                if old_file == new_file:
+                    continue
+                try:
+                    if Qkeep_original or Qrenamed:
+                        msg.append("Copying : %s --> %s" % (old_file, new_file))
+                        history.append({"type": "copy", "to": new_file})
+                        shutil.copy2(old_file, new_file)
+                    else:
+                        msg.append("Renaming : %s --> %s" % (old_file, new_file))
+                        history.append({"type": "rename", "from": old_file, "to": new_file})
+                        os.rename(old_file, new_file)
+                        Qrenamed = True
+                        old_file = new_file
+                    retcode.append(0)
+                except (OSError, IOError):
+                    retcode.append(1)
+        return {"retcode": retcode, "msg": msg, "history": history}
 
 
 def progress_msg(j, numtasks, output):
@@ -42,30 +53,19 @@ def progress_msg(j, numtasks, output):
         return "Processed sources..."
 
 
-def get_renames(old, preview):
+def get_renames(old_pathes, preview_pathes):
 
-    numtasks = len(old)
+    numtasks = len(old_pathes)
 
     # Create the task list
     Tasks = [((), ()) for i in range(numtasks)]
     Results = [None for i in range(numtasks)]
 
     Qkeep_original = get_config()["keep_original"]
-    Qmatch_firstletter = get_config()["match_firstletter"]
     for i in range(numtasks):
-        old_path = old[i]
-        preview_path = preview[i]
-        if old_path == preview_path:
-            continue
-        old_file = str(old_path)
-        new_file = str(preview_path)
-        if new_file == ".":
-            continue
-        if not old_path.is_file():
-            continue
         Tasks[i] = (
             (),
-            (old_file, new_file, Qkeep_original, Qmatch_firstletter, main_dlg.candidates,),
+            (old_pathes[i], preview_pathes[i], Qkeep_original),
         )
 
     numproc = get_config()["workers"]

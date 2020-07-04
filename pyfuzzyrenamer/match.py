@@ -5,21 +5,19 @@ from pyfuzzyrenamer import main_dlg, masks, taskserver
 from pyfuzzyrenamer.config import get_config
 
 
-class FileMatch:
-    def __init__(self, file, match_results):
-        self.file = file
-        self.match_results = match_results
-
-
 def mySimilarityScorer(s1, s2):
     return fuzzywuzzy.fuzz.WRatio(s1, s2, force_ascii=False, full_process=False)
 
 
 def fuzz_processor(file):
-    if type(file).__name__ == "FileFiltered":
-        return file.filtered
-    elif type(file).__name__ == "FileMasked":
+    t = type(file).__name__
+    if t == "str":
+        return file
+    elif t == "FileMasked":
+        # masked = [pre, middle, post]
         return file.masked[1]
+    elif t == "FileFiltered":
+        return file.filtered
 
 
 class TaskMatch:
@@ -30,10 +28,11 @@ class TaskMatch:
         if not args:
             return []
         f_masked, f_candidates = args
-        data = fuzzywuzzy.process.extract(
+        match_results = fuzzywuzzy.process.extract(
             f_masked, f_candidates, scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
         )
-        return FileMatch(f_masked.file, data)
+        # [(candidate_key_1, score1), (candidate_key_2, score2), ...]
+        return match_results
 
 
 def progress_msg(j, numtasks, output):
@@ -55,19 +54,19 @@ def get_matches(sources):
 
     Qmatch_firstletter = get_config()["match_firstletter"]
     for i in range(numtasks):
-        f_masked = masks.FileMasked(sources[i])
+        f_masked = masks.FileMasked(sources[i][0])
         if f_masked.masked[1]:
             if Qmatch_firstletter:
                 first_letter = f_masked.masked[1][0]
                 if first_letter in main_dlg.candidates.keys():
                     Tasks[i] = (
                         (),
-                        (f_masked, main_dlg.candidates[first_letter],),
+                        (f_masked, list(main_dlg.candidates[first_letter].keys()),),
                     )
             else:
                 Tasks[i] = (
                     (),
-                    (f_masked, main_dlg.candidates["all"],),
+                    (f_masked, list(main_dlg.candidates["all"].keys()),),
                 )
 
     numproc = get_config()["workers"]
@@ -77,6 +76,13 @@ def get_matches(sources):
     )
     ts.run()
 
+    # [ [{"key": candidate_key_1, "files_filtered": [...], "score":score1]}, {"key": candidate_key_2, "files_filtered": [...], "score":score2}, ...], ...]
+    for i in range(numtasks):
+        if Results[i]:
+            Results[i] = [
+                {"key": canditate_key, "files_filtered": main_dlg.candidates["all"][canditate_key], "score": score}
+                for canditate_key, score in Results[i]
+            ]
     return Results
 
 
@@ -84,7 +90,7 @@ def get_match_standalone(source, candidates, match_firstletter):
     ret = None
     if not candidates:
         return ret
-    f_masked = masks.FileMasked(source)
+    f_masked = masks.FileMasked(source[0])
     if not f_masked.masked[1]:
         return ret
 
@@ -92,12 +98,19 @@ def get_match_standalone(source, candidates, match_firstletter):
         first_letter = f_masked.masked[1][0]
         if first_letter in candidates.keys():
             ret = fuzzywuzzy.process.extract(
-                f_masked, candidates[first_letter], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
+                f_masked, candidates[first_letter].keys(), scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
             )
     else:
         ret = fuzzywuzzy.process.extract(
-            f_masked, candidates["all"], scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
+            f_masked, candidates["all"].keys(), scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
         )
+
+    # [{"key": candidate_key_1, "files_filtered": [...], "score":score1}, {"key": candidate_key_2: "files_filtered": [...], "score":score2}, ...]
+    if ret:
+        ret = [
+            {"key": canditate_key, "files_filtered": candidates["all"][canditate_key], "score": score}
+            for canditate_key, score in ret
+        ]
     return ret
 
 

@@ -62,7 +62,7 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["The wiire", "89", "Wire, The", "Wire, The", "Matched", "True"],
+            ["The wiire", "89", "Wire, The", "Wire, The", "1", "Matched", "True"],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 
@@ -120,7 +120,7 @@ class filter_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["The foo", "100", "Wire, The", "Wire, The", "Matched", "True"],
+            ["The foo", "100", "Wire, The", "Wire, The", "1", "Matched", "True"],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 

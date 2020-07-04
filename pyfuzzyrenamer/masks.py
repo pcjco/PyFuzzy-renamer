@@ -3,6 +3,29 @@ import re
 from pyfuzzyrenamer import filters, utils
 
 
+def getmergedprepost(lst):
+    pre = set()
+    post = set()
+    for f in lst:
+        f_masked = FileMasked(f, useFilter=False)
+        middle = f_masked.masked[1]
+        if f_masked.masked[0]:
+            pre.add(f_masked.masked[0])
+        if f_masked.masked[2]:
+            post.add(f_masked.masked[2])
+    ret = ""
+    if len(pre) == 1:
+        ret = list(pre)[0]
+    elif len(pre) > 1:
+        ret = "[" + ",".join(sorted(pre)) + "]"
+    ret += middle
+    if len(post) == 1:
+        ret += list(post)[0]
+    elif len(post) > 1:
+        ret += "[" + ",".join(sorted(post)) + "]"
+    return ret
+
+
 def mask_processed(file, masks, re_filters, applyFilters=True):
     stem, suffix = utils.GetFileStemAndSuffix(file)
     ret = stem
@@ -61,6 +84,6 @@ def CompileMasks(s_filters):
 class FileMasked:
     masks = []
 
-    def __init__(self, file):
+    def __init__(self, file, useFilter=True):
         self.file = file
-        self.masked = mask_processed(file, FileMasked.masks, filters.FileFiltered.filters)
+        self.masked = mask_processed(file, FileMasked.masks, filters.FileFiltered.filters, useFilter)

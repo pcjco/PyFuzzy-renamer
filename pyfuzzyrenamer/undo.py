@@ -2,7 +2,7 @@ import os
 import shutil
 from pathlib import Path
 
-from pyfuzzyrenamer import main_dlg, taskserver, match, masks, filters
+from pyfuzzyrenamer import main_dlg, taskserver, match, masks, filters, rename
 from pyfuzzyrenamer.config import get_config
 
 
@@ -12,24 +12,23 @@ class TaskUndo:
 
     def calculate(self, args):
         retcode = 0
-        new_path = None
-        msg = ""
-        if not args:
-            retcode = 2
-            return {"retcode": retcode, "msg": msg, "similarity": None}
-
-        old_file, new_file, matchname = args
-        try:
-            os.rename(old_file, new_file)
-            new_path = Path(new_file)
-            similarity = match.mySimilarityScorer(
-                masks.FileMasked(new_path).masked[1], filters.FileFiltered(matchname).filtered,
-            )
-            msg = "Renaming : %s --> %s" % (old_file, new_file)
-        except (OSError, IOError):
-            retcode = 1
-            msg = "Error when renaming : %s --> %s" % (old_file, new_file)
-        return {"retcode": retcode, "msg": msg, "similarity": similarity}
+        msg = []
+        ren = args[0]
+        if ren["type"] == "rename":
+            try:
+                os.rename(ren["to"], ren["from"])
+                msg.append("Renaming : %s --> %s" % (ren["to"], ren["from"]))
+            except (OSError, IOError):
+                retcode = 1
+                msg.append("Error when renaming : %s --> %s" % (ren["to"], ren["from"]))
+        elif ren["type"] == "copy":
+            try:
+                os.remove(ren["to"])
+                msg.append("Removing : %s" % (ren["to"]))
+            except (OSError, IOError):
+                retcode = 1
+                msg.append("Error when removing : %s" % (ren["to"]))
+        return {"retcode": retcode, "msg": msg}
 
 
 def progress_msg(j, numtasks, output):
@@ -39,31 +38,18 @@ def progress_msg(j, numtasks, output):
         return "Processed sources..."
 
 
-def get_undos(old, new, matchnames):
+def get_undos():
 
-    numtasks = len(old)
+    numtasks = len(rename.history)
 
     # Create the task list
     Tasks = [((), ()) for i in range(numtasks)]
     Results = [None for i in range(numtasks)]
 
     for i in range(numtasks):
-        old_path = old[i]
-        new_path = new[i]
-        matchname = matchnames[i]
-        if new_path == None:
-            continue
-        if old_path == new_path:
-            continue
-        old_file = str(old_path)
-        new_file = str(new_path)
-        if new_file == ".":
-            continue
-        if not old_path.is_file():
-            continue
         Tasks[i] = (
             (),
-            (old_file, new_file, matchname,),
+            (rename.history[i],),
         )
 
     numproc = get_config()["workers"]

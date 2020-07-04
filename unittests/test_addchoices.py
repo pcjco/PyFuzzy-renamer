@@ -60,10 +60,10 @@ class add_choices_Tests(pfr.PyFuzzyRenamerTestCase):
                     self.frame.panel.OnAddChoicesFromClipboard(None)
                 else:
                     self.frame.panel.AddChoicesFromFiles(choices)
-        allNames = [f.file.name for f in main_dlg.candidates["all"]]
+        allNames = [f for f in main_dlg.candidates["all"]]
         self.assertEqual(6, len(main_dlg.candidates["all"]))
-        self.assertIn("Abutilon hybridum.txt", allNames)
-        self.assertIn("Volutaria tubuliflora.txt", allNames)
+        self.assertIn("abutilon hybridum", allNames)
+        self.assertIn("volutaria tubuliflora", allNames)
 
 
 # ---------------------------------------------------------------------------

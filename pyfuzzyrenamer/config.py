@@ -2,6 +2,7 @@ import configparser
 import copy
 import logging
 import os
+from enum import IntEnum
 from multiprocessing import cpu_count
 from pathlib import Path
 
@@ -11,18 +12,37 @@ D_FILENAME = 0
 D_MATCH_SCORE = 1
 D_MATCHNAME = 2
 D_PREVIEW = 3
-D_STATUS = 4
-D_CHECKED = 5
-D_PREVIOUS_FILENAME = 6
+D_NBMATCH = 4
+D_STATUS = 5
+D_CHECKED = 6
+
+
+class MatchStatus(IntEnum):
+    NONE = 0
+    MATCH = 1
+    USRMATCH = 2
+    NOMATCH = 3
+
+    def __str__(self):
+        if self.value == 1:
+            return "Matched"
+        elif self.value == 2:
+            return "User choice"
+        elif self.value == 3:
+            return "No match found"
+        else:
+            return ""
+
 
 DEFAULT_CONFIG_FILE = os.sep.join([os.getcwd(), "pyfuzzyrenamer.ini"])
 default_columns = [
-    [0, 300, "Source Name"],
-    [1, 80, "Similarity(%)"],
-    [2, 300, "Closest Match"],
-    [3, 300, "Renaming Preview"],
-    [4, 100, "Status"],
-    [5, 60, "Checked"],
+    {"index": D_FILENAME, "width": 300, "label": "Source Name", "shown": True},
+    {"index": D_MATCH_SCORE, "width": 80, "label": "Similarity(%)", "shown": True},
+    {"index": D_MATCHNAME, "width": 300, "label": "Closest Match", "shown": True},
+    {"index": D_PREVIEW, "width": 300, "label": "Renaming Preview", "shown": True},
+    {"index": D_NBMATCH, "width": 60, "label": "Match#", "shown": False},
+    {"index": D_STATUS, "width": 100, "label": "Matching Status", "shown": True},
+    {"index": D_CHECKED, "width": 60, "label": "Checked", "shown": False},
 ]
 default_masks_teststring = "(1986) Hitchhiker's Guide to the Galaxy, The (AGA) Disk1"
 default_filters_teststring = "Hitchhiker's Guide to the Galaxy, The (AGA)"
@@ -43,7 +63,7 @@ default_filters = (
     + r'" "'
     + "\n"
     + "+Strip articles\n"
-    + r'"(^(the|a)\b|, the)"'
+    + r'"(^(?:(?:the|a|an)\s+)|, the)"'
     + "\n"
     + r'" "'
     + "\n"
@@ -109,8 +129,8 @@ def default():
     theConfig["workers"] = cpu_count()
     theConfig["recent_session"] = []
     for i in range(0, len(default_columns)):
-        theConfig["col%d_order" % (i + 1)] = default_columns[i][0]
-        theConfig["col%d_size" % (i + 1)] = default_columns[i][1]
+        theConfig["col%d_order" % (i + 1)] = default_columns[i]["index"]
+        theConfig["col%d_size" % (i + 1)] = default_columns[i]["width"] if default_columns[i]["shown"] else 0
 
 
 def read(config_file=None):

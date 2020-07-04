@@ -28,12 +28,12 @@ class check_Tests(pfr.PyFuzzyRenamerTestCase):
 
         lst.CheckItem(item, False)
         self.assertFalse(lst.IsItemChecked(item))
-        self.assertEqual("False", lst.GetItemText(item, 5))
+        self.assertEqual("False", lst.GetItemText(item, 6))
         self.assertEqual(wx.FONTSTYLE_ITALIC, lst.GetItemFont(item).GetStyle())
 
         lst.CheckItem(item, True)
         self.assertTrue(lst.IsItemChecked(item))
-        self.assertEqual("True", lst.GetItemText(item, 5))
+        self.assertEqual("True", lst.GetItemText(item, 6))
         self.assertEqual(wx.FONTSTYLE_NORMAL, lst.GetItemFont(item).GetStyle())
 
 

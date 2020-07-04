@@ -34,7 +34,7 @@ class loadsave_Tests(pfr.PyFuzzyRenamerTestCase):
         def Pick():
             for dlg in lst.GetChildren():
                 if isinstance(dlg, main_listctrl.PickCandidate):
-                    dlg.text.SetValue("Volutaria tubuliflora.txt")
+                    dlg.text.SetValue("volutaria tubuliflora")
                     event = wx.CommandEvent(wx.wxEVT_TEXT_ENTER, dlg.text.GetId())
                     dlg.text.GetEventHandler().ProcessEvent(event)
 
@@ -79,27 +79,35 @@ class loadsave_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe à feuilles molles.txt", "", "", "", "No match", "True"],
+            ["Acanthe à feuilles molles.txt", "", "", "", "", "", "True"],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe épineuse.txt", "", "", "", "No match", "True"],
+            ["Acanthe épineuse.txt", "", "", "", "", "", "True"],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Abutilon à feuilles marbrées.txt", "86", "Abutilon hybridum.txt", "Abutilon hybridum.txt", "Matched", "True",],
+            [
+                "Abutilon à feuilles marbrées.txt",
+                "86",
+                "Abutilon hybridum.txt",
+                "Abutilon hybridum.txt",
+                "1",
+                "Matched",
+                "True",
+            ],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "Matched", "False",],
+            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "1", "Matched", "False",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "Matched", "True",],
+            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
@@ -109,6 +117,7 @@ class loadsave_Tests(pfr.PyFuzzyRenamerTestCase):
                 "54",
                 "Volutaria tubuliflora.txt",
                 "Volutaria tubuliflora.txt",
+                "1",
                 "Matched",
                 "True",
             ],

@@ -65,13 +65,13 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
         item = lst.GetNextItem(item)
         self.assertEqual(6, lst.GetItemCount())
         self.assertEqual(
-            ["Abutilon à feuilles marbrées.txt", "", "", "", "Not processed", "True"],
+            ["Abutilon à feuilles marbrées.txt", "", "", "", "", "", "True"],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         for i in range(0, 5):
             item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Volutaire à fleurs tubulées.txt", "", "", "", "Not processed", "True"],
+            ["Volutaire à fleurs tubulées.txt", "", "", "", "", "", "True"],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 

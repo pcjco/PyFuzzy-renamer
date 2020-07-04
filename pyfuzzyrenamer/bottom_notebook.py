@@ -108,28 +108,37 @@ class TabDuplicates(wx.Panel):
         self.list_ctrl.DeleteAllItems()
         row_id = 0
         self.list_ctrl.Freeze()
-        for key in duplicates_keys:
-            stem = self.mlist.listdata[key][config.D_PREVIEW].stem
-            self.list_ctrl.InsertItem(row_id, stem)
-            self.listdata[row_id] = [stem, key]
-            self.list_ctrl.SetItemData(row_id, row_id)
-            row_id += 1
+        for keys in duplicates_keys:
+            for preview in self.mlist.listdata[keys[0]][config.D_PREVIEW]:
+                stem = preview.stem
+                self.list_ctrl.InsertItem(row_id, stem)
+                self.listdata[row_id] = [stem, keys]
+                self.list_ctrl.SetItemData(row_id, row_id)
+                row_id += 1
         self.list_ctrl.SetColumnWidth(0, wx.LIST_AUTOSIZE)
         self.list_ctrl.Thaw()
 
     def ActivateCb(self, event):
         row_id = event.GetIndex()
         pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
-        key = self.listdata[pos][1]
-        row_id0 = self.mlist.FindItem(-1, key)
-        if row_id0 != wx.NOT_FOUND:
-            selected = utils.get_selected_items(self.mlist)
-            self.mlist.Freeze()
-            for row_id1 in selected:
-                self.mlist.Select(row_id1, 0)
-            self.mlist.Thaw()
-            self.mlist.Select(row_id0)
-            self.mlist.EnsureVisible(row_id0)
+        keys = self.listdata[pos][1]
+
+        row_id0 = []
+        for key in keys:
+            idx = self.mlist.FindItem(-1, key)
+            if idx != wx.NOT_FOUND:
+                row_id0.append(idx)
+        selected = utils.get_selected_items(self.mlist)
+        self.mlist.Freeze()
+        for row_id1 in selected:
+            self.mlist.Select(row_id1, 0)
+        self.mlist.Thaw()
+        first = True
+        for r in row_id0:
+            self.mlist.Select(r)
+            if first:
+                self.mlist.EnsureVisible(r)
+                first = False
 
 
 class TabListItemError(wx.Panel):
@@ -153,10 +162,11 @@ class TabListItemError(wx.Panel):
         row_id = 0
         self.list_ctrl.Freeze()
         for key, msg in errors.items():
-            self.list_ctrl.InsertItem(row_id, msg)
-            self.listdata[row_id] = [msg, key]
-            self.list_ctrl.SetItemData(row_id, row_id)
-            row_id += 1
+            for m in msg:
+                self.list_ctrl.InsertItem(row_id, m)
+                self.listdata[row_id] = [m, key]
+                self.list_ctrl.SetItemData(row_id, row_id)
+                row_id += 1
         self.list_ctrl.SetColumnWidth(0, wx.LIST_AUTOSIZE)
         self.list_ctrl.Thaw()
 

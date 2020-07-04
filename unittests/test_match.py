@@ -29,27 +29,35 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Abutilon à feuilles marbrées.txt", "86", "Abutilon hybridum.txt", "Abutilon hybridum.txt", "Matched", "True",],
+            [
+                "Abutilon à feuilles marbrées.txt",
+                "86",
+                "Abutilon hybridum.txt",
+                "Abutilon hybridum.txt",
+                "1",
+                "Matched",
+                "True",
+            ],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "Matched", "True",],
+            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "Matched", "True",],
+            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "Matched", "True",],
+            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "Matched", "True",],
+            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
@@ -59,6 +67,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
                 "54",
                 "Volutaria tubuliflora.txt",
                 "Volutaria tubuliflora.txt",
+                "1",
                 "Matched",
                 "True",
             ],
@@ -87,7 +96,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "Matched", "True",],
+            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
@@ -97,6 +106,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
                 "54",
                 "Volutaria tubuliflora.txt",
                 "Volutaria tubuliflora.txt",
+                "1",
                 "Matched",
                 "True",
             ],
@@ -104,22 +114,30 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "Matched", "True",],
+            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "Matched", "True",],
+            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "Matched", "True",],
+            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Abutilon à feuilles marbrées.txt", "86", "Abutilon hybridum.txt", "Abutilon hybridum.txt", "Matched", "True",],
+            [
+                "Abutilon à feuilles marbrées.txt",
+                "86",
+                "Abutilon hybridum.txt",
+                "Abutilon hybridum.txt",
+                "1",
+                "Matched",
+                "True",
+            ],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 
@@ -146,27 +164,35 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Abutilon à feuilles marbrées.txt", "86", "Abutilon hybridum.txt", "Abutilon hybridum.txt", "Matched", "True",],
+            [
+                "Abutilon à feuilles marbrées.txt",
+                "86",
+                "Abutilon hybridum.txt",
+                "Abutilon hybridum.txt",
+                "1",
+                "Matched",
+                "True",
+            ],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "Matched", "True",],
+            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "Matched", "True",],
+            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "Matched", "True",],
+            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "Matched", "True",],
+            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
@@ -176,6 +202,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
                 "54",
                 "Volutaria tubuliflora.txt",
                 "Volutaria tubuliflora.txt",
+                "1",
                 "Matched",
                 "True",
             ],
@@ -205,27 +232,35 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Abutilon à feuilles marbrées.txt", "86", "Abutilon hybridum.txt", "Abutilon hybridum.txt", "Matched", "True",],
+            [
+                "Abutilon à feuilles marbrées.txt",
+                "86",
+                "Abutilon hybridum.txt",
+                "Abutilon hybridum.txt",
+                "1",
+                "Matched",
+                "True",
+            ],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "Matched", "True",],
+            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "Matched", "True",],
+            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "Matched", "True",],
+            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "Matched", "True",],
+            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
@@ -235,6 +270,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
                 "54",
                 "Volutaria tubuliflora.txt",
                 "Volutaria tubuliflora.txt",
+                "1",
                 "Matched",
                 "True",
             ],
@@ -264,27 +300,35 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Abutilon à feuilles marbrées.txt", "86", "Abutilon hybridum.txt", "Abutilon hybridum.txt", "Matched", "True",],
+            [
+                "Abutilon à feuilles marbrées.txt",
+                "86",
+                "Abutilon hybridum.txt",
+                "Abutilon hybridum.txt",
+                "1",
+                "Matched",
+                "True",
+            ],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "Matched", "True",],
+            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "Matched", "True",],
+            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "Matched", "True",],
+            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "Matched", "True",],
+            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
@@ -294,6 +338,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
                 "54",
                 "Volutaria tubuliflora.txt",
                 "Volutaria tubuliflora.txt",
+                "1",
                 "Matched",
                 "True",
             ],
@@ -323,27 +368,35 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
         item = -1
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Abutilon à feuilles marbrées.txt", "86", "Abutilon hybridum.txt", "Abutilon hybridum.txt", "Matched", "True",],
+            [
+                "Abutilon à feuilles marbrées.txt",
+                "86",
+                "Abutilon hybridum.txt",
+                "Abutilon hybridum.txt",
+                "1",
+                "Matched",
+                "True",
+            ],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "Matched", "True",],
+            ["Acanthe à feuilles molles.txt", "70", "Acanthus mollis.txt", "Acanthus mollis.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "Matched", "True",],
+            ["Acanthe épineuse.txt", "73", "Acanthus spinosus.txt", "Acanthus spinosus.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "Matched", "True",],
+            ["Aconit vénéneux.txt", "52", "Aconitum anthora.txt", "Aconitum anthora.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "Matched", "True",],
+            ["Violette cornue.txt", "71", "Viola cornuta.txt", "Viola cornuta.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
         item = lst.GetNextItem(item)
@@ -353,6 +406,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
                 "54",
                 "Volutaria tubuliflora.txt",
                 "Volutaria tubuliflora.txt",
+                "1",
                 "Matched",
                 "True",
             ],
