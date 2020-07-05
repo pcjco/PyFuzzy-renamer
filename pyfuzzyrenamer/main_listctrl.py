@@ -27,7 +27,7 @@ def list_completer(a_list):
 class PickCandidate(wx.MiniFrame):
     def __init__(self, parent, row_id, position):
         wx.MiniFrame.__init__(self, parent, title="", pos=position, style=wx.RESIZE_BORDER)
-        self.lst_c = main_dlg.candidates["all"].keys()
+        self.lst_c = [masks.FileMasked(v[0].file, useFilter=False).masked[1] for v in main_dlg.candidates["all"].values()]
         self.text = AutocompleteTextCtrl(self, size=(400, -1), completer=list_completer(self.lst_c))
         self.text.SetMinSize((400, -1))
         self.row_id = row_id
@@ -60,8 +60,9 @@ class PickCandidate(wx.MiniFrame):
 
     def OnEnter(self, event):
         forced_match = self.text.GetLineText(0).strip()
+        item = filters.FileFiltered(Path(forced_match), alreadyStem=True)
         list_ctrl = self.GetParent()
-        list_ctrl.MenuForceMatchCb(self.row_id, forced_match, None)
+        list_ctrl.MenuForceMatchCb(self.row_id, item.filtered, None)
 
         self.Close(True)
 
@@ -221,7 +222,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             if matches:
                 menu.AppendSeparator()
                 for match_ in matches:
-                    mnu_match = menu.Append(wx.ID_ANY, "[%d%%] %s" % (match_["score"], match_["key"]))
+                    f_masked = masks.FileMasked(match_["files_filtered"][0].file, useFilter=False)
+                    mnu_match = menu.Append(wx.ID_ANY, "[%d%%] %s" % (match_["score"], f_masked.masked[1]))
                     self.Bind(
                         wx.EVT_MENU, partial(self.MenuForceMatchCb, row_id, match_["key"]), mnu_match,
                     )

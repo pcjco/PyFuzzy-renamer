@@ -634,16 +634,21 @@ class MainPanel(wx.Panel):
 
     def OnLogDuplicate(self, evt):
         with wx.lib.busy.BusyInfo("Please wait..."):
-            values = [x[config.D_PREVIEW] for x in self.list_ctrl.listdata.values()]
+            previews = [x[config.D_PREVIEW] for x in self.list_ctrl.listdata.values()]
             # [[...], [...], ...] -> [...]
-            all_values = [z for x in values for y in x for z in y]
+            all_previews = [p for previews_per_source in previews for previews_per_singlesource in previews_per_source for p in previews_per_singlesource]
             duplicates = defaultdict(list)
-            for (key, value) in zip(self.list_ctrl.listdata.keys(), values):
-                all_values_for_key = [y for x in value for y in x]
-                for v in all_values_for_key:
-                    if v and v.stem and all_values.count(v) > 1:
+            for (key, previews_per_source) in zip(self.list_ctrl.listdata.keys(), previews):
+                all_previews_for_key = [p for previews_per_singlesource in previews_per_source for p in previews_per_singlesource]
+                for v in all_previews_for_key:
+                    if v and v.stem and all_previews.count(v) > 1:
                         duplicates[v].append(key)
             duplicates_key = [duplicates[sorted_key] for sorted_key in sorted(duplicates.keys())]
+            a = []
+            for d in duplicates_key:
+                if not d in a:
+                    a.append(d)
+            duplicates_key = a
 
         duplicateTabIdx = -1
         for idx in range(0, self.bottom_notebook.GetPageCount()):
@@ -1092,7 +1097,9 @@ def getDoc():
         "<li>When strings are coming from file paths, the following terminology is used:"
         "<ul>"
         "<li>A <b>file path</b> is composed of a <b>parent directory</b> and a <b>file name</b>;<br>e.g. <b>file path</b>=<code>c:/foo/bar/setup.tar.gz</code>, <b>parent directory</b>=<code>c:/foo/bar</code>, <b>file name</b>=<code>setup.tar.gz</code></li>"
-        "<li>A <b>file name</b> is composed of a <b>stem</b> and a <b>suffix</b>;<br>e.g. <b>file name</b>=<code>setup.tar.gz</code>, <b>stem</b>=<code>setup.tar</code>, <b>suffix</b>=<code>.gz</code></li>"
+        "<li>A <b>file name</b> is composed of a <b>stem</b> and a <b>suffix</b>;<br>"
+        "e.g. <b>file name</b>=<code>setup.tar</code>, <b>stem</b>=<code>setup</code>, <b>suffix</b>=<code>.tar</code><br>"
+        "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>file name</b>=<code>setup.tar.gz</code>, <b>stem</b>=<code>setup.tar</code>, <b>suffix</b>=<code>.gz</code></li>"
         "<li>A <b>suffix</b> can only contain alphanumeric characters after the dot, if it contains non-alphanumeric characters, the suffix is considered as part of the <b>stem</b>;<br>e.g. <b>file name</b>=<code>A.Train III</code>, <b>stem</b>=<code>A.Train III</code>, <b>suffix</b>=<code>None</code></li>"
         "</ul></li>"
         "</ul>"
@@ -1110,9 +1117,9 @@ def getDoc():
         '<p>E.g. if <b>source</b> is <code><font color="blue">c:/foo/Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color="red">d:/bar/Amaryllidinae.jpg</font></code>, <b>renamed source</b> is <code><font color="blue">c:/foo/</font><font color="red">Amaryllidinae</font><font color="blue">.png</font></code></p>'
         "<p>If <b>masks</b> and <b>filters</b> are applied, the process applied to match and rename each <b>source</b> is the following:</p>"
         "<pre>"
-        "                                ┌─────────┐<br>"
-        '                      <font color="red">Choices</font>───┤Filtering├────<font color="red">Filtered Choices</font>────────┐<br>'
-        "                                └─────────┘                            │<br>"
+        "        ┌───────┐               ┌─────────┐<br>"
+        ' <font color="red">Choices</font>┤Masking├─<font color="red">Masked Choices</font>┤Filtering├──<font color="red">Masked&Filtered Choices</font>───┐<br>'
+        "        └───────┘               └─────────┘                            │<br>"
         "        ┌───────┐               ┌─────────┐                        ┌───┴────┐                     ┌────────┐                       ┌─────────┐<br>"
         ' <font color="blue">Source</font>─┤Masking├─<font color="blue">Masked Source</font>─┤Filtering├─<font color="blue">Masked&Filtered Source</font>─┤Matching├─<font color="red">Most Similar Choice</font>─┤Renaming├─<font color="blue">Masked</font> <font color="red">Renamed</font> <font color="blue">Source</font>─┤Unmasking├─<font color="green">Unmasked</font> <font color="red">Renamed</font> <font color="blue">Source</font><br>'
         "        └───┬───┘               └─────────┘                        └────────┘                     └────────┘                       └────┬────┘<br>"
@@ -1154,19 +1161,29 @@ def getDoc():
         "<li>Re-ordering a filter is done by dragging and dropping the filter item across the filter list.</li>"
         "</ul>"
         "<h3>Masks</h3>"
-        "<p>Sometimes, it can be interesting to ignore some leading and/or trailing parts from a <b>source</b> in the <b>matching</b> process and restore them after the <b>renaming</b> process. It is particularly important in order to enhance <b>matching</b> when <b>choices</b> don't contain these parts.</p>"
+        "<p>Sometimes, it can be interesting to ignore some leading and/or trailing parts from <b>sources</b> or <b>choices</b> in the <b>matching</b> process and restore them after the <b>renaming</b> process.</p>"
         '<p>E.g. <b>source</b> is <code><font color="blue">c:/foo/(1983-06-22) Amaryllis [Russia].png</font></code>, and we want to ignore the date <code><font color="blue">(1983-06-22)</font></code> and the country <code><font color="blue">[Russia]</font></code> during <b>matching</b> but we need to restore them when <b>renaming</b>, '
         ' then if <b>most similar choice</b> is <code><font color="red">d:/bar/Amaryllidinae.jpg</font></code>, the <b>renamed source</b> should be <code><font color="blue">c:/foo/(1983-06-22) </font><font color="red">Amaryllidinae</font><font color="blue"> [Russia].png</font></code></p>'
         "<p>To achieve this, the application uses <b>masks</b>.</p>"
-        "<p>The masks are using Python regular expression patterns. They are removed from <b>sources</b> strings before <b>filtering</b> and <b>matching</b> occur."
+        "<p>The masks are using Python regular expression patterns. They are removed from <b>sources</b> and <b>choices</b> strings before <b>filtering</b> and <b>matching</b> occur."
         "It is used to remove leading and trailing expressions (year, disk#...) before <b>matching</b> and restore them after <b>renaming</b>.</p>"
         "<p>For example, to preserve the Disk number at the end of a <b>source</b> file, a mask with the pattern <code>(\\s?disk\\d)$</code> could be used:<br>"
         "<ol>"
-        '<li><b>Masking</b>: <code><font color="blue">c:/foo/The Wiiire Disk1.rom</font></code> &rarr; <code><font color="blue">The Wiiire</font></code> + Trailing mask = <code><font color="green"> Disk1</font></code></li>'
+        '<li><b>Masking source</b>: <code><font color="blue">c:/foo/The Wiiire Disk1.rom</font></code> &rarr; <code><font color="blue">The Wiiire</font></code> + Trailing mask = <code><font color="green"> Disk1</font></code></li>'
         '<li><b>Matching</b>: <code><font color="blue">The Wiiire</font></code> &rarr; <code><font color="red">The Wire</font></code></li>'
         '<li><b>Renaming</b>: <code><font color="blue">c:/foo/The Wiiire.rom</font></code> &rarr; <code><font color="blue">c:/foo/</font><font color="red">The Wire</font><font color="blue">.rom</font></code></li>'
-        '<li><b>Unmkasking</b>: <code><font color="blue">c:/foo/The Wiiire.rom</font></code> &rarr; <code><font color="blue">c:/foo/The Wire<font color="green"> Disk1</font>.rom</font></code></li>'
+        '<li><b>Unmkasking</b>: <code><font color="blue">c:/foo/</font><font color="red">The Wire</font><font color="blue">.rom</font></code> &rarr; <code><font color="blue">c:/foo/</font><font color="red">The Wire</font> <font color="green">Disk1</font><font color="blue">.rom</font></code></li>'
         "</ol>"
+
+        "<p>It is also used to match a single <b>source</b> with multiple <b>choices</b> and generate multiple renamed files.</p>"
+        "<p>For example, masking the pattern <font face=\"verdana\">'(\\s?disk\\d)$'</font>:<br>"
+        "<ol>"
+        '<li><b>Masking choices</b>: <code><font color="red">The Wire Disk1</font></code>, <code><font color="red">The Wire Disk2</font></code> &rarr; <code><font color="red">The Wire</font></code> + Trailing masks = <code><font color="green">[Disk1, Disk2]</font></code></li>'
+        '<li><b>Matching</b>: <code><font color="blue">The Wiiire</font></code> &rarr; <code><font color="red">The Wire</font></code></li>'
+        '<li><b>Renaming</b>: <code><font color="blue">c:/foo/The Wiiire.rom</font></code> &rarr; <code><font color="blue">c:/foo/</font><font color="red">The Wire</font><font color="blue">.rom</font></code></li>'
+        '<li><b>Unmkasking</b>: <code><font color="blue">c:/foo/</font><font color="red">The Wire</font><font color="blue">.rom</font></code> &rarr; <code><font color="blue">c:/foo/</font><font color="red">The Wire</font> <font color="green">Disk1</font><font color="blue">.rom</font></code>, <code><font color="blue">c:/foo/</font><font color="red">The Wire</font> <font color="green">Disk2</font><font color="blue">.rom</font></code></li>'
+        "</ol>"
+
         "<p>Masks creation, addition, deletion, re-ordering is available from <code><b>Masks &amp; Filters</b></code> button.</p>"
         "<ul>"
         "<li>Edition of the mask name and pattern is done directly by clicking on the mask list cells</li>"

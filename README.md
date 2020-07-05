@@ -18,7 +18,8 @@ The following terminology is used in the application, and in this document:
         e.g. **file path**=`c:/foo/bar/setup.tar.gz`, **parent directory**=`c:/foo/bar`, **file name**=`setup.tar.gz`
     *   A **file name** is composed of a **stem** and a **suffix**;
 
-        e.g. **file name**=`setup.tar.gz`, **stem**=`setup.tar`, **suffix**=`.gz`
+        e.g. **file name**=`setup.tar`, **stem**=`setup`, **suffix**=`.tar`
+             **file name**=`setup.tar.gz`, **stem**=`setup.tar`, **suffix**=`.gz`
     * A **suffix** can only contain alphanumeric characters after the dot, if it contains non-alphanumeric characters, the **suffix** is considered as part of the **stem**
 
         e.g. **file name**=`A.Train III`, **stem**=`A.Train III`, **suffix**=`None`
@@ -45,9 +46,9 @@ E.g. if **source** is `c:/foo/Amaryllis.png`, and **most similar choice** is `d:
 If **masks** and **filters** are applied, the process applied to match and rename each **source** is the following:
 
 <pre>
-                                ┌─────────┐
-                      Choices───┤Filtering├────Filtered Choices────────┐
-                                └─────────┘                            │
+        ┌───────┐               ┌─────────┐
+ Choices┤Masking├─Masked Choices┤Filtering├──Masked&Filtered Choices───┐
+        └───────┘               └─────────┘                            │
         ┌───────┐               ┌─────────┐                        ┌───┴────┐                     ┌────────┐                       ┌─────────┐
  Source─┤Masking├─Masked Source─┤Filtering├─Masked&Filtered Source─┤Matching├─Most Similar Choice─┤Renaming├─Masked Renamed Source─┤Unmasking├─Unmasked Renamed Source
         └───┬───┘               └─────────┘                        └────────┘                     └────────┘                       └────┬────┘
@@ -103,20 +104,29 @@ Filters creation, addition, deletion, re-ordering is available from **`Masks & F
 
 ### Masks
 
-Sometimes, it can be interesting to ignore some leading and/or trailing parts from a **source** in the **matching** process and restore them after the **renaming** process. It is particularly important in order to enhance **matching** when **choices** don't contain these parts.
+Sometimes, it can be interesting to ignore some leading and/or trailing parts from **sources** or **choices** in the **matching** process and restore them after the **renaming** process.
 
 E.g. **source** is `c:/foo/(1983-06-22) Amaryllis [Russia].png`, and we want to ignore the date `(1983-06-22)` and the country `[Russia]` during **matching** but we need to restore them when **renaming**, then if **most similar choice** is `d:/bar/Amaryllidinae.jpg`, the **renamed source** should be `c:/foo/(1983-06-22) Amaryllidinae [Russia].png`
 
 To achieve this, the application uses **masks**.
 
-The masks are using Python regular expression patterns. They are removed from **sources** strings before **filtering** and **matching** occur. It is used to remove leading and trailing expressions (year, disk#...) before **matching** and restore them after **renaming**.
+The masks are using Python regular expression patterns. They are removed from **sources** and **choices** strings before **filtering** and **matching** occur. It is used to remove leading and trailing expressions (year, disk#...) before **matching** and restore them after **renaming**.
 
 For example, to preserve the Disk number at the end of a **source** file, a mask with the pattern `(\s?disk\d)$` could be used:
 
-1.  **Masking**: `c:/foo/The Wiiire Disk1.rom` ⭢ `The Wiiire` + Trailing mask = `Disk1`
+1.  **Masking source**: `c:/foo/The Wiiire Disk1.rom` ⭢ `The Wiiire` + Trailing mask = `Disk1`
 2.  **Matching**: `The Wiiire` ⭢ `The Wire`
 3.  **Renaming**: `c:/foo/The Wiiire.rom` ⭢ `c:/foo/The Wire.rom`
 4.  **Unmkasking**: `c:/foo/The Wiiire.rom` ⭢ `c:/foo/The Wire Disk1.rom`
+
+It is also used to match a single **source** with multiple **choices** and generate multiple renamed files.
+
+For example, masking the pattern `(\s?disk\d)$`:
+
+1.  **Masking choices**: `The Wire Disk1`, `The Wire Disk2` ⭢ `The Wire` + Trailing masks = `[Disk1, Disk2]`
+2.  **Matching**: `The Wiiire` ⭢ `The Wire`
+3.  **Renaming**: `c:/foo/The Wiiire.rom` ⭢ `c:/foo/The Wire.rom`
+4.  **Unmkasking**: `c:/foo/The Wire.rom` ⭢ `c:/foo/The Wire Disk1.rom`, `c:/foo/The Wire Disk2.rom`
 
 Masks creation, addition, deletion, re-ordering is available from **`Masks & Filters`** button.
 

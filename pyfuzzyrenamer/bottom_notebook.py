@@ -1,6 +1,6 @@
 import wx
 import wx.lib.agw.aui as aui
-from pyfuzzyrenamer import config, utils, icons
+from pyfuzzyrenamer import config, utils, icons, masks
 from pyfuzzyrenamer.config import get_config
 
 
@@ -109,12 +109,14 @@ class TabDuplicates(wx.Panel):
         row_id = 0
         self.list_ctrl.Freeze()
         for keys in duplicates_keys:
-            for preview in self.mlist.listdata[keys[0]][config.D_PREVIEW]:
-                stem = preview.stem
-                self.list_ctrl.InsertItem(row_id, stem)
-                self.listdata[row_id] = [stem, keys]
-                self.list_ctrl.SetItemData(row_id, row_id)
-                row_id += 1
+            all_previews = [y for x in self.mlist.listdata[keys[0]][config.D_PREVIEW] for y in x]
+            stem, suffix = utils.GetFileStemAndSuffix(all_previews[0])
+            if len(all_previews) > 1:
+                stem = masks.getmergedprepost(all_previews)
+            self.list_ctrl.InsertItem(row_id, stem)
+            self.listdata[row_id] = [stem, keys]
+            self.list_ctrl.SetItemData(row_id, row_id)
+            row_id += 1
         self.list_ctrl.SetColumnWidth(0, wx.LIST_AUTOSIZE)
         self.list_ctrl.Thaw()
 

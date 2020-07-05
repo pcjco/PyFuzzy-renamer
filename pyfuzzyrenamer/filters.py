@@ -3,8 +3,11 @@ import re
 from pyfuzzyrenamer import utils
 
 
-def filter_processed(file, re_filters):
-    stem, suffix = utils.GetFileStemAndSuffix(file)
+def filter_processed(file, re_filters, alreadyStem=False):
+    if alreadyStem:
+        stem = str(file)
+    else:
+        stem, suffix = utils.GetFileStemAndSuffix(file)
     ret = stem
     # convert to lowercase.
     ret = ret.lower()
@@ -36,6 +39,6 @@ def CompileFilters(filters):
 class FileFiltered:
     filters = []
 
-    def __init__(self, file):
+    def __init__(self, file, alreadyStem=False):
         self.file = file
-        self.filtered = filter_processed(file, FileFiltered.filters)
+        self.filtered = filter_processed(file, FileFiltered.filters, alreadyStem)

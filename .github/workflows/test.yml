@@ -53,12 +53,12 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu')
       run: |
         pip install pytest
-        xvfb-run --auto-servernum pytest
-    - name: Test with pytest (ubuntu)
+        xvfb-run --auto-servernum pytest -r
+    - name: Test with pytest (windows)
       if: startsWith(matrix.os, 'windows') || startsWith(matrix.os, 'macos')
       run: |
         pip install pytest
-        pytest
+        pytest -r
     - name: build with pyinstaller
       if: startsWith(matrix.os, 'windows')
       run: |

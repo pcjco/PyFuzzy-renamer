@@ -65,7 +65,7 @@ class masksandfiltersPanel(wx.Panel):
             " These filters, using Python regular expression patterns, are applied to <b>sources</b> and <b>choices</b> strings before matching occurs."
             "It is used to help matching by cleaning strings (removing tags, ...) beforehand.<br><br>"
             "For example, replacing the pattern <font face=\"verdana\">'(\\(\\d{4}\\))'</font> by <font face=\"verdana\">''</font>:<br>"
-            '<ul><li><i><font face="verdana">The Wire <font color="red">(2002)</font></font></i> &rarr; <i><font face="verdana">The Wire</font></i></li>'
+            '<ul><li><i><font face="verdana">The Wire <b>(2002)</b></font></i> &rarr; <i><font face="verdana">The Wire</font></i></li></ul>'
         )
 
         sizer2 = wx.BoxSizer(wx.HORIZONTAL)
@@ -96,12 +96,21 @@ class masksandfiltersPanel(wx.Panel):
         html_desc_masks = wx.html.HtmlWindow(page_masks, size=(600, 200))
         html_desc_masks.SetPage(
             '<img src="memory:info.png">'
-            " These masks, using Python regular expression patterns, are removed from <b>sources</b> strings before filtering and matching occur."
+            " These masks, using Python regular expression patterns, are removed from <b>sources</b> and <b>choices</b> strings before filtering and matching occur."
             "It is used to remove leading and trailing expressions (year, disk#...) before matching and restore them at renaming.<br><br>"
             "For example, masking the pattern <font face=\"verdana\">'(\\s?disk\\d)$'</font>:<br>"
-            '<ol><li>Source&rarr;masked source: <i><font face="verdana">The Wiiire <font color="red"> Disk1</font> &rarr; The Wiiire</font></i></li>'
-            '<li>Masked source&rarr;best choice: <i><font face="verdana">The Wiiire &rarr; The Wire</font></i></li>'
-            '<li>Best choice&rarr;renamed unmasked source: <i><font face="verdana">The Wire &rarr; The Wire<font color="red"> Disk1</font></font></i></li>'
+            '<ol><li>Source&rarr;masked source: <i><font face="verdana" color="blue">The Wiiire <b>Disk1</b></font></i> &rarr; <i><font face="verdana" color="blue">The Wiiire <font face="verdana" color="green"><b>[Disk1]</b></font></font></i></li>'
+            '<li>Choice&rarr;masked choice: <i><font face="verdana" color="red">The Wire</font></i> &rarr; <i><font face="verdana" color="red">The Wire</font></i></li>'
+            '<li>Masked source&rarr;best choice: <i><font face="verdana" color="blue">The Wiiire <font face="verdana" color="green"><b>[Disk1]</b></font></font></i> &rarr; <i><font face="verdana" color="red">The Wire</font></i></li>'
+            '<li>Best choice&rarr;renamed unmasked source: <i><font face="verdana" color="red">The Wire</font></i> &rarr; <i><font face="verdana" color="blue">The Wire <b>Disk1</b></font></i></li>'
+            '<li>Source&rarr;renamed sources: <i><font face="verdana" color="blue">The Wiiire <b>Disk1</b></font></i> &rarr; <i><font face="verdana" color="blue">The Wire <b>Disk1</b></i></li></ol>'
+            "<br><br>It is also used to match a single <b>source</b> with multiple <b>choices</b> and generate multiple renamed files.<br><br>"
+            "For example, masking the pattern <font face=\"verdana\">'(\\s?disk\\d)$'</font>:<br>"
+            '<ol><li>Source&rarr;masked source: <i><font face="verdana" color="blue">The Wiiire</font></i> &rarr; <i><font face="verdana" color="blue">The Wiiire</font></i></li>'
+            '<li>Choices&rarr;masked choices: <i><font face="verdana" color="red">The Wire <b>Disk1</b>, The Wire <b>Disk2</b></font></i> &rarr; <i><font face="verdana" color="red">The Wire <font face="verdana" color="green"><b>[Disk1, Disk2]</b></font></font></i></li>'
+            '<li>Masked source&rarr;best choice: <i><font face="verdana" color="blue">The Wiiire</font></i> &rarr; <i><font face="verdana" color="red">The Wire <font face="verdana" color="green"><b>[Disk1, Disk2]</b></font></font></i></li>'
+            '<li>Best choice&rarr;renamed unmasked source: <i><font face="verdana" color="red">The Wire <font face="verdana" color="green"><b>[Disk1, Disk2]</b></font></font></i> &rarr; <i><font face="verdana" color="blue">The Wire <b>Disk1</b>, The Wire <b>Disk2</b></font></i></li>'
+            '<li>Source&rarr;renamed sources: <i><font face="verdana" color="blue">The Wiiire</font></i> &rarr; <i><font face="verdana" color="blue">The Wire <b>Disk1</b>, The Wire <b>Disk2</b></font></i></li></ol>'
         )
 
         sizer22 = wx.BoxSizer(wx.HORIZONTAL)
