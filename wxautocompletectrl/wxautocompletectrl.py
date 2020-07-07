@@ -161,20 +161,23 @@ class AutocompleteTextCtrl(wx.TextCtrl):
         event.Skip()
 
     def AutoComplete(self):
-        self.queued_popup = False
-        if self.Value != "":
-            formated, unformated = self.completer(self.Value)
-            if len(formated) > 0:
-                self.popup.SetSuggestions(formated, unformated)
-                self.AdjustPopupPosition()
-                self.Unbind(wx.EVT_KILL_FOCUS)
-                self.popup.ShowWithoutActivating()
-                self.SetFocus()
-                self.Bind(wx.EVT_KILL_FOCUS, self.OnKillFocus)
+        try:
+            self.queued_popup = False
+            if self.Value != "":
+                formated, unformated = self.completer(self.Value)
+                if len(formated) > 0:
+                    self.popup.SetSuggestions(formated, unformated)
+                    self.AdjustPopupPosition()
+                    self.Unbind(wx.EVT_KILL_FOCUS)
+                    self.popup.ShowWithoutActivating()
+                    self.SetFocus()
+                    self.Bind(wx.EVT_KILL_FOCUS, self.OnKillFocus)
+                else:
+                    self.popup.Hide()
             else:
                 self.popup.Hide()
-        else:
-            self.popup.Hide()
+        except RuntimeError:
+            pass
 
     def OnSizeChange(self, event):
         self.popup.Size = (self.Size[0], self.height)

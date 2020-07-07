@@ -53,12 +53,12 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu')
       run: |
         pip install pytest
-        xvfb-run --auto-servernum pytest -r
+        xvfb-run --auto-servernum pytest -W ignore::DeprecationWarning
     - name: Test with pytest (windows)
       if: startsWith(matrix.os, 'windows') || startsWith(matrix.os, 'macos')
       run: |
         pip install pytest
-        pytest -r
+        pytest -W ignore::DeprecationWarning
     - name: build with pyinstaller
       if: startsWith(matrix.os, 'windows')
       run: |
