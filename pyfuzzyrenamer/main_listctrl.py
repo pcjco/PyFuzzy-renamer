@@ -241,8 +241,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         font.SetWeight(f.GetWeight())
         self.SetItemFont(row_id, font)
         pos = self.GetItemData(row_id)  # 0-based unsorted index
-        self.listdata[pos][config.D_CHECKED] = "True"
-        self.SetItem(row_id, config.D_CHECKED, self.listdata[pos][config.D_CHECKED])
+        self.listdata[pos][config.D_CHECKED] = True
+        self.SetItem(row_id, config.D_CHECKED, str(self.listdata[pos][config.D_CHECKED]))
 
     def UncheckedCb(self, event):
         row_id = event.GetIndex()
@@ -254,8 +254,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         font.SetWeight(f.GetWeight())
         self.SetItemFont(row_id, font)
         pos = self.GetItemData(row_id)  # 0-based unsorted index
-        self.listdata[pos][config.D_CHECKED] = "False"
-        self.SetItem(row_id, config.D_CHECKED, self.listdata[pos][config.D_CHECKED])
+        self.listdata[pos][config.D_CHECKED] = False
+        self.SetItem(row_id, config.D_CHECKED, str(self.listdata[pos][config.D_CHECKED]))
 
     def SelectCb(self, event):
         nb = self.GetSelectedItemCount()
@@ -521,7 +521,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix),
         )
         self.SetItem(row_id, config.D_STATUS, str(status))
-        self.SetItem(row_id, config.D_CHECKED, data[config.D_CHECKED])
+        self.SetItem(row_id, config.D_CHECKED, str(data[config.D_CHECKED]))
         if data[config.D_NBMATCH]:
             self.SetItem(row_id, config.D_MATCH_SCORE, str(score))
             parent, stem, suffix = utils.GetFileParentStemAndSuffix(matchname[0])
@@ -572,7 +572,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.Freeze()
         for f in newdata:
 
-            key = masks.FileMasked(f, useFilter=True).masked[1]
+            key = masks.FileMasked(f, useFilter=False).masked[1]
             if key in self.listdataname:
                 pos = self.listdataname[key]
                 row_id0 = self.FindItem(-1, pos)
@@ -590,7 +590,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
                 self.listdataname[key] = index
                 self.listdatanameinv[index] = key
-                self.listdata[index] = [[f], 0, [], [], 0, config.MatchStatus.NONE, "True"]
+                self.listdata[index] = [[f], 0, [], [], 0, config.MatchStatus.NONE, True]
                 self.InsertItem(row_id, item_name)
                 self.SetItemData(row_id, index)
                 self.RefreshItem(row_id, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)

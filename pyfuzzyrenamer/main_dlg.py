@@ -73,8 +73,13 @@ def getRenamePreview(input, matches):
 def RefreshCandidates():
     global candidates
     candidates.clear()
+
+    if not glob_choices:
+        return
+        
     # get suffix counters
     suffix_counts = dict()
+
     for f in glob_choices:
         suffix_counts[f.suffix] = suffix_counts.get(f.suffix, 0) + 1
     # get most common suffix
@@ -489,12 +494,32 @@ class MainPanel(wx.Panel):
         dia = masksandfilters_dlg.masksandfiltersDialog(None, "Masks & Filters")
         res = dia.ShowModal()
         if res == wx.ID_OK:
+            prev_filters = filters.FileFiltered.filters
+            prev_masks = masks.FileMasked.masks
             get_config()["filters"] = dia.panel.filters_list.GetFilters()
             filters.FileFiltered.filters = filters.CompileFilters(get_config()["filters"])
             get_config()["masks"] = dia.panel.masks_list.GetMasks()
             masks.FileMasked.masks = masks.CompileMasks(get_config()["masks"])
             get_config()["filters_test"] = dia.panel.preview_filters.GetValue()
             get_config()["masks_test"] = dia.panel.preview_masks.GetValue()
+            if prev_filters != filters.FileFiltered.filters or prev_masks != masks.FileMasked.masks:
+                RefreshCandidates()
+                
+                # retrieve sources from list
+                row_id = -1
+                newdata = []
+                while True:  # loop all the checked items
+                    row_id = self.list_ctrl.GetNextItem(row_id)
+                    if row_id == -1:
+                        break
+                    pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
+                    for f in self.list_ctrl.listdata[pos][config.D_FILENAME]:
+                        newdata.append(f)
+                self.list_ctrl.listdata.clear()
+                self.list_ctrl.listdataname.clear()
+                self.list_ctrl.listdatanameinv.clear()
+                self.list_ctrl.DeleteAllItems()
+                self.list_ctrl.AddToList(newdata)
 
         dia.Destroy()
 
@@ -634,12 +659,12 @@ class MainPanel(wx.Panel):
 
     def OnLogDuplicate(self, evt):
         with wx.lib.busy.BusyInfo("Please wait..."):
-            previews = [x[config.D_PREVIEW] for x in self.list_ctrl.listdata.values()]
+            previews = [x[config.D_PREVIEW] for x in self.list_ctrl.listdata.values() if x[config.D_CHECKED]]
             # [[...], [...], ...] -> [...]
             all_previews = [p for previews_per_source in previews for previews_per_singlesource in previews_per_source for p in previews_per_singlesource]
             duplicates = defaultdict(list)
-            for (key, previews_per_source) in zip(self.list_ctrl.listdata.keys(), previews):
-                all_previews_for_key = [p for previews_per_singlesource in previews_per_source for p in previews_per_singlesource]
+            for (key, source) in self.list_ctrl.listdata.items():
+                all_previews_for_key = [p for previews_per_singlesource in source[config.D_PREVIEW] for p in previews_per_singlesource]
                 for v in all_previews_for_key:
                     if v and v.stem and all_previews.count(v) > 1:
                         duplicates[v].append(key)
@@ -1056,8 +1081,8 @@ class MainFrame(wx.Frame):
                 list.InsertItem(row_id, "")
                 list.SetItemData(row_id, key)
                 list.RefreshItem(row_id, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)
-                list.CheckItem(row_id, data[config.D_CHECKED] == "True")
-                if data[config.D_CHECKED] == "False":
+                list.CheckItem(row_id, data[config.D_CHECKED])
+                if not data[config.D_CHECKED]:
                     f = list.GetItemFont(row_id)
                     if not f.IsOk():
                         f = list.GetFont()
