@@ -76,7 +76,7 @@ def RefreshCandidates():
 
     if not glob_choices:
         return
-        
+
     # get suffix counters
     suffix_counts = dict()
 
@@ -504,7 +504,7 @@ class MainPanel(wx.Panel):
             get_config()["masks_test"] = dia.panel.preview_masks.GetValue()
             if prev_filters != filters.FileFiltered.filters or prev_masks != masks.FileMasked.masks:
                 RefreshCandidates()
-                
+
                 # retrieve sources from list
                 row_id = -1
                 newdata = []
@@ -661,10 +661,17 @@ class MainPanel(wx.Panel):
         with wx.lib.busy.BusyInfo("Please wait..."):
             previews = [x[config.D_PREVIEW] for x in self.list_ctrl.listdata.values() if x[config.D_CHECKED]]
             # [[...], [...], ...] -> [...]
-            all_previews = [p for previews_per_source in previews for previews_per_singlesource in previews_per_source for p in previews_per_singlesource]
+            all_previews = [
+                p
+                for previews_per_source in previews
+                for previews_per_singlesource in previews_per_source
+                for p in previews_per_singlesource
+            ]
             duplicates = defaultdict(list)
             for (key, source) in self.list_ctrl.listdata.items():
-                all_previews_for_key = [p for previews_per_singlesource in source[config.D_PREVIEW] for p in previews_per_singlesource]
+                all_previews_for_key = [
+                    p for previews_per_singlesource in source[config.D_PREVIEW] for p in previews_per_singlesource
+                ]
                 for v in all_previews_for_key:
                     if v and v.stem and all_previews.count(v) > 1:
                         duplicates[v].append(key)
@@ -1045,12 +1052,13 @@ class MainFrame(wx.Frame):
         try:
             with open(pathname, "wb") as file:
                 pickle.dump(
-                    [
-                        glob_choices,
-                        self.panel.list_ctrl.listdata,
-                        self.panel.list_ctrl.listdataname,
-                        self.panel.list_ctrl.listdatanameinv,
-                    ],
+                    {
+                        "version": __version__,
+                        "glob_choices": glob_choices,
+                        "listdata": self.panel.list_ctrl.listdata,
+                        "listdataname": self.panel.list_ctrl.listdataname,
+                        "listdatanameinv": self.panel.list_ctrl.listdatanameinv,
+                    },
                     file,
                 )
 
@@ -1066,7 +1074,12 @@ class MainFrame(wx.Frame):
         list = self.panel.list_ctrl
         try:
             with open(pathname, "rb") as file:
-                glob_choices, list.listdata, list.listdataname, list.listdatanameinv = pickle.load(file)
+                data = pickle.load(file)
+                if data["version"] == "0.2.1":
+                    glob_choices = data["glob_choices"]
+                    list.listdata = data["listdata"]
+                    list.listdataname = data["listdataname"]
+                    list.listdatanameinv = data["listdatanameinv"]
         except IOError:
             wx.LogError("Cannot open file '%s'." % pathname)
 
@@ -1199,7 +1212,6 @@ def getDoc():
         '<li><b>Renaming</b>: <code><font color="blue">c:/foo/The Wiiire.rom</font></code> &rarr; <code><font color="blue">c:/foo/</font><font color="red">The Wire</font><font color="blue">.rom</font></code></li>'
         '<li><b>Unmkasking</b>: <code><font color="blue">c:/foo/</font><font color="red">The Wire</font><font color="blue">.rom</font></code> &rarr; <code><font color="blue">c:/foo/</font><font color="red">The Wire</font> <font color="green">Disk1</font><font color="blue">.rom</font></code></li>'
         "</ol>"
-
         "<p>It is also used to match a single <b>source</b> with multiple <b>choices</b> and generate multiple renamed files.</p>"
         "<p>For example, masking the pattern <font face=\"verdana\">'(\\s?disk\\d)$'</font>:<br>"
         "<ol>"
@@ -1208,7 +1220,6 @@ def getDoc():
         '<li><b>Renaming</b>: <code><font color="blue">c:/foo/The Wiiire.rom</font></code> &rarr; <code><font color="blue">c:/foo/</font><font color="red">The Wire</font><font color="blue">.rom</font></code></li>'
         '<li><b>Unmkasking</b>: <code><font color="blue">c:/foo/</font><font color="red">The Wire</font><font color="blue">.rom</font></code> &rarr; <code><font color="blue">c:/foo/</font><font color="red">The Wire</font> <font color="green">Disk1</font><font color="blue">.rom</font></code>, <code><font color="blue">c:/foo/</font><font color="red">The Wire</font> <font color="green">Disk2</font><font color="blue">.rom</font></code></li>'
         "</ol>"
-
         "<p>Masks creation, addition, deletion, re-ordering is available from <code><b>Masks &amp; Filters</b></code> button.</p>"
         "<ul>"
         "<li>Edition of the mask name and pattern is done directly by clicking on the mask list cells</li>"
