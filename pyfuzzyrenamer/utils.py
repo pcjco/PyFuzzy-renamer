@@ -32,7 +32,7 @@ def group(L):
     yield first, last  # Yield the last group
 
 
-def shorten_path(file_path, length):
+def shorten_path(filename, length):
     if len(filename) < length:
         return filename
     fp = Path(filename)
