@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import sys
@@ -32,14 +33,16 @@ def group(L):
 
 
 def shorten_path(file_path, length):
-    parts = Path(file_path).parts
-    if len(parts[-1]) >= length:
-        return parts[-1]
+    if len(filename) < length:
+        return filename
+    fp = Path(filename)
+    parts = fp.parts
     if len(parts) > 2:
         for i in range(1, len(parts) - 1):
             ret = parts[0] + "..." + os.sep + os.sep.join(parts[i:])
             if len(ret) <= length:
                 return ret
+    ret = filename[:math.ceil(l/2)-2] + "..." + filename[-math.floor(l/2)+1:]
     return ret
 
 
