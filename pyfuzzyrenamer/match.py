@@ -1,8 +1,10 @@
 import fuzzywuzzy.fuzz
 import fuzzywuzzy.process
+from pathlib import Path
 
-from pyfuzzyrenamer import main_dlg, masks, taskserver
+from pyfuzzyrenamer import main_dlg, masks, taskserver, utils
 from pyfuzzyrenamer.config import get_config
+from pyfuzzyrenamer.args import get_args
 
 
 def mySimilarityScorer(s1, s2):
@@ -27,7 +29,7 @@ class TaskMatch:
     def calculate(self, args):
         if not args:
             return []
-        f_masked, f_candidates = args
+        f_masked, sources, f_candidates = args
         match_results = fuzzywuzzy.process.extract(
             f_masked, f_candidates, scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
         )
@@ -61,19 +63,32 @@ def get_matches(sources):
                 if first_letter in main_dlg.candidates.keys():
                     Tasks[i] = (
                         (),
-                        (f_masked, list(main_dlg.candidates[first_letter].keys()),),
+                        (f_masked, sources[i], list(main_dlg.candidates[first_letter].keys()),),
                     )
             else:
                 Tasks[i] = (
                     (),
-                    (f_masked, list(main_dlg.candidates["all"].keys()),),
+                    (f_masked, sources[i], list(main_dlg.candidates["all"].keys()),),
                 )
 
     numproc = get_config()["workers"]
 
-    ts = taskserver.TaskServerMP(
-        processCls=TaskMatch, numprocesses=numproc, tasks=Tasks, results=Results, msgfunc=progress_msg, title="Match Progress"
-    )
+    if not get_args().mode:
+        ts = taskserver.TaskServerMP(
+            processCls=TaskMatch,
+            numprocesses=numproc,
+            tasks=Tasks,
+            results=Results,
+            msgfunc=progress_msg,
+            title="Match Progress",
+        )
+    else:
+        updatefunc_ = None
+        if get_args().mode == "report_match":
+            updatefunc_ = update_console
+        ts = taskserver.TaskServerMP(
+            processCls=TaskMatch, numprocesses=numproc, tasks=Tasks, results=Results, updatefunc=updatefunc_, progress=False
+        )
     ts.run()
 
     # [ [{"key": candidate_key_1, "files_filtered": [...], "score":score1]}, {"key": candidate_key_2, "files_filtered": [...], "score":score2}, ...], ...]
@@ -84,6 +99,19 @@ def get_matches(sources):
                 for canditate_key, score in Results[i]
             ]
     return Results
+
+
+def update_console(output, msgfunc=None):
+    if not output["args"] or not output["result"]:
+        return
+    Qview_fullpath = get_config()["show_fullpath"]
+    Qhide_extension = get_config()["hide_extension"]
+    f_masked = output["args"][0].masked[1]
+    print_source = f_masked
+
+    canditate_key, score = output["result"][0]
+    print_match = canditate_key
+    print("%s --> %s (%.2f)" % (print_source, print_match, score))
 
 
 def get_match_standalone(source, candidates, match_firstletter):

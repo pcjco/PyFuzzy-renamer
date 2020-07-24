@@ -28,7 +28,7 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
     def add_sources(self, dir=False, singles=False, clipboard=False, drop=False):
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
         if dir:
-            self.frame.panel.AddSourceFromDir(sourcesDir)
+            self.frame.panel.AddSourcesFromDir(sourcesDir)
         else:
             sources = []
             for f in sorted(Path(sourcesDir).resolve().glob("*"), key=os.path.basename):
@@ -36,7 +36,7 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
                     if f.is_file():
                         sources.append(f)
                         if singles:
-                            self.frame.panel.AddSourceFromFiles(sources)
+                            self.frame.panel.AddSourcesFromFiles(sources)
                             sources.clear()
                 except (OSError, IOError):
                     pass
@@ -57,9 +57,9 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
                     wx.TheClipboard.Open()
                     wx.TheClipboard.SetData(clipdata)
                     wx.TheClipboard.Close()
-                    self.frame.panel.OnAddSourceFromClipboard(None)
+                    self.frame.panel.OnAddSourcesFromClipboard(None)
                 else:
-                    self.frame.panel.AddSourceFromFiles(sources)
+                    self.frame.panel.AddSourcesFromFiles(sources)
         lst = self.frame.panel.list_ctrl
         item = -1
         item = lst.GetNextItem(item)

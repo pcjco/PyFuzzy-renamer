@@ -151,7 +151,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 Qsources = dlg.ShowModal() == wx.ID_YES
                 dlg.Destroy()
                 if Qsources:
-                    self.GetParent().GetParent().GetParent().AddSourceFromFiles(files)
+                    self.GetParent().GetParent().GetParent().AddSourcesFromFiles(files)
                 else:
                     self.GetParent().GetParent().GetParent().AddChoicesFromFiles(files)
         elif keycode == wx.WXK_CONTROL_P:

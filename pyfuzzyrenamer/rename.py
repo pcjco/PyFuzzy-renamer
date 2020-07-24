@@ -2,8 +2,9 @@ import os
 import shutil
 from pathlib import Path
 
-from pyfuzzyrenamer import taskserver, main_dlg, match, masks, utils
+from pyfuzzyrenamer import taskserver, utils, masks
 from pyfuzzyrenamer.config import get_config
+from pyfuzzyrenamer.args import get_args
 
 history = []
 
@@ -16,9 +17,13 @@ class TaskRename:
         retcode = []
         msg = []
         history = []
-        old_pathes, previews_pathes, Qkeep_original = args
-        for old_path, preview_pathes in zip(old_pathes, previews_pathes):
+        old_pathes, previews_pathes, Qkeep_original, simulate = args
+
+        for i in range(len(old_pathes)):
+            old_path = old_pathes[i]
+            preview_pathes = previews_pathes[i]
             old_file = str(old_path)
+            f_masked = masks.FileMasked(old_path)
             if not old_path.is_file():
                 retcode.append(1)
                 msg.append("Cannot find file : %s" % old_file)
@@ -33,11 +38,13 @@ class TaskRename:
                     if Qkeep_original or Qrenamed:
                         msg.append("Copying : %s --> %s" % (old_file, new_file))
                         history.append({"type": "copy", "to": new_file})
-                        shutil.copy2(old_file, new_file)
+                        if not simulate:
+                            shutil.copy2(old_file, new_file)
                     else:
                         msg.append("Renaming : %s --> %s" % (old_file, new_file))
                         history.append({"type": "rename", "from": old_file, "to": new_file})
-                        os.rename(old_file, new_file)
+                        if not simulate:
+                            os.rename(old_file, new_file)
                         Qrenamed = True
                         old_file = new_file
                     retcode.append(0)
@@ -53,7 +60,7 @@ def progress_msg(j, numtasks, output):
         return "Processed sources..."
 
 
-def get_renames(old_pathes, preview_pathes):
+def get_renames(old_pathes, preview_pathes, simulate=False):
 
     numtasks = len(old_pathes)
 
@@ -65,19 +72,25 @@ def get_renames(old_pathes, preview_pathes):
     for i in range(numtasks):
         Tasks[i] = (
             (),
-            (old_pathes[i], preview_pathes[i], Qkeep_original),
+            (old_pathes[i], preview_pathes[i], Qkeep_original, simulate),
         )
 
     numproc = get_config()["workers"]
 
-    ts = taskserver.TaskServerMP(
-        processCls=TaskRename,
-        numprocesses=numproc,
-        tasks=Tasks,
-        results=Results,
-        msgfunc=progress_msg,
-        title="Rename Progress",
-    )
+    if not get_args().mode:
+        ts = taskserver.TaskServerMP(
+            processCls=TaskRename,
+            numprocesses=numproc,
+            tasks=Tasks,
+            results=Results,
+            msgfunc=progress_msg,
+            title="Rename Progress",
+        )
+    else:
+        ts = taskserver.TaskServerMP(
+            processCls=TaskRename, numprocesses=numproc, tasks=Tasks, results=Results, progress=False,
+        )
+
     ts.run()
 
     return Results

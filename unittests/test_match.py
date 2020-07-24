@@ -13,7 +13,7 @@ from pyfuzzyrenamer.config import get_config
 class match_Tests(pfr.PyFuzzyRenamerTestCase):
     def test_match(self):
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
@@ -76,7 +76,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
 
     def test_match_sort_similarity(self):
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
@@ -143,7 +143,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
 
     def test_match_sort_match(self):
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
@@ -211,7 +211,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
 
     def test_match_sort_preview(self):
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
@@ -279,7 +279,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
 
     def test_match_sort_status(self):
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
@@ -347,7 +347,7 @@ class match_Tests(pfr.PyFuzzyRenamerTestCase):
 
     def test_match_sort_checked(self):
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 

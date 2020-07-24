@@ -3,13 +3,14 @@ import copy
 import unittest
 import wx
 
-from pyfuzzyrenamer import config, main_dlg
+from pyfuzzyrenamer import args, config, main_dlg
 
 
 class PyFuzzyRenamerTestCase(unittest.TestCase):
     def setUp(self):
 
         config.default()
+        args.theArgs = args.theArgsParser.parse_args([])  # rewrite command line with no args
 
         main_dlg.glob_choices.clear()
         self.app = wx.App()
@@ -18,6 +19,33 @@ class PyFuzzyRenamerTestCase(unittest.TestCase):
         self.frame.Show()
         self.frame.PostSizeEvent()
         self.button_panel = self.frame.panel.GetChildren()[0].GetChildren()[0].GetChildren()[0]
+        self.outdir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./outdir"))
+
+    def tearDown(self):
+        def _cleanup():
+            for tlw in wx.GetTopLevelWindows():
+                if tlw:
+                    if isinstance(tlw, wx.Dialog) and tlw.IsModal():
+                        tlw.EndModal(0)
+                        wx.CallAfter(tlw.Destroy)
+                    else:
+                        tlw.Close(force=True)
+            wx.WakeUpIdle()
+
+        timer = wx.PyTimer(_cleanup)
+        timer.Start(100)
+        self.app.MainLoop()
+        del self.app
+
+
+class PyFuzzyRenamerTestCaseCLI(unittest.TestCase):
+    def setUp(self):
+
+        config.default()
+
+        main_dlg.glob_choices.clear()
+        self.app = wx.App()
+        wx.Log.SetActiveTarget(wx.LogStderr())
         self.outdir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./outdir"))
 
     def tearDown(self):

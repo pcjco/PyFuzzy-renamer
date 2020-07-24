@@ -10,7 +10,7 @@ from unittests import pfr
 class check_Tests(pfr.PyFuzzyRenamerTestCase):
     def test_check(self):
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 

@@ -15,7 +15,7 @@ class loadsave_Tests(pfr.PyFuzzyRenamerTestCase):
             shutil.rmtree(self.outdir)
         os.makedirs(self.outdir)
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 

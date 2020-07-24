@@ -42,7 +42,7 @@ def shorten_path(filename, length):
             ret = parts[0] + "..." + os.sep + os.sep.join(parts[i:])
             if len(ret) <= length:
                 return ret
-    ret = filename[:math.ceil(l/2)-2] + "..." + filename[-math.floor(l/2)+1:]
+    ret = filename[: math.ceil(l / 2) - 2] + "..." + filename[-math.floor(l / 2) + 1 :]
     return ret
 
 

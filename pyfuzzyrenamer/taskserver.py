@@ -48,7 +48,9 @@ class TaskServerMP:
     The TaskServerMP class provides a target worker class method for queued processes.
     """
 
-    def __init__(self, processCls, numprocesses=1, tasks=[], results=[], updatefunc=None, msgfunc=None, title="Progress"):
+    def __init__(
+        self, processCls, numprocesses=1, tasks=[], results=[], updatefunc=None, msgfunc=None, progress=True, title="Progress"
+    ):
         """
         Initialise the TaskServerMP and create the dispatcher and processes.
         """
@@ -58,6 +60,7 @@ class TaskServerMP:
         self.numtasks = len(tasks)
         self.updatefunc = updatefunc
         self.msgfunc = msgfunc
+        self.progress = None
 
         # Create the dispatcher
         self.dispatcher = Dispatcher()
@@ -80,19 +83,23 @@ class TaskServerMP:
         self.i = 0
         self.j = 0
 
-        if isinstance(msgfunc, (types.FunctionType, types.MethodType)):
-            msg = msgfunc(0, self.numtasks, None)
-        else:
-            msg = "Complete: %2d / %2d" % (0, self.numtasks)
-        self.progress = wx.ProgressDialog(
-            title,
-            msg
-            + "\nTime Elapsed: %s\nRemaining: %s"
-            % (time.strftime("%M:%S", time.gmtime(self.timeElapsed)), time.strftime("%M:%S", time.gmtime(self.timeRemain))),
-            maximum=self.numtasks,
-            parent=None,
-            style=wx.PD_AUTO_HIDE | wx.PD_CAN_ABORT,
-        )
+        if progress:
+            if isinstance(msgfunc, (types.FunctionType, types.MethodType)):
+                msg = msgfunc(0, self.numtasks, None)
+            else:
+                msg = "Complete: %2d / %2d" % (0, self.numtasks)
+            self.progress = wx.ProgressDialog(
+                title,
+                msg
+                + "\nTime Elapsed: %s\nRemaining: %s"
+                % (
+                    time.strftime("%M:%S", time.gmtime(self.timeElapsed)),
+                    time.strftime("%M:%S", time.gmtime(self.timeRemain)),
+                ),
+                maximum=self.numtasks,
+                parent=None,
+                style=wx.PD_AUTO_HIDE | wx.PD_CAN_ABORT,
+            )
 
     def processTasks(self, resfunc=None, msgfunc=None):
         """
@@ -208,6 +215,7 @@ class TaskServerMP:
             output = {
                 "process": {"name": current_process().name, "pid": current_process().pid},
                 "num": args[0],
+                "args": args[2],
                 "result": result,
             }
             # Put the result on the output queue
@@ -223,7 +231,7 @@ class TaskServerMP:
         args = self.dispatcher.getTask()
         taskproc = processCls(args[1])
         result = taskproc.calculate(args[2])
-        output = {"process": {"name": "Process-0", "pid": 0}, "num": args[0], "result": result}
+        output = {"process": {"name": "Process-0", "pid": 0}, "num": args[0], "args": args[2], "result": result}
         # Put the result on the output queue
         self.dispatcher.putResult(output)
 
@@ -245,10 +253,10 @@ class TaskServerMP:
                     time.strftime("%M:%S", time.gmtime(self.timeRemain)),
                 ),
             )[0]
-        if cancelled:
-            # Stop processing tasks
-            self.processStop()
-            self.progress = None
+            if cancelled:
+                # Stop processing tasks
+                self.processStop()
+                self.progress = None
 
     def run(self):
         """

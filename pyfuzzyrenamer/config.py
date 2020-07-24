@@ -119,6 +119,7 @@ def default():
     theConfig["match_firstletter"] = False
     theConfig["keep_match_ext"] = False
     theConfig["keep_original"] = False
+    theConfig["source_w_multiple_choice"] = True
     theConfig["folder_sources"] = os.getcwd()
     theConfig["folder_choices"] = os.getcwd()
     theConfig["folder_output"] = ""
@@ -169,6 +170,10 @@ def read(config_file=None):
             pass
         try:
             theConfig["match_firstletter"] = True if config["global"]["match_firstletter"] == "True" else False
+        except KeyError:
+            pass
+        try:
+            theConfig["source_w_multiple_choice"] = True if config["global"]["source_w_multiple_choice"] == "True" else False
         except KeyError:
             pass
         try:
@@ -246,6 +251,7 @@ def write(config_file=None):
                 "filters": theConfig["filters"],
                 "masks_test": theConfig["masks_test"],
                 "filters_test": theConfig["filters_test"],
+                "source_w_multiple_choice": theConfig["source_w_multiple_choice"],
                 "workers": theConfig["workers"],
             },
             "recent": {

@@ -19,7 +19,7 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
         os.makedirs(self.outdir)
         self.frame.panel.SetOutputDirectory(self.outdir)
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
@@ -68,7 +68,7 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
         os.makedirs(self.outdir)
         self.frame.panel.SetOutputDirectory(self.outdir)
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
@@ -115,7 +115,7 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
             shutil.rmtree(self.outdir)
         shutil.copytree(os.path.abspath(os.path.join(os.path.dirname(__file__), "./data")), self.outdir)
         sourcesDir = os.path.join(self.outdir, "sources")
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.join(self.outdir, "choices")
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
@@ -162,7 +162,7 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
             shutil.rmtree(self.outdir)
         shutil.copytree(os.path.abspath(os.path.join(os.path.dirname(__file__), "./data")), self.outdir)
         sourcesDir = os.path.join(self.outdir, "sources")
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.join(self.outdir, "choices")
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
@@ -286,7 +286,7 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
         btn.GetEventHandler().ProcessEvent(event)
 
         sourcesDir = os.path.join(self.outdir, "sources_multimatch")
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.join(self.outdir, "choices_multimatch")
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
@@ -300,6 +300,32 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
 
         lst = self.frame.panel.list_ctrl
         item = -1
+        item = lst.GetNextItem(item)
+        self.assertEqual(
+            [
+                "Acanthe à feuilles molles_disk2.txt",
+                "70",
+                "Acanthus mollis[_disk1,_disk2].txt",
+                "Acanthus mollis_disk2.txt",
+                "2",
+                "Matched",
+                "True",
+            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
+        )
+        item = lst.GetNextItem(item)
+        self.assertEqual(
+            [
+                "Acanthe épineuse.txt",
+                "73",
+                "Acanthus spinosus[_disk1,_disk2].txt",
+                "Acanthus spinosus[_disk1,_disk2].txt",
+                "2",
+                "Matched",
+                "True",
+            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
+        )
         item = lst.GetNextItem(item)
         self.assertEqual(
             [
@@ -350,7 +376,9 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
 
         self.assertEqual(
             [
-                "Aconit vénéneux_disk3.txt",
+                "Acanthus mollis_disk2.txt",
+                "Acanthus spinosus_disk1.txt",
+                "Acanthus spinosus_disk2.txt",
                 "Aconitum anthora.txt",
                 "Aconitum anthora_disk1.txt",
                 "Aconitum anthora_disk2.txt",
@@ -362,6 +390,32 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
         )
 
         item = -1
+        item = lst.GetNextItem(item)
+        self.assertEqual(
+            [
+                "Acanthus mollis_disk2.txt",
+                "100",
+                "Acanthus mollis[_disk1,_disk2].txt",
+                "Acanthus mollis_disk2.txt",
+                "2",
+                "Matched",
+                "True",
+            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
+        )
+        item = lst.GetNextItem(item)
+        self.assertEqual(
+            [
+                "Acanthus spinosus[_disk1,_disk2].txt",
+                "100",
+                "Acanthus spinosus[_disk1,_disk2].txt",
+                "Acanthus spinosus[_disk1,_disk2].txt",
+                "2",
+                "Matched",
+                "True",
+            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
+        )
         item = lst.GetNextItem(item)
         self.assertEqual(
             [
@@ -413,6 +467,8 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
 
         self.assertEqual(
             [
+                "Acanthe à feuilles molles_disk2.txt",
+                "Acanthe épineuse.txt",
                 "Aconit vénéneux.txt",
                 "Aconit vénéneux_disk1.txt",
                 "Aconit vénéneux_disk3.txt",
@@ -423,6 +479,32 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
         )
 
         item = -1
+        item = lst.GetNextItem(item)
+        self.assertEqual(
+            [
+                "Acanthe à feuilles molles_disk2.txt",
+                "70",
+                "Acanthus mollis[_disk1,_disk2].txt",
+                "Acanthus mollis_disk2.txt",
+                "2",
+                "Matched",
+                "True",
+            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
+        )
+        item = lst.GetNextItem(item)
+        self.assertEqual(
+            [
+                "Acanthe épineuse.txt",
+                "73",
+                "Acanthus spinosus[_disk1,_disk2].txt",
+                "Acanthus spinosus[_disk1,_disk2].txt",
+                "2",
+                "Matched",
+                "True",
+            ],
+            [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
+        )
         item = lst.GetNextItem(item)
         self.assertEqual(
             [

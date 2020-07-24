@@ -11,7 +11,7 @@ from pyfuzzyrenamer import config, main_listctrl
 class action_Tests(pfr.PyFuzzyRenamerTestCase):
     def test_pickchoice(self):
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
@@ -60,7 +60,7 @@ class action_Tests(pfr.PyFuzzyRenamerTestCase):
 
     def test_resetmatch(self):
         sourcesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/sources"))
-        self.frame.panel.AddSourceFromDir(sourcesDir)
+        self.frame.panel.AddSourcesFromDir(sourcesDir)
         choicesDir = os.path.abspath(os.path.join(os.path.dirname(__file__), "./data/choices"))
         self.frame.panel.AddChoicesFromDir(choicesDir)
 
