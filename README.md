@@ -18,8 +18,8 @@ The following terminology is used in the application, and in this document:
         e.g. **file path**=`c:/foo/bar/setup.tar.gz`, **parent directory**=`c:/foo/bar`, **file name**=`setup.tar.gz`
     *   A **file name** is composed of a **stem** and a **suffix**;
 
-        e.g. **file name**=`setup.tar`, **stem**=`setup`, **suffix**=`.tar`
-             **file name**=`setup.tar.gz`, **stem**=`setup.tar`, **suffix**=`.gz`
+        e.g. **file name**=`setup.tar`, **stem**=`setup`, **suffix**=`.tar`  
+        e.g. **file name**=`setup.tar.gz`, **stem**=`setup.tar`, **suffix**=`.gz`
     * A **suffix** can only contain alphanumeric characters after the dot, if it contains non-alphanumeric characters, the **suffix** is considered as part of the **stem**
 
         e.g. **file name**=`A.Train III`, **stem**=`A.Train III`, **suffix**=`None`
@@ -150,12 +150,12 @@ There are two options available:
 
 *   **View full path**
 
-    When **source** strings are coming from file paths, the full path of files are shown in the **`Source Name`** and **`Renaming Preview`** columns.
+    When **source** strings are coming from file paths, the full path of files are shown in the **`Source Name`** and **`Renaming Preview`** columns.  
     When **choices** strings are coming from file paths, the full path of files are shown in the **`Closest Match`** columns.
 
 *   **Hide suffix**
 
-    When **source** strings are coming from file paths, the suffixes are hidden in the **`Source Name`** and **`Renaming Preview`** columns.
+    When **source** strings are coming from file paths, the suffixes are hidden in the **`Source Name`** and **`Renaming Preview`** columns.  
     When **choices** strings are coming from file paths, the suffixes are hidden in the **`Closest Match`** columns.
 
 *   **Keep original on renaming**
@@ -164,14 +164,24 @@ There are two options available:
 
 *   **Keep matched file suffix**
 
-    During **renaming**, the suffix of the **most similar choice** is used before suffix of the **source**.
+    During **renaming**, the suffix of the **most similar choice** is used before suffix of the **source**.  
     E.g. if **source** is `Amaryllis.png`, and **most similar choice** is `Amaryllidinae.rom`, **renamed source** is `Amaryllidinae.rom.png`
 
 *   **Always match first letter**
     
-    During **matching**, each **source** will search for the **most similar choice** among **choices** that start with the same letter only.
+    During **matching**, each **source** will search for the **most similar choice** among **choices** that start with the same letter only.  
     This decreases greatly the processing time during **matching**.
 
+*   **Source can match multiple choices**
+
+    If a **source** matches a group of **choices** with different **masks**, then the renaming will create copies of this **source** for each **mask**.  
+    E.g. if **source** is `Amaryllis.png`, and **most similar choices** are `Amaryllidinae[_disk1, disk2].rom`, **renamed sources** are `Amaryllidinae_disk1.png` and `Amaryllidinae_disk2.png`.  
+    If option is unchecked **renamed source** is only `Amaryllidinae.png`.
+
+*   **Number of processes**
+
+    Number of parallel processes used when launching matching/renaming/undoing tasks (=1 to not use parallel tasks)
+    
 ### Available actions on source items
 
 From the context menu on each **source** item in the main list, the following actions are available:
@@ -183,6 +193,10 @@ From the context menu on each **source** item in the main list, the following ac
 *   **Reset choice**
 
     Reset the **choice**.
+
+*   **Best choice**
+
+    Set **choice** to the best match.
 
 *   **Pick a match...**
 
@@ -199,3 +213,21 @@ The current list of **sources** and **choices** as well as the current **most si
 A saved session is restored by using **`File->Load Session`**. When restoring a session, the current list of sources and choices is resetted first.
 
 The list of the 8 most recent saved session files can be loaded directly from the **`File`** menu.
+
+### Command line options
+
+<pre>
+usage: pyfuzzyrenamer [-h] [--sources SOURCES] [--choices CHOICES] {rename,report_match,preview_rename} ...
+
+positional arguments:
+  {rename,report_match,preview_rename}
+                        sub-command help
+    rename              rename sources
+    report_match        report best match
+    preview_rename      preview renaming
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --sources SOURCES     directory for sources
+  --choices CHOICES     directory for choices
+</pre>

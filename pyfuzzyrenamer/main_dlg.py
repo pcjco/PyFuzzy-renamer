@@ -37,12 +37,13 @@ glob_choices = OrderedDict()
 def getRenamePreview(input, matches):
     ret = [[] for i in range(len(input))]
     Qkeep_match_ext = get_config()["keep_match_ext"]
+    Qsource_w_multiple_choice = get_config()["source_w_multiple_choice"]
     if matches:
         f_masked = masks.FileMasked(matches[0], useFilter=False)
         stem, suffix = utils.GetFileStemAndSuffix(matches[0])
         match_clean = utils.strip_extra_whitespace(utils.strip_illegal_chars(f_masked.masked[1]))
 
-    ii = -1
+    done_in_last = -1
     already_used = set()
     for i in range(len(input)):
         inp = input[i]
@@ -63,26 +64,37 @@ def getRenamePreview(input, matches):
                 ]
                 already_used.add(preview_name)
             else:
-                ii = i
+                done_in_last = i
 
-    if ii != -1:
+    if done_in_last != -1:
         ret2 = []
-        inp = input[ii]
+        inp = input[done_in_last]
         stem_masked, suffix_masked = utils.GetFileStemAndSuffix(inp)
-        for f in matches:
-            f_masked = masks.FileMasked(f, useFilter=False)
-            preview_name = f_masked.masked[0] + match_clean + f_masked.masked[2]
-            if not preview_name in already_used:
-                ret2.append(
-                    Path(
-                        os.path.join(
-                            get_config()["folder_output"] if get_config()["folder_output"] else inp.parent,
-                            f_masked.masked[0] + match_clean + f_masked.masked[2] + (suffix if Qkeep_match_ext else ""),
+        if Qsource_w_multiple_choice:
+            for f in matches:
+                f_masked = masks.FileMasked(f, useFilter=False)
+                preview_name = f_masked.masked[0] + match_clean + f_masked.masked[2]
+                if not preview_name in already_used:
+                    ret2.append(
+                        Path(
+                            os.path.join(
+                                get_config()["folder_output"] if get_config()["folder_output"] else inp.parent,
+                                preview_name + (suffix if Qkeep_match_ext else ""),
+                            )
+                            + suffix_masked
                         )
-                        + suffix_masked
                     )
+        else:
+            ret2.append(
+                Path(
+                    os.path.join(
+                        get_config()["folder_output"] if get_config()["folder_output"] else inp.parent,
+                        match_clean + (suffix if Qkeep_match_ext else ""),
+                    )
+                    + suffix_masked
                 )
-        ret[ii] = ret2
+            )
+        ret[done_in_last] = ret2
     return ret
 
 
@@ -914,8 +926,8 @@ class MainFrame(wx.Frame):
         workers_ = wx.MenuItem(
             options,
             wx.ID_ANY,
-            "&Number of matching processes",
-            "Select the number of parallel processes used during matching",
+            "&Number of processes",
+            "Select the number of parallel processes used during matching/renaming/undoing tasks",
         )
         self.mnu_procs = []
         workers_.SetSubMenu(workers)
@@ -1299,6 +1311,12 @@ def getDoc():
         'E.g. if <b>source</b> is <code><font color="blue">Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color="red">Amaryllidinae.rom</font></code>, <b>renamed source</b> is <code><font color="red">Amaryllidinae.rom</font></code><code><font color="blue">.png</font></code>'
         "<br><li><b>Always match first letter</b><br><br>"
         "During <b>matching</b>, each <b>source</b> will search for the <b>most similar choice</b> among <b>choices</b> that start with the same letter only. This decreases greatly the processing time during <b>matching</b>."
+        "<br><li><b>Source can match multiple choices</b><br><br>"
+        "If a <b>source</b> matches a group of <b>choices</b> with different <b>masks</b>, then the renaming will create copies of this <b>source</b> for each <b>mask</b>.<br>"
+        'E.g. if <b>source</b> is <code><font color="blue">Amaryllis.png</font></code>, and <b>most similar choices</b> are <code><font color="red">Amaryllidinae[_disk1, disk2].rom</font></code>, <b>renamed sources</b> are <code><font color="red">Amaryllidinae_disk1</font><font color="blue">.png</font></code> and <code><font color="red">Amaryllidinae_disk2</font><font color="blue">.png</font></code>.<br>'
+        '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If option is unchecked <b>renamed source</b> is only <code><font color="red">Amaryllidinae</font><font color="blue">.png</font></code>.'
+        "<br><li><b>Number of processes</b><br><br>"
+        "Number of parallel processes used when launching matching/renaming/undoing tasks (=1 to not use parallel tasks)"
         "</ul>"
         "<h3>Available actions on <b>source</b> items</h3>"
         "<p>From the context menu on each <b>source</b> item in the main list, the following actions are available:"
@@ -1307,6 +1325,8 @@ def getDoc():
         "Delete the file associated with the selected <b>source</b> string."
         "<br><li><b>Reset choice</b><br><br>"
         "Reset the <b>choice</b>."
+        "<br><li><b>Best choice</b><br><br>"
+        "Set the <b>choice</b> to the best match."
         "<br><li><b>Pick a match...</b><br><br>"
         "Change the <b>choice</b> by typing your own from the available <b>choices</b>."
         "<br><li><b>Alternate match</b><br><br>"
@@ -1316,6 +1336,22 @@ def getDoc():
         "<p>The current list of <b>sources</b> and <b>choices</b> as well as the current <b>most similar choice</b> can be saved to a file by using <code><b>File->Save Session</b></code>.</p>"
         "<p>A saved session is restored by using <code><b>File->Load Session</b></code>. When restoring a session, the current list of sources and choices is resetted first.</p>"
         "<p>The list of the 8 most recent saved session files can be loaded directly from the <code><b>File</b></code> menu.</p>"
+        "<h3>Command line options</h3>"
+        "<pre>"
+        "usage: pyfuzzyrenamer [-h] [--sources SOURCES] [--choices CHOICES] {rename,report_match,preview_rename} ...<br>"
+        "<br>"
+        "positional arguments:<br>"
+        "  {rename,report_match,preview_rename}<br>"
+        "                        sub-command help<br>"
+        "    rename              rename sources<br>"
+        "    report_match        report best match<br>"
+        "    preview_rename      preview renaming<br>"
+        "<br>"
+        "optional arguments:<br>"
+        "  -h, --help            show this help message and exit<br>"
+        "  --sources SOURCES     directory for sources<br>"
+        "  --choices CHOICES     directory for choices<br>"
+        "</pre>"
         "<h3>Licenses</h3>"
         "PyFuzzy-renamer is licensed under MIT license:"
         "<pre>Copyright (c) 2020 pcjco\n"

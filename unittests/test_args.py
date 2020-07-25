@@ -17,6 +17,7 @@ from pyfuzzyrenamer.args import get_args, get_argparser
 
 class args_Tests(pfr.PyFuzzyRenamerTestCaseCLI):
     def test_args_report_match(self):
+        get_config()["workers"] = 1
         get_config()["show_fullpath"] = False
         get_config()["hide_extension"] = True
         get_config()["masks"] = "+Ending Disk#\n" + r'"(\s?_disk\d)$"' + "\n"
@@ -44,6 +45,7 @@ class args_Tests(pfr.PyFuzzyRenamerTestCaseCLI):
             )
 
     def test_args_preview_rename(self):
+        get_config()["workers"] = 1
         get_config()["masks"] = "+Ending Disk#\n" + r'"(\s?_disk\d)$"' + "\n"
         masks.FileMasked.masks = masks.CompileMasks(get_config()["masks"])
         filters.FileFiltered.filters = filters.CompileFilters(get_config()["filters"])
@@ -99,7 +101,59 @@ class args_Tests(pfr.PyFuzzyRenamerTestCaseCLI):
                 output,
             )
 
+    def test_args_preview_rename_nomultirename(self):
+        get_config()["workers"] = 1
+        get_config()["source_w_multiple_choice"] = False
+        get_config()["masks"] = "+Ending Disk#\n" + r'"(\s?_disk\d)$"' + "\n"
+        masks.FileMasked.masks = masks.CompileMasks(get_config()["masks"])
+        filters.FileFiltered.filters = filters.CompileFilters(get_config()["filters"])
+
+        if os.path.exists(self.outdir):
+            shutil.rmtree(self.outdir)
+        shutil.copytree(os.path.abspath(os.path.join(os.path.dirname(__file__), "./data")), self.outdir)
+        sourcesDir = os.path.join(self.outdir, "sources_multimatch")
+        choicesDir = os.path.join(self.outdir, "choices_multimatch")
+        args.theArgs = args.theArgsParser.parse_args(["--sources", sourcesDir, "--choices", choicesDir, "preview_rename"])
+
+        with io.StringIO() as buf, redirect_stdout(buf):
+            frame = main_dlg.MainFrame()
+            shutil.rmtree(self.outdir)
+            output = buf.getvalue()
+            self.maxDiff = None
+            self.assertEqual(
+                "Renaming : "
+                + os.path.join(sourcesDir, "Acanthe à feuilles molles_disk2.txt")
+                + " --> "
+                + os.path.join(sourcesDir, "Acanthus mollis_disk2.txt\n")
+                + "Renaming : "
+                + os.path.join(sourcesDir, "Acanthe épineuse.txt")
+                + " --> "
+                + os.path.join(sourcesDir, "Acanthus spinosus.txt\n")
+                + "Renaming : "
+                + os.path.join(sourcesDir, "Aconit vénéneux.txt")
+                + " --> "
+                + os.path.join(sourcesDir, "Aconitum anthora.txt\n")
+                + "Renaming : "
+                + os.path.join(sourcesDir, "Aconit vénéneux_disk1.txt")
+                + " --> "
+                + os.path.join(sourcesDir, "Aconitum anthora_disk1.txt\n")
+                + "Renaming : "
+                + os.path.join(sourcesDir, "Aconit vénéneux_disk3.txt")
+                + " --> "
+                + os.path.join(sourcesDir, "Aconitum anthora_disk3.txt\n")
+                + "Renaming : "
+                + os.path.join(sourcesDir, "Violette cornue_disk1.txt")
+                + " --> "
+                + os.path.join(sourcesDir, "Viola cornuta_disk1.txt\n")
+                + "Renaming : "
+                + os.path.join(sourcesDir, "Volutaire à fleurs tubulées_disk1.txt")
+                + " --> "
+                + os.path.join(sourcesDir, "Volutaria tubuliflora_disk1.txt\n"),
+                output,
+            )
+
     def test_args_rename(self):
+        get_config()["workers"] = 1
         get_config()["keep_original"] = False
         get_config()["masks"] = "+Ending Disk#\n" + r'"(\s?_disk\d)$"' + "\n"
         masks.FileMasked.masks = masks.CompileMasks(get_config()["masks"])

@@ -329,10 +329,10 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
         item = lst.GetNextItem(item)
         self.assertEqual(
             [
-                "Aconit vénéneux[_disk1,_disk3].txt",
+                "Aconit vénéneux[ ,_disk1,_disk3].txt",
                 "52",
-                "Aconitum anthora[_disk2,_disk3].txt",
-                "Aconitum anthora[_disk1,_disk2,_disk3].txt",
+                "Aconitum anthora[ ,_disk2,_disk3].txt",
+                "Aconitum anthora[ ,_disk1,_disk2,_disk3].txt",
                 "3",
                 "Matched",
                 "True",
@@ -419,10 +419,10 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
         item = lst.GetNextItem(item)
         self.assertEqual(
             [
-                "Aconitum anthora[_disk1,_disk2,_disk3].txt",
+                "Aconitum anthora[ ,_disk1,_disk2,_disk3].txt",
                 "100",
-                "Aconitum anthora[_disk2,_disk3].txt",
-                "Aconitum anthora[_disk1,_disk2,_disk3].txt",
+                "Aconitum anthora[ ,_disk2,_disk3].txt",
+                "Aconitum anthora[ ,_disk1,_disk2,_disk3].txt",
                 "3",
                 "Matched",
                 "True",
@@ -508,10 +508,10 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
         item = lst.GetNextItem(item)
         self.assertEqual(
             [
-                "Aconit vénéneux[_disk1,_disk3].txt",
+                "Aconit vénéneux[ ,_disk1,_disk3].txt",
                 "52",
-                "Aconitum anthora[_disk2,_disk3].txt",
-                "Aconitum anthora[_disk1,_disk2,_disk3].txt",
+                "Aconitum anthora[ ,_disk2,_disk3].txt",
+                "Aconitum anthora[ ,_disk1,_disk2,_disk3].txt",
                 "3",
                 "Matched",
                 "True",
