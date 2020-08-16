@@ -91,6 +91,12 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             order = [get_config()["col%d_order" % (col + 1)] for col in range(0, len(config.default_columns))]
             self.SetColumnsOrder(order)
 
+        imagelist = wx.ImageList(16, 11)
+        self.img_downarrow = imagelist.Add(icons.DownArrow_16_PNG.GetBitmap())
+        self.img_uparrow = imagelist.Add(icons.UpArrow_16_PNG.GetBitmap())
+
+        self.AssignImageList(imagelist, wx.IMAGE_LIST_SMALL)
+            
         self.listdata = {}
         self.listdataname = {}
         self.listdatanameinv = {}
@@ -603,3 +609,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         row_id = self.GetFirstSelected()
         if row_id != -1:
             self.EnsureVisible(row_id)
+        col_sorted, sort_type = self.GetSortState()
+        for col in range(0, len(config.default_columns)):
+            self.SetColumnImage(col, -1)
+        self.SetColumnImage(col_sorted, self.img_uparrow if sort_type else self.img_downarrow)
