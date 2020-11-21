@@ -115,7 +115,18 @@ def ClipBoardFiles():
             if wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_TEXT)):
                 do = wx.TextDataObject()
                 wx.TheClipboard.GetData(do)
-                ret = do.GetText().splitlines()
+                filenames = do.GetText().splitlines()
+                for f in filenames:
+                    try:
+                        fp = Path(f)
+                        if fp.is_dir():
+                            for fp2 in fp.resolve().glob("*"):
+                                if fp2.is_file():
+                                    ret.append(str(fp2))
+                        else:
+                            ret.append(f)
+                    except (OSError, IOError):
+                        pass
             elif wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_FILENAME)):
                 do = wx.FileDataObject()
                 wx.TheClipboard.GetData(do)

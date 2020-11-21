@@ -91,7 +91,11 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             order = [get_config()["col%d_order" % (col + 1)] for col in range(0, len(config.default_columns))]
             self.SetColumnsOrder(order)
 
-        imagelist = wx.ImageList(16, 11)
+        imagelist = wx.ImageList(16, 16)
+        self.img_red = imagelist.Add(icons.RedSquare_16_PNG.GetBitmap())
+        self.img_yellow = imagelist.Add(icons.YellowSquare_16_PNG.GetBitmap())
+        self.img_orange = imagelist.Add(icons.OrangeSquare_16_PNG.GetBitmap())
+        self.img_green = imagelist.Add(icons.GreenSquare_16_PNG.GetBitmap())
         self.img_downarrow = imagelist.Add(icons.DownArrow_16_PNG.GetBitmap())
         self.img_uparrow = imagelist.Add(icons.UpArrow_16_PNG.GetBitmap())
 
@@ -524,11 +528,12 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.SetItem(
             row_id,
             config.D_FILENAME,
-            parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix),
+            parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix),self.colorFromScore(score)
         )
         self.SetItem(row_id, config.D_STATUS, str(status))
         self.SetItem(row_id, config.D_CHECKED, str(data[config.D_CHECKED]))
         if data[config.D_NBMATCH]:
+            #self.SetItemImage(row_id, self.colorFromScore(score))
             self.SetItem(row_id, config.D_MATCH_SCORE, str(score))
             parent, stem, suffix = utils.GetFileParentStemAndSuffix(matchname[0])
             if data[config.D_NBMATCH] > 1:
@@ -550,11 +555,21 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 )
             self.SetItem(row_id, config.D_NBMATCH, str(nbmatch))
         else:
+            self.SetItemImage(row_id, -1)
             self.SetItem(row_id, config.D_MATCH_SCORE, "")
             self.SetItem(row_id, config.D_MATCHNAME, "")
             self.SetItem(row_id, config.D_PREVIEW, "")
             self.SetItem(row_id, config.D_NBMATCH, "")
 
+    def colorFromScore(self, score):
+        if score == 100:
+            return self.img_green
+        if score >= 95:
+            return self.img_yellow
+        elif score >= 90:
+            return self.img_orange
+        return self.img_red
+    
     def RefreshList(self):
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
@@ -597,7 +612,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.listdataname[key] = index
                 self.listdatanameinv[index] = key
                 self.listdata[index] = [[f], 0, [], [], 0, config.MatchStatus.NONE, True]
-                self.InsertItem(row_id, item_name)
+                self.InsertItem(row_id, item_name, -1)
                 self.SetItemData(row_id, index)
                 self.RefreshItem(row_id, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)
                 self.CheckItem(row_id, True)

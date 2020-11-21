@@ -428,6 +428,21 @@ class MainPanel(wx.Panel):
         if files:
             self.AddChoicesFromFiles(files)
 
+    def OnSwap(self, event):
+        sources = []
+        row_id = -1
+        while True:
+            row_id = self.list_ctrl.GetNextItem(row_id)
+            if row_id == -1:
+                break
+            pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
+            sources += self.list_ctrl.listdata[pos][config.D_FILENAME]
+        choices = [str(key) for key in glob_choices]
+        sources, choices = choices, sources
+        self.OnReset(None)
+        self.AddSourcesFromFiles(sources)
+        self.AddChoicesFromFiles(choices)
+
     def OnOutputDirectory(self, evt):
         if self.parent.mnu_user_dir.IsChecked():
             self.parent.mnu_same_as_input.Check(False)
@@ -440,7 +455,7 @@ class MainPanel(wx.Panel):
             if dirDialog.ShowModal() == wx.ID_CANCEL:
                 return
             self.SetOutputDirectory(dirDialog.GetPath())
-
+            
     def OnSameOutputDirectory(self, evt):
         if self.parent.mnu_same_as_input.IsChecked():
             self.parent.mnu_user_dir.Check(False)
@@ -752,7 +767,8 @@ class aboutDialog(wx.Dialog):
         html = wxHTML(self)
 
         html.SetPage(
-            '<font size="30">PyFuzzy-renamer ' + __version__ + "</font><br><br>"
+            '<font size="30">PyFuzzy-renamer ' + __version__ + '</font><br><br>'
+            '<u>Source</u> <a href ="https://github.com/pcjco/PyFuzzy-renamer">https://github.com/pcjco/PyFuzzy-renamer</a><br>'
             "<u>Authors</u><br>"
             "<ul><li>pcjco</li></ul>"
             "<u>Credits</u><br>"
@@ -868,6 +884,9 @@ class MainFrame(wx.Frame):
         mnu_choices_from_clipboard.SetBitmap(icons.Clipboard_16_PNG.GetBitmap())
         choices.Append(mnu_choices_from_clipboard)
 
+        mnu_swap = wx.MenuItem(self.files, wx.ID_ANY, "Sources \u2194 Choices\tCtrl+W", "Swap sources and choices")
+        mnu_swap.SetBitmap(icons.Swap_16_PNG.GetBitmap())
+        
         output_dir = wx.Menu()
         output_dir_ = wx.MenuItem(self.files, wx.ID_ANY, "&Output Directory", "Select output directory")
         output_dir_.SetBitmap(icons.Folder_16_PNG.GetBitmap())
@@ -890,6 +909,7 @@ class MainFrame(wx.Frame):
         self.files.Append(sources_)
         self.files.Append(choices_)
         self.files.Append(output_dir_)
+        self.files.Append(mnu_swap)
         self.files.AppendSeparator()
         self.files.Append(mnu_open)
         self.files.Append(mnu_save)
@@ -994,6 +1014,7 @@ class MainFrame(wx.Frame):
         self.Bind(
             wx.EVT_MENU, self.panel.OnAddChoicesFromClipboard, mnu_choices_from_clipboard,
         )
+        self.Bind(wx.EVT_MENU, self.panel.OnSwap, mnu_swap)
         self.Bind(wx.EVT_MENU, self.panel.OnOutputDirectory, self.mnu_user_dir)
         self.Bind(wx.EVT_MENU, self.panel.OnSameOutputDirectory, self.mnu_same_as_input)
         self.Bind(wx.EVT_MENU, self.panel.OnToggleBottom, self.mnu_view_bottom)
@@ -1153,7 +1174,7 @@ class MainFrame(wx.Frame):
         with wx.lib.busy.BusyInfo("Please wait..."):
             list.Freeze()
             for key, data in list.listdata.items():
-                list.InsertItem(row_id, "")
+                list.InsertItem(row_id, "", -1)
                 list.SetItemData(row_id, key)
                 list.RefreshItem(row_id, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)
                 list.CheckItem(row_id, data[config.D_CHECKED])

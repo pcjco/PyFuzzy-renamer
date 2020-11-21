@@ -1,11 +1,9 @@
 import os
 import unittest
 import wx
-from pathlib import Path
 
 from unittests import pfr
 from pyfuzzyrenamer import config
-from pyfuzzyrenamer.config import get_config
 
 # ---------------------------------------------------------------------------
 
