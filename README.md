@@ -63,6 +63,7 @@ Sources are entered in the following ways:
 *   click on the **`Sources`** button to add a selection of file paths to the current **sources**;
 *   Go to **`File->Sources->Sources from Directory`** menu to add file paths from a selected folder to the current **sources**;
 *   Go to **`File->Sources->Sources from Clipboard`** menu to add file paths from clipboard to the current **sources**. If clipboard contains a folder, then the file paths of the files inside this folder are added;
+*   Go to **`File->Sources`** menu to add recently selected folders to the current **sources**;
 *   Drag files or folders into application panel and choose **`Sources`** to add file paths to the current **sources**. For folders, the file paths of the files inside folders are added;
 *   Paste (Ctrl+V) into application panel and choose **`Sources`** to add file paths or folders in clipboard to the current **sources**. For folders, the file paths of the files inside folders are added
 
@@ -73,6 +74,7 @@ Choices are entered in the following ways:
 *   click on the **`Choices`** button to add a selection of file paths to the current **choices**;
 *   Go to **`File->Choices->Choices from Directory`** menu to add file paths from a selected folder to the current **choices**;
 *   Go to **`File->Choices->Choices from Clipboard`** menu to add files paths from clipboard to the current **choices**. If clipboard contains a folder, then the file paths of the files inside this folder are added;
+*   Go to **`File->Choices`** menu to add recently selected folders to the current **choices**;
 *   Drag files or folders into application panel and choose **`Choices`** to add file paths to the current **choices**. For folders, the file paths of the files inside folders are added;
 *   Paste (Ctrl+V) into application panel and choose **`Choices`** to add file paths or folders in clipboard to the current **choices**. For folders, the file paths of the files inside folders are added
 

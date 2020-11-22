@@ -340,6 +340,7 @@ class MainPanel(wx.Panel):
                 except (OSError, IOError):
                     pass
             self.list_ctrl.AddToList(newdata)
+            self.parent.UpdateRecentSources(directory)
 
     def OnAddSourcesFromFiles(self, evt):
         with wx.FileDialog(
@@ -394,6 +395,7 @@ class MainPanel(wx.Panel):
                 except (OSError, IOError):
                     pass
             RefreshCandidates()
+            self.parent.UpdateRecentChoices(directory)
 
     def OnAddChoicesFromFiles(self, evt):
         with wx.FileDialog(
@@ -852,37 +854,63 @@ class MainFrame(wx.Frame):
         options = wx.Menu()
         help = wx.Menu()
 
-        sources = wx.Menu()
+        self.sources = wx.Menu()
         sources_ = wx.MenuItem(self.files, wx.ID_ANY, "&Sources", "Select sources (to rename)")
-        sources_.SetSubMenu(sources)
+        sources_.SetSubMenu(self.sources)
 
         mnu_source_from_dir = wx.MenuItem(
-            sources, wx.ID_ANY, "Sources from &Directory...\tCtrl+D", "Select sources from directory",
+            self.sources, wx.ID_ANY, "Sources from &Directory...\tCtrl+D", "Select sources from directory",
         )
         mnu_source_from_dir.SetBitmap(icons.AddFolder_16_PNG.GetBitmap())
-        sources.Append(mnu_source_from_dir)
+        self.sources.Append(mnu_source_from_dir)
 
         mnu_source_from_clipboard = wx.MenuItem(
-            sources, wx.ID_ANY, "Sources from &Clipboard", "Select sources from clipboard",
+            self.sources, wx.ID_ANY, "Sources from &Clipboard", "Select sources from clipboard",
         )
         mnu_source_from_clipboard.SetBitmap(icons.Clipboard_16_PNG.GetBitmap())
-        sources.Append(mnu_source_from_clipboard)
+        self.sources.Append(mnu_source_from_clipboard)
 
-        choices = wx.Menu()
+        self.mnu_recents_sources = []
+        if get_config()["recent_sources"]:
+            self.sources.AppendSeparator()
+            for i in range(0, len(get_config()["recent_sources"])):
+                new_mnu_recent_source = wx.MenuItem(
+                    self.sources,
+                    wx.ID_ANY,
+                    "&" + str(i + 1) + ": " + utils.shorten_path(get_config()["recent_sources"][i], 64),
+                    "",
+                )
+                self.sources.Append(new_mnu_recent_source)
+                self.mnu_recents_sources.append(new_mnu_recent_source)
+        
+        self.choices = wx.Menu()
         choices_ = wx.MenuItem(self.files, wx.ID_ANY, "&Choices", "Select choices (to match)")
-        choices_.SetSubMenu(choices)
+        choices_.SetSubMenu(self.choices)
 
         mnu_target_from_dir = wx.MenuItem(
-            choices, wx.ID_ANY, "Choices from &Directory...\tCtrl+T", "Select choices from directory",
+            self.choices, wx.ID_ANY, "Choices from &Directory...\tCtrl+T", "Select choices from directory",
         )
         mnu_target_from_dir.SetBitmap(icons.AddFolder_16_PNG.GetBitmap())
-        choices.Append(mnu_target_from_dir)
+        self.choices.Append(mnu_target_from_dir)
 
         mnu_choices_from_clipboard = wx.MenuItem(
-            choices, wx.ID_ANY, "Choices from &Clipboard", "Select choices from clipboard",
+            self.choices, wx.ID_ANY, "Choices from &Clipboard", "Select choices from clipboard",
         )
         mnu_choices_from_clipboard.SetBitmap(icons.Clipboard_16_PNG.GetBitmap())
-        choices.Append(mnu_choices_from_clipboard)
+        self.choices.Append(mnu_choices_from_clipboard)
+
+        self.mnu_recents_choices = []
+        if get_config()["recent_choices"]:
+            self.choices.AppendSeparator()
+            for i in range(0, len(get_config()["recent_choices"])):
+                new_mnu_recent_choice = wx.MenuItem(
+                    self.choices,
+                    wx.ID_ANY,
+                    "&" + str(i + 1) + ": " + utils.shorten_path(get_config()["recent_choices"][i], 64),
+                    "",
+                )
+                self.choices.Append(new_mnu_recent_choice)
+                self.mnu_recents_choices.append(new_mnu_recent_choice)
 
         mnu_swap = wx.MenuItem(self.files, wx.ID_ANY, "Sources \u2194 Choices\tCtrl+W", "Swap sources and choices")
         mnu_swap.SetBitmap(icons.Swap_16_PNG.GetBitmap())
@@ -1034,6 +1062,10 @@ class MainFrame(wx.Frame):
 
         for mnu_recent in self.mnu_recents:
             self.Bind(wx.EVT_MENU, self.OnOpenRecent, mnu_recent)
+        for mnu_recent in self.mnu_recents_sources:
+            self.Bind(wx.EVT_MENU, self.OnAddRecentSource, mnu_recent)
+        for mnu_recent in self.mnu_recents_choices:
+            self.Bind(wx.EVT_MENU, self.OnAddRecentChoice, mnu_recent)
         for mnu_proc in self.mnu_procs:
             self.Bind(wx.EVT_MENU, self.OnNumProc, mnu_proc)
 
@@ -1117,7 +1149,7 @@ class MainFrame(wx.Frame):
             found_recent = True
             self.files.Delete(mnu_recent)
         if not found_recent:
-            item, pos = self.files.FindChildItem(self.mnu_quit.GetId())  # Searh Exit button
+            item, pos = self.files.FindChildItem(self.mnu_quit.GetId())  # Search Exit button
             self.files.InsertSeparator(pos)
 
         # - Refresh recents
@@ -1126,10 +1158,78 @@ class MainFrame(wx.Frame):
             new_mnu_recent = wx.MenuItem(
                 self.files, wx.ID_ANY, "&" + str(i + 1) + ": " + utils.shorten_path(get_config()["recent_session"][i], 64), "",
             )
-            item, pos = self.files.FindChildItem(self.mnu_quit.GetId())  # Searh Exit button
+            item, pos = self.files.FindChildItem(self.mnu_quit.GetId())  # Search Exit button
             self.files.Insert(pos - 1, new_mnu_recent)
             self.mnu_recents.append(new_mnu_recent)
             self.Bind(wx.EVT_MENU, self.OnOpenRecent, new_mnu_recent)
+
+    def OnAddRecentSource(self, event):
+        menu = event.GetEventObject()
+        menuItem = menu.FindItemById(event.GetId())
+        pathname = get_config()["recent_sources"][self.mnu_recents_sources.index(menuItem)]
+        self.panel.AddSourcesFromDir(pathname)
+
+    def UpdateRecentSources(self, pathname):
+        if pathname in get_config()["recent_sources"]:
+            idx = get_config()["recent_sources"].index(pathname)
+            if idx:
+                get_config()["recent_sources"].insert(0, get_config()["recent_sources"].pop(idx))
+        else:
+            get_config()["recent_sources"].insert(0, pathname)
+            get_config()["recent_sources"] = get_config()["recent_sources"][:8]
+
+        # update sources menu
+        # - Remove all recent
+        found_recent = False
+        for mnu_recent in self.mnu_recents_sources:
+            found_recent = True
+            self.sources.Delete(mnu_recent)
+        if not found_recent:
+            self.sources.AppendSeparator()
+
+        # - Refresh recents
+        self.mnu_recents_sources.clear()
+        for i in range(0, len(get_config()["recent_sources"])):
+            new_mnu_recent = wx.MenuItem(
+                self.sources, wx.ID_ANY, "&" + str(i + 1) + ": " + utils.shorten_path(get_config()["recent_sources"][i], 64), "",
+            )
+            self.sources.Append(new_mnu_recent)
+            self.mnu_recents_sources.append(new_mnu_recent)
+            self.Bind(wx.EVT_MENU, self.OnAddRecentSource, new_mnu_recent)
+
+    def OnAddRecentChoice(self, event):
+        menu = event.GetEventObject()
+        menuItem = menu.FindItemById(event.GetId())
+        pathname = get_config()["recent_choices"][self.mnu_recents_choices.index(menuItem)]
+        self.panel.AddChoicesFromDir(pathname)
+
+    def UpdateRecentChoices(self, pathname):
+        if pathname in get_config()["recent_choices"]:
+            idx = get_config()["recent_choices"].index(pathname)
+            if idx:
+                get_config()["recent_choices"].insert(0, get_config()["recent_choices"].pop(idx))
+        else:
+            get_config()["recent_choices"].insert(0, pathname)
+            get_config()["recent_choices"] = get_config()["recent_choices"][:8]
+
+        # update choices menu
+        # - Remove all recent
+        found_recent = False
+        for mnu_recent in self.mnu_recents_choices:
+            found_recent = True
+            self.choices.Delete(mnu_recent)
+        if not found_recent:
+            self.choices.AppendSeparator()
+
+        # - Refresh recents
+        self.mnu_recents_choices.clear()
+        for i in range(0, len(get_config()["recent_choices"])):
+            new_mnu_recent = wx.MenuItem(
+                self.choices, wx.ID_ANY, "&" + str(i + 1) + ": " + utils.shorten_path(get_config()["recent_choices"][i], 64), "",
+            )
+            self.choices.Append(new_mnu_recent)
+            self.mnu_recents_choices.append(new_mnu_recent)
+            self.Bind(wx.EVT_MENU, self.OnAddRecentChoice, new_mnu_recent)
 
     def SaveSession(self, pathname):
         try:
@@ -1252,6 +1352,7 @@ def getDoc():
         "<ul><li>click on the <code><b>Sources</b></code> button to add a selection of file paths to the current <b>sources</b>;</li>"
         "<li>Go to <code><b>File->Sources->Sources from Directory</b></code> menu to add file paths from a selected folder to the current <b>sources</b>;</li>"
         "<li>Go to <code><b>File->Sources->Sources from Clipboard</b></code> menu to add file paths or folders from clipboard to the current <b>sources</b>. If clipboard contains a folder, then the file paths of the files inside this folder are added;</li>"
+        "<li>Go to <code><b>File->Sources</b></code> to add recently selected folders to the current <b>sources</b>;</li>"
         "<li>Drag files or folders into application panel and choose <code><b>Sources</b></code> to add file paths to the current <b>sources</b>. For folders, the file paths of the files inside folders are added;</li>"
         "<li>Paste (Ctrl+V) into application panel and choose <code><b>Sources</b></code> to add file paths of the files or folders in clipboard to the current <b>sources</b>. For folders, the file paths of the files inside folders are added</li></ul>"
         "<h3>Choices</h3>"
@@ -1259,6 +1360,7 @@ def getDoc():
         "<ul><li>click on the <code><b>Choices</b></code> button to add a selection of files paths to the current <b>choices</b>;</li>"
         "<li>Go to <code><b>File->Choices->Choices from Directory</b></code> menu to add files paths from a selected folder to the current <b>choices</b>;</li>"
         "<li>Go to <code><b>File->Choices->Choices from Clipboard</b></code> menu to add files paths from clipboard to the current <b>choices</b>. If clipboard contains a folder, then the file paths of the files inside this folder are added;</li>"
+        "<li>Go to <code><b>File->Choices</b></code> to add recently selected folders to the current <b>choices</b>;</li>"
         "<li>Drag files or folders into application panel and choose <code><b>Choices</b></code> to add file paths to the current <b>choices</b>. For folders, the file paths of the files inside folders are added;</li>"
         "<li>Paste (Ctrl+V) into application panel and choose <code><b>Choices</b></code> to add file paths of the files or folders in clipboard to the current <b>choices</b>. For folders, the file paths of the files inside folders are added</li></ul>"
         "<h3>Filters</h3>"

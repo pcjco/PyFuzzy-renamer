@@ -129,6 +129,8 @@ def default():
     theConfig["filters_test"] = default_filters_teststring
     theConfig["workers"] = cpu_count()
     theConfig["recent_session"] = []
+    theConfig["recent_sources"] = []
+    theConfig["recent_choices"] = []
     for i in range(0, len(default_columns)):
         theConfig["col%d_order" % (i + 1)] = default_columns[i]["index"]
         theConfig["col%d_size" % (i + 1)] = default_columns[i]["width"] if default_columns[i]["shown"] else 0
@@ -193,6 +195,20 @@ def read(config_file=None):
                 f = config["recent"]["recent_session%d" % i]
                 if Path(f).is_file():
                     theConfig["recent_session"].append(f)
+            except KeyError:
+                pass
+        for i in range(1, 9):
+            try:
+                f = config["recent"]["recent_sources%d" % i]
+                if Path(f).is_dir():
+                    theConfig["recent_sources"].append(f)
+            except KeyError:
+                pass
+        for i in range(1, 9):
+            try:
+                f = config["recent"]["recent_choices%d" % i]
+                if Path(f).is_dir():
+                    theConfig["recent_choices"].append(f)
             except KeyError:
                 pass
         try:
@@ -265,6 +281,10 @@ def write(config_file=None):
     )
     for i in range(0, len(theConfig["recent_session"])):
         config["recent"]["recent_session%d" % (i + 1)] = theConfig["recent_session"][i]
+    for i in range(0, len(theConfig["recent_sources"])):
+        config["recent"]["recent_sources%d" % (i + 1)] = theConfig["recent_sources"][i]
+    for i in range(0, len(theConfig["recent_choices"])):
+        config["recent"]["recent_choices%d" % (i + 1)] = theConfig["recent_choices"][i]
 
     for i in range(0, len(default_columns)):
         config["ui"]["col%d_order" % (i + 1)] = str(theConfig["col%d_order" % (i + 1)])
