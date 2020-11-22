@@ -25,12 +25,14 @@ def list_completer(a_list):
 
 
 class PickCandidate(wx.MiniFrame):
-    def __init__(self, parent, row_id, position):
+    def __init__(self, parent, row_id, position, selectNextOnClose = False):
         wx.MiniFrame.__init__(self, parent, title="", pos=position, style=wx.RESIZE_BORDER)
+        print(len(main_dlg.candidates["all"].values()))
         self.lst_c = [masks.FileMasked(v[0].file, useFilter=False).masked[1] for v in main_dlg.candidates["all"].values()]
         self.text = AutocompleteTextCtrl(self, size=(400, -1), completer=list_completer(self.lst_c))
         self.text.SetMinSize((400, -1))
         self.row_id = row_id
+        self.selectNextOnClose = selectNextOnClose
         self.firstLose = False
         panel_sizer = wx.BoxSizer(wx.HORIZONTAL)
         panel_sizer.Add(self.text, 1, wx.EXPAND | wx.ALL, 0)
@@ -47,6 +49,13 @@ class PickCandidate(wx.MiniFrame):
             self.firstLose = True
         else:
             self.OnCloseWindow(None)
+            if self.selectNextOnClose:
+                # Select next item
+                list_ctrl = self.GetParent()
+                list_ctrl.Select(self.row_id, on=False)
+                list_ctrl.Select(self.row_id + 1, on=True)
+                list_ctrl.Focus(self.row_id + 1)
+                list_ctrl.EnsureVisible(self.row_id + 1)
 
     def OnCloseWindow(self, event):
         self.Destroy()
@@ -54,6 +63,7 @@ class PickCandidate(wx.MiniFrame):
     def OnKeyUP(self, event):
         keycode = event.GetKeyCode()
         if keycode == wx.WXK_ESCAPE:
+            self.selectNextOnClose = False
             self.Close(True)
         if keycode:
             event.Skip()
@@ -63,7 +73,12 @@ class PickCandidate(wx.MiniFrame):
         item = filters.FileFiltered(Path(forced_match), alreadyStem=True)
         list_ctrl = self.GetParent()
         list_ctrl.MenuForceMatchCb(self.row_id, item.filtered, None)
-
+        if self.selectNextOnClose:
+            # Select next item
+            list_ctrl.Select(self.row_id, on=False)
+            list_ctrl.Select(self.row_id + 1, on=True)
+            list_ctrl.Focus(self.row_id + 1)
+            list_ctrl.EnsureVisible(self.row_id + 1)
         self.Close(True)
 
 
@@ -122,9 +137,20 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 for index in focused:
                     if not index in selected:
                         self.CheckItem(index, not check)
+                event.Skip()
+            elif self.GetSelectedItemCount() == 1:
+                # Select next item
+                row_id = self.GetFirstSelected()
+                self.CheckItem(row_id, self.IsItemChecked(row_id))
+                self.Select(row_id, on=False)
+                self.Select(row_id + 1, on=True)
+                self.Focus(row_id + 1)
+                self.EnsureVisible(row_id + 1)
         elif keycode == wx.WXK_F2:
             if self.GetSelectedItemCount() == 1:
                 index = self.GetFirstSelected()
+                self.EditLabel(index)
+            event.Skip()
         elif keycode == wx.WXK_CONTROL_A:
             self.Freeze()
             item = -1
@@ -134,6 +160,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     break
                 self.SetItemState(item, wx.LIST_STATE_SELECTED, wx.LIST_STATE_SELECTED)
             self.Thaw()
+            event.Skip()
         elif keycode == wx.WXK_DELETE:
             if event.GetModifiers() == wx.MOD_SHIFT:
                 self.DeleteSelectionCb(None)
@@ -148,6 +175,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     key = self.listdatanameinv[pos]
                     del self.listdatanameinv[pos]
                     del self.listdataname[key]
+            event.Skip()
         elif keycode == wx.WXK_CONTROL_V:
             files = utils.ClipBoardFiles()
             if files:
@@ -164,6 +192,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     self.GetParent().GetParent().GetParent().AddSourcesFromFiles(files)
                 else:
                     self.GetParent().GetParent().GetParent().AddChoicesFromFiles(files)
+            event.Skip()
         elif keycode == wx.WXK_CONTROL_P:
             if self.GetSelectedItemCount() == 1:
                 row_id = self.GetFirstSelected()
@@ -174,15 +203,30 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     pos_column_match += self.GetColumnWidth(i)
                 rect = self.GetItemRect(row_id)
                 position = self.ClientToScreen(rect.GetPosition())
-                dia = PickCandidate(self, row_id, wx.Point(position.x + pos_column_match, position.y))
+                dia = PickCandidate(self, row_id, wx.Point(position.x + pos_column_match, position.y), selectNextOnClose=True)
                 dia.Show()
                 dia.text.SetFocus()
         elif keycode == wx.WXK_CONTROL_R:
             self.NoMatchSelectionCb(None)
+            if self.GetSelectedItemCount() == 1:
+                # Select next item
+                row_id = self.GetFirstSelected()
+                self.Select(row_id, on=False)
+                self.Select(row_id + 1, on=True)
+                self.Focus(row_id + 1)
+                self.EnsureVisible(row_id + 1)
+            event.Skip()
         elif keycode == wx.WXK_CONTROL_B:
             self.ReMatchSelectionCb(None)
-
-        if keycode:
+            if self.GetSelectedItemCount() == 1:
+                # Select next item
+                row_id = self.GetFirstSelected()
+                self.Select(row_id, on=False)
+                self.Select(row_id + 1, on=True)
+                self.Focus(row_id + 1)
+                self.EnsureVisible(row_id + 1)
+            event.Skip()
+        elif keycode:
             event.Skip()
 
     def ColRightClickCb(self, event):
@@ -325,6 +369,13 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 Qview_fullpath=Qview_fullpath,
                 Qhide_extension=Qhide_extension,
             )
+            f = self.GetItemFont(row_id)
+            if not f.IsOk():
+                f = self.list_ctrl.GetFont()
+            font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+            font.SetWeight(wx.FONTWEIGHT_NORMAL)
+            font.SetStyle(f.GetStyle())
+            self.SetItemFont(row_id, font)
         self.Thaw()
 
     def ReMatchSelectionCb(self, event):
@@ -369,7 +420,6 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     row_id,
                     score=0,
                     matchname=[],
-                    preview_pathes=[],
                     nbmatch=0,
                     status=config.MatchStatus.NOMATCH,
                     Qview_fullpath=Qview_fullpath,
@@ -385,18 +435,28 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         )
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
-        matching_results = main_dlg.candidates["all"][forced_match]
-        nb_match = len(matching_results)
-        self.RefreshItem(
-            row_id,
-            score=similarity,
-            matchname=[result.file for result in matching_results],
-            nbmatch=nb_match,
-            status=config.MatchStatus.USRMATCH,
-            Qview_fullpath=Qview_fullpath,
-            Qhide_extension=Qhide_extension,
-        )
-
+        if forced_match in main_dlg.candidates["all"]:
+            matching_results = main_dlg.candidates["all"][forced_match]
+            nb_match = len(matching_results)
+            self.RefreshItem(
+                row_id,
+                score=similarity,
+                matchname=[result.file for result in matching_results],
+                nbmatch=nb_match,
+                status=config.MatchStatus.USRMATCH,
+                Qview_fullpath=Qview_fullpath,
+                Qhide_extension=Qhide_extension,
+            )
+        else:
+            self.RefreshItem(
+                row_id,
+                score=0,
+                matchname=[],
+                nbmatch=0,
+                status=config.MatchStatus.NOMATCH,
+                Qview_fullpath=Qview_fullpath,
+                Qhide_extension=Qhide_extension,
+            )
         f = self.GetItemFont(row_id)
         if not f.IsOk():
             f = self.GetFont()
@@ -419,7 +479,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         if position.x >= start_match_col and position.x <= end_match_col:
             event.Veto()
             row_id = event.GetIndex()
-            dia = PickCandidate(self, row_id, wx.Point(mouse_pos.x - 10, mouse_pos.y - 20))
+            dia = PickCandidate(self, row_id, wx.Point(mouse_pos.x - 10, mouse_pos.y - 20), selectNextOnClose=True)
             dia.Show()
             dia.text.SetFocus()
         else:
@@ -474,7 +534,6 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     row_id,
                     score=0,
                     matchname=[],
-                    preview_pathes=[],
                     nbmatch=0,
                     status=config.MatchStatus.NOMATCH,
                     Qview_fullpath=Qview_fullpath,
@@ -533,7 +592,6 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.SetItem(row_id, config.D_STATUS, str(status))
         self.SetItem(row_id, config.D_CHECKED, str(data[config.D_CHECKED]))
         if data[config.D_NBMATCH]:
-            #self.SetItemImage(row_id, self.colorFromScore(score))
             self.SetItem(row_id, config.D_MATCH_SCORE, str(score))
             parent, stem, suffix = utils.GetFileParentStemAndSuffix(matchname[0])
             if data[config.D_NBMATCH] > 1:
