@@ -27,8 +27,7 @@ def list_completer(a_list):
 class PickCandidate(wx.MiniFrame):
     def __init__(self, parent, row_id, position, selectNextOnClose = False):
         wx.MiniFrame.__init__(self, parent, title="", pos=position, style=wx.RESIZE_BORDER)
-        print(len(main_dlg.candidates["all"].values()))
-        self.lst_c = [masks.FileMasked(v[0].file, useFilter=False).masked[1] for v in main_dlg.candidates["all"].values()]
+        self.lst_c = [masks.FileMasked(w.file, useFilter=False).masked[1] for v in main_dlg.candidates["all"].values() for w in v]
         self.text = AutocompleteTextCtrl(self, size=(400, -1), completer=list_completer(self.lst_c))
         self.text.SetMinSize((400, -1))
         self.row_id = row_id
@@ -71,8 +70,15 @@ class PickCandidate(wx.MiniFrame):
     def OnEnter(self, event):
         forced_match = self.text.GetLineText(0).strip()
         item = filters.FileFiltered(Path(forced_match), alreadyStem=True)
+        matching_results = main_dlg.candidates["all"][item.filtered]
+        idx_file = -1
+        for i in range(len(matching_results)):
+            if matching_results[i].file.stem == forced_match:
+                idx_file = i
+                break
+        
         list_ctrl = self.GetParent()
-        list_ctrl.MenuForceMatchCb(self.row_id, item.filtered, None)
+        list_ctrl.MenuForceMatchCb(self.row_id, item.filtered, idx_file, None)
         if self.selectNextOnClose:
             # Select next item
             list_ctrl.Select(self.row_id, on=False)
@@ -96,6 +102,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.Bind(wx.EVT_LIST_ITEM_UNCHECKED, self.UncheckedCb)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.SelectCb)
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.UnselectCb)
+        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.ActivateCb)
 
         for col in range(0, len(config.default_columns)):
             self.InsertColumn(
@@ -168,6 +175,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 selected = utils.get_selected_items(self)
 
                 selected.reverse()  # Delete all the items, starting with the last item
+                self.Freeze()
                 for row_id in selected:
                     pos = self.GetItemData(row_id)  # 0-based unsorted index
                     self.DeleteItem(row_id)
@@ -175,6 +183,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     key = self.listdatanameinv[pos]
                     del self.listdatanameinv[pos]
                     del self.listdataname[key]
+                self.Thaw()
             event.Skip()
         elif keycode == wx.WXK_CONTROL_V:
             files = utils.ClipBoardFiles()
@@ -276,11 +285,12 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             if matches:
                 menu.AppendSeparator()
                 for match_ in matches:
-                    f_masked = masks.FileMasked(match_["files_filtered"][0].file, useFilter=False)
-                    mnu_match = menu.Append(wx.ID_ANY, "[%d%%] %s" % (match_["score"], f_masked.masked[1]))
-                    self.Bind(
-                        wx.EVT_MENU, partial(self.MenuForceMatchCb, row_id, match_["key"]), mnu_match,
-                    )
+                    for idx_file in range(len(match_["files_filtered"])):
+                        f_masked = masks.FileMasked(match_["files_filtered"][idx_file].file, useFilter=False)
+                        mnu_match = menu.Append(wx.ID_ANY, "[%d%%] %s" % (match_["score"], f_masked.masked[1]))
+                        self.Bind(
+                            wx.EVT_MENU, partial(self.MenuForceMatchCb, row_id, match_["key"], idx_file), mnu_match,
+                        )
 
         self.PopupMenu(menu, event.GetPoint())
         menu.Destroy()
@@ -338,6 +348,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         selected = utils.get_selected_items(self)
 
         selected.reverse()  # Delete all the items + source file, starting with the last item
+        self.Freeze()
         for row_id in selected:
             pos = self.GetItemData(row_id)  # 0-based unsorted index
             for f in self.listdata[pos][config.D_FILENAME]:
@@ -353,6 +364,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             key = self.listdatanameinv[pos]
             del self.listdatanameinv[pos]
             del self.listdataname[key]
+        self.Thaw()
 
     def NoMatchSelectionCb(self, event):
         Qview_fullpath = get_config()["show_fullpath"]
@@ -428,25 +440,38 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             count += 1
         self.Thaw()
 
-    def MenuForceMatchCb(self, row_id, forced_match, event):
+    def MenuForceMatchCb(self, row_id, forced_match, idx_file, event):
         pos = self.GetItemData(row_id)  # 0-based unsorted index
-        similarity = match.mySimilarityScorer(
+        similarityscorer = get_config()["similarityscorer"]
+        similarity = match.similarityScorers[similarityscorer](
             masks.FileMasked(self.listdata[pos][config.D_FILENAME][0]).masked[1], forced_match,
         )
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
+        Qsource_w_multiple_choice = get_config()["source_w_multiple_choice"]
         if forced_match in main_dlg.candidates["all"]:
             matching_results = main_dlg.candidates["all"][forced_match]
-            nb_match = len(matching_results)
-            self.RefreshItem(
-                row_id,
-                score=similarity,
-                matchname=[result.file for result in matching_results],
-                nbmatch=nb_match,
-                status=config.MatchStatus.USRMATCH,
-                Qview_fullpath=Qview_fullpath,
-                Qhide_extension=Qhide_extension,
-            )
+            if Qsource_w_multiple_choice or idx_file == -1:
+                nb_match = len(matching_results)
+                self.RefreshItem(
+                    row_id,
+                    score=similarity,
+                    matchname=[result.file for result in matching_results],
+                    nbmatch=nb_match,
+                    status=config.MatchStatus.USRMATCH,
+                    Qview_fullpath=Qview_fullpath,
+                    Qhide_extension=Qhide_extension,
+                )
+            else:
+                self.RefreshItem(
+                    row_id,
+                    score=similarity,
+                    matchname=[matching_results[idx_file].file],
+                    nbmatch=1,
+                    status=config.MatchStatus.USRMATCH,
+                    Qview_fullpath=Qview_fullpath,
+                    Qhide_extension=Qhide_extension,
+                )
         else:
             self.RefreshItem(
                 row_id,
@@ -464,6 +489,34 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         font.SetWeight(wx.FONTWEIGHT_BOLD)
         font.SetStyle(f.GetStyle())
         self.SetItemFont(row_id, font)
+
+    def ActivateCb(self, event):
+        start_match_col = 0
+        end_match_col = 0
+        for col in self.GetColumnsOrder() if self.HasColumnOrderSupport() else range(0, len(config.default_columns)):
+            end_match_col += self.GetColumnWidth(col)
+            if col == 2:
+                break
+            start_match_col = end_match_col
+        start_source_col = 0
+        end_source_col = 0
+        for col in self.GetColumnsOrder() if self.HasColumnOrderSupport() else range(0, len(config.default_columns)):
+            end_source_col += self.GetColumnWidth(col)
+            if col == 0:
+                break
+            start_source_col = end_source_col
+
+        row_id = event.GetIndex()
+        pos = self.GetItemData(row_id)  # 0-based unsorted index
+        data = self.listdata[pos]
+        mouse_pos = wx.GetMousePosition()
+        position = self.ScreenToClient(mouse_pos)
+        if position.x >= start_source_col and position.x <= end_source_col:
+            filename_path = data[config.D_FILENAME]
+            os.startfile(str(filename_path[0]))
+        elif position.x >= start_match_col and position.x <= end_match_col:
+            matchname = data[config.D_MATCHNAME]
+            os.startfile(str(matchname[0]))
 
     def OnBeginLabelEdit(self, event):
         start_match_col = 0

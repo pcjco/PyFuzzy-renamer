@@ -5,11 +5,12 @@ from pyfuzzyrenamer import filters, utils
 
 def getmergedprepost(lst):
     pre = set()
+    middle = set()
     post = set()
     space = "\u0020"
     for f in lst:
         f_masked = FileMasked(f, useFilter=False)
-        middle = f_masked.masked[1]
+        middle.add(f_masked.masked[1])
         if f_masked.masked[0]:
             pre.add(f_masked.masked[0])
         else:
@@ -23,7 +24,10 @@ def getmergedprepost(lst):
         ret = list(pre)[0]
     elif len(pre) > 1:
         ret = "[" + ",".join(sorted(pre)) + "]"
-    ret += middle
+    if len(middle) == 1:
+        ret += list(middle)[0]
+    elif len(middle) > 1:
+        ret = "[" + ",".join(sorted(middle)) + "]"
     if len(post) == 1 and list(post)[0] != space:
         ret += list(post)[0]
     elif len(post) > 1:

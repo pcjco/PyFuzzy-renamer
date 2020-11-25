@@ -143,6 +143,37 @@ class TabDuplicates(wx.Panel):
                 first = False
 
 
+class TabUnmatched(wx.Panel):
+    def __init__(self, parent):
+        wx.Panel.__init__(self, parent=parent, id=wx.ID_ANY)
+
+        self.list_ctrl = wx.ListCtrl(self, style=wx.LC_REPORT | wx.BORDER_SUNKEN | wx.LC_NO_HEADER)
+        self.listdata = {}
+        self.list_ctrl.InsertColumn(0, "Choices")
+
+        sizer = wx.BoxSizer()
+        sizer.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 0)
+
+        self.SetSizer(sizer)
+
+    def SetUnmatched(self, unmatched):
+        Qview_fullpath = get_config()["show_fullpath"]
+        Qhide_extension = get_config()["hide_extension"]
+        self.listdata.clear()
+        self.list_ctrl.DeleteAllItems()
+        row_id = 0
+        self.list_ctrl.Freeze()
+        for u in unmatched:
+            parent, stem, suffix = utils.GetFileParentStemAndSuffix(u)
+            d = parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix)
+            self.list_ctrl.InsertItem(row_id, d)
+            self.listdata[row_id] = [d]
+            self.list_ctrl.SetItemData(row_id, row_id)
+            row_id += 1
+        self.list_ctrl.SetColumnWidth(0, wx.LIST_AUTOSIZE)
+        self.list_ctrl.Thaw()
+
+
 class TabListItemError(wx.Panel):
     def __init__(self, parent, mlist):
         wx.Panel.__init__(self, parent=parent, id=wx.ID_ANY)

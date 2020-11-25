@@ -17,6 +17,33 @@ D_STATUS = 5
 D_CHECKED = 6
 
 
+class SimilarityScorer(IntEnum):
+    WRATIO = 0
+    QRATIO = 1
+    PARTIAL_RATIO = 2
+    TOKEN_SORT_RATIO = 3
+    PARTIAL_TOKEN_SORT_RATIO = 4
+    TOKEN_SET_RATIO = 5
+    PARTIAL_TOKEN_SET_RATIO = 6
+
+    def __str__(self):
+        if self.value == 0:
+            return "Combined"
+        elif self.value == 1:
+            return "Simple ratio"
+        elif self.value == 2:
+            return "Partial Ratio"
+        elif self.value == 3:
+            return "Token Sort Ratio"
+        elif self.value == 4:
+            return "Partial Token Sort Ratio"
+        elif self.value == 5:
+            return "Token Set Ratio"
+        elif self.value == 6:
+            return "Partial Token Set Ratio"
+        else:
+            return ""
+
 class MatchStatus(IntEnum):
     NONE = 0
     MATCH = 1
@@ -128,6 +155,7 @@ def default():
     theConfig["masks_test"] = default_masks_teststring
     theConfig["filters_test"] = default_filters_teststring
     theConfig["workers"] = cpu_count()
+    theConfig["similarityscorer"] = SimilarityScorer.WRATIO
     theConfig["recent_session"] = []
     theConfig["recent_sources"] = []
     theConfig["recent_choices"] = []
@@ -171,11 +199,11 @@ def read(config_file=None):
         except KeyError:
             pass
         try:
-            theConfig["match_firstletter"] = True if config["global"]["match_firstletter"] == "True" else False
+            theConfig["match_firstletter"] = True if config["matching"]["match_firstletter"] == "True" else False
         except KeyError:
             pass
         try:
-            theConfig["source_w_multiple_choice"] = True if config["global"]["source_w_multiple_choice"] == "True" else False
+            theConfig["source_w_multiple_choice"] = True if config["matching"]["source_w_multiple_choice"] == "True" else False
         except KeyError:
             pass
         try:
@@ -231,6 +259,10 @@ def read(config_file=None):
             theConfig["workers"] = int(config["matching"]["workers"])
         except KeyError:
             pass
+        try:
+            theConfig["similarityscorer"] = int(config["matching"]["similarityscorer"])
+        except KeyError:
+            pass
         for i in range(0, len(default_columns)):
             try:
                 theConfig["col%d_order" % (i + 1)] = int(config["ui"]["col%d_order" % (i + 1)])
@@ -260,14 +292,15 @@ def write(config_file=None):
                 "hide_extension": theConfig["hide_extension"],
                 "keep_match_ext": theConfig["keep_match_ext"],
                 "keep_original": theConfig["keep_original"],
-                "match_firstletter": theConfig["match_firstletter"],
             },
             "matching": {
                 "masks": theConfig["masks"],
                 "filters": theConfig["filters"],
                 "masks_test": theConfig["masks_test"],
                 "filters_test": theConfig["filters_test"],
+                "match_firstletter": theConfig["match_firstletter"],
                 "source_w_multiple_choice": theConfig["source_w_multiple_choice"],
+                "similarityscorer": int(theConfig["similarityscorer"]),
                 "workers": theConfig["workers"],
             },
             "recent": {

@@ -7,9 +7,36 @@ from pyfuzzyrenamer.config import get_config
 from pyfuzzyrenamer.args import get_args
 
 
-def mySimilarityScorer(s1, s2):
-    return fuzzywuzzy.fuzz.WRatio(s1, s2, force_ascii=False, full_process=False)
+def mySimilarityScorer1(s1, s2):
+    return fuzzywuzzy.fuzz.WRatio(s1, s2, force_ascii=False, full_process=True)
 
+def mySimilarityScorer2(s1, s2):
+    return fuzzywuzzy.fuzz.QRatio(s1, s2, force_ascii=False, full_process=True)
+
+def mySimilarityScorer3(s1, s2):
+    return fuzzywuzzy.fuzz.partial_ratio(s1, s2)
+
+def mySimilarityScorer4(s1, s2):
+    return fuzzywuzzy.fuzz.token_sort_ratio(s1, s2, force_ascii=False, full_process=True)
+
+def mySimilarityScorer5(s1, s2):
+    return fuzzywuzzy.fuzz.partial_token_sort_ratio(s1, s2, force_ascii=False, full_process=True)
+
+def mySimilarityScorer6(s1, s2):
+    return fuzzywuzzy.fuzz.token_set_ratio(s1, s2, force_ascii=False, full_process=True)
+
+def mySimilarityScorer7(s1, s2):
+    return fuzzywuzzy.fuzz.partial_token_set_ratio(s1, s2, force_ascii=False, full_process=True)
+
+similarityScorers = [
+    mySimilarityScorer1,
+    mySimilarityScorer2,
+    mySimilarityScorer3,
+    mySimilarityScorer4,
+    mySimilarityScorer5,
+    mySimilarityScorer6,
+    mySimilarityScorer7,
+    ]
 
 def fuzz_processor(file):
     t = type(file).__name__
@@ -29,9 +56,9 @@ class TaskMatch:
     def calculate(self, args):
         if not args:
             return []
-        f_masked, sources, f_candidates = args
+        f_masked, sources, f_candidates, similarityscorer = args
         match_results = fuzzywuzzy.process.extract(
-            f_masked, f_candidates, scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
+            f_masked, f_candidates, scorer=similarityScorers[similarityscorer], processor=fuzz_processor, limit=10,
         )
         # [(candidate_key_1, score1), (candidate_key_2, score2), ...]
         return match_results
@@ -55,6 +82,7 @@ def get_matches(sources):
         return Results
 
     Qmatch_firstletter = get_config()["match_firstletter"]
+    similarityscorer = get_config()["similarityscorer"]
     for i in range(numtasks):
         f_masked = masks.FileMasked(sources[i][0])
         if f_masked.masked[1]:
@@ -63,12 +91,12 @@ def get_matches(sources):
                 if first_letter in main_dlg.candidates.keys():
                     Tasks[i] = (
                         (),
-                        (f_masked, sources[i], list(main_dlg.candidates[first_letter].keys()),),
+                        (f_masked, sources[i], list(main_dlg.candidates[first_letter].keys()),similarityscorer,),
                     )
             else:
                 Tasks[i] = (
                     (),
-                    (f_masked, sources[i], list(main_dlg.candidates["all"].keys()),),
+                    (f_masked, sources[i], list(main_dlg.candidates["all"].keys()),similarityscorer,),
                 )
 
     numproc = get_config()["workers"]
@@ -126,11 +154,11 @@ def get_match_standalone(source, candidates, match_firstletter):
         first_letter = f_masked.masked[1][0]
         if first_letter in candidates.keys():
             ret = fuzzywuzzy.process.extract(
-                f_masked, candidates[first_letter].keys(), scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
+                f_masked, candidates[first_letter].keys(), scorer=similarityScorers[get_config()["similarityscorer"]], processor=fuzz_processor, limit=10,
             )
     else:
         ret = fuzzywuzzy.process.extract(
-            f_masked, candidates["all"].keys(), scorer=mySimilarityScorer, processor=fuzz_processor, limit=10,
+            f_masked, candidates["all"].keys(), scorer=similarityScorers[get_config()["similarityscorer"]], processor=fuzz_processor, limit=10,
         )
 
     # [{"key": candidate_key_1, "files_filtered": [...], "score":score1}, {"key": candidate_key_2: "files_filtered": [...], "score":score2}, ...]

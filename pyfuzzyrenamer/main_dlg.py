@@ -33,7 +33,6 @@ from pyfuzzyrenamer.args import get_args
 candidates = {}
 glob_choices = OrderedDict()
 
-
 def getRenamePreview(input, matches):
     ret = [[] for i in range(len(input))]
     Qkeep_match_ext = get_config()["keep_match_ext"]
@@ -73,6 +72,8 @@ def getRenamePreview(input, matches):
         if Qsource_w_multiple_choice:
             for f in matches:
                 f_masked = masks.FileMasked(f, useFilter=False)
+                stem, suffix = utils.GetFileStemAndSuffix(f)
+                match_clean = utils.strip_extra_whitespace(utils.strip_illegal_chars(f_masked.masked[1]))
                 preview_name = f_masked.masked[0] + match_clean + f_masked.masked[2]
                 if not preview_name in already_used:
                     ret2.append(
@@ -762,6 +763,34 @@ class MainPanel(wx.Panel):
             if duplicateTabIdx != -1:
                 self.bottom_notebook.DeletePage(duplicateTabIdx)
 
+    def OnLogUnmatched(self, evt):
+        with wx.lib.busy.BusyInfo("Please wait..."):
+            all_matches = {
+                match
+                for source in self.list_ctrl.listdata.values()
+                for match in source[config.D_MATCHNAME]
+            }
+        unmatched = sorted(set(glob_choices.keys()) - all_matches)
+
+        TabIdx = -1
+        for idx in range(0, self.bottom_notebook.GetPageCount()):
+            if self.bottom_notebook.GetPageText(idx) == "Unmatched choices":
+                TabIdx = idx
+                break
+
+        if len(unmatched):
+            wx.LogMessage("Found %d unmatched choice(s)" % (len(unmatched)))
+            if TabIdx != -1:
+                self.bottom_notebook.SetSelection(TabIdx)
+            else:
+                self.tab_unmatched = bottom_notebook.TabUnmatched(parent=self.bottom_notebook)
+                self.bottom_notebook.AddPage(self.tab_unmatched, "Unmatched choices", select=True)
+            self.tab_unmatched.SetUnmatched(unmatched)
+        else:
+            wx.LogMessage("No unmatched found")
+            if TabIdx != -1:
+                self.bottom_notebook.DeletePage(TabIdx)
+
 
 class aboutDialog(wx.Dialog):
     def __init__(self, parent):
@@ -925,6 +954,8 @@ class MainFrame(wx.Frame):
             wx.ID_ANY, "&User-defined directory...", "Select User-defined directory"
         )
 
+        mnu_listunmatched = wx.MenuItem(self.files, wx.ID_ANY, "&List unmatched choices", "List choices not matching any source")
+
         mnu_open = wx.MenuItem(self.files, wx.ID_ANY, "&Load Session...\tCtrl+O", "Open...")
         mnu_open.SetBitmap(icons.Open_16_PNG.GetBitmap())
 
@@ -938,6 +969,7 @@ class MainFrame(wx.Frame):
         self.files.Append(choices_)
         self.files.Append(output_dir_)
         self.files.Append(mnu_swap)
+        self.files.Append(mnu_listunmatched)
         self.files.AppendSeparator()
         self.files.Append(mnu_open)
         self.files.Append(mnu_save)
@@ -993,6 +1025,28 @@ class MainFrame(wx.Frame):
         if get_config()["workers"] <= len(self.mnu_procs) and get_config()["workers"] > 0:
             self.mnu_procs[get_config()["workers"] - 1].Check(True)
 
+        similarityscorers = wx.Menu()
+        similarityscorers_ = wx.MenuItem(
+            options,
+            wx.ID_ANY,
+            "&Similarity scorer",
+            "Select the similarity algorithm used in matching process",
+        )
+        self.mnu_scorers = []
+        similarityscorers_.SetSubMenu(similarityscorers)
+        for i in range(7):
+            new_mnu_scorer = similarityscorers.AppendRadioItem(
+                wx.ID_ANY,
+                "&"
+                + str(i + 1) + "    "
+                + (str(config.SimilarityScorer(i))),
+                "",
+            )
+            self.mnu_scorers.append(new_mnu_scorer)
+        options.Append(similarityscorers_)
+        if get_config()["similarityscorer"] <= len(self.mnu_scorers) and get_config()["similarityscorer"] > 0:
+            self.mnu_scorers[get_config()["similarityscorer"]].Check(True)
+
         mnu_doc = wx.MenuItem(help, wx.ID_ANY, "&Help...", "Help")
         mnu_doc.SetBitmap(icons.Help_16_PNG.GetBitmap())
         help.Append(mnu_doc)
@@ -1043,6 +1097,7 @@ class MainFrame(wx.Frame):
             wx.EVT_MENU, self.panel.OnAddChoicesFromClipboard, mnu_choices_from_clipboard,
         )
         self.Bind(wx.EVT_MENU, self.panel.OnSwap, mnu_swap)
+        self.Bind(wx.EVT_MENU, self.panel.OnLogUnmatched, mnu_listunmatched)
         self.Bind(wx.EVT_MENU, self.panel.OnOutputDirectory, self.mnu_user_dir)
         self.Bind(wx.EVT_MENU, self.panel.OnSameOutputDirectory, self.mnu_same_as_input)
         self.Bind(wx.EVT_MENU, self.panel.OnToggleBottom, self.mnu_view_bottom)
@@ -1068,6 +1123,8 @@ class MainFrame(wx.Frame):
             self.Bind(wx.EVT_MENU, self.OnAddRecentChoice, mnu_recent)
         for mnu_proc in self.mnu_procs:
             self.Bind(wx.EVT_MENU, self.OnNumProc, mnu_proc)
+        for mnu_scorer in self.mnu_scorers:
+            self.Bind(wx.EVT_MENU, self.OnSimilarityScorer, mnu_scorer)
 
         # arguments
         if get_args().sources:
@@ -1115,6 +1172,11 @@ class MainFrame(wx.Frame):
         menu = event.GetEventObject()
         menuItem = menu.FindItemById(event.GetId())
         get_config()["workers"] = self.mnu_procs.index(menuItem) + 1
+
+    def OnSimilarityScorer(self, event):
+        menu = event.GetEventObject()
+        menuItem = menu.FindItemById(event.GetId())
+        get_config()["similarityscorer"] = self.mnu_scorers.index(menuItem)
 
     def OnOpenRecent(self, event):
         menu = event.GetEventObject()
