@@ -145,6 +145,7 @@ def default():
     theConfig["hide_extension"] = False
     theConfig["match_firstletter"] = False
     theConfig["keep_match_ext"] = False
+    theConfig["rename_choice"] = False
     theConfig["keep_original"] = False
     theConfig["source_w_multiple_choice"] = True
     theConfig["folder_sources"] = os.getcwd()
@@ -192,6 +193,10 @@ def read(config_file=None):
             pass
         try:
             theConfig["keep_match_ext"] = True if config["global"]["keep_match_ext"] == "True" else False
+        except KeyError:
+            pass
+        try:
+            theConfig["rename_choice"] = True if config["global"]["rename_choice"] == "True" else False
         except KeyError:
             pass
         try:
@@ -292,6 +297,7 @@ def write(config_file=None):
                 "hide_extension": theConfig["hide_extension"],
                 "keep_match_ext": theConfig["keep_match_ext"],
                 "keep_original": theConfig["keep_original"],
+                "rename_choice": theConfig["rename_choice"],
             },
             "matching": {
                 "masks": theConfig["masks"],

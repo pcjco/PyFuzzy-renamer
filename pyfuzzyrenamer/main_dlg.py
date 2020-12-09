@@ -34,6 +34,14 @@ candidates = {}
 glob_choices = OrderedDict()
 
 def getRenamePreview(input, matches):
+    # input : list of Path
+    # matches : list of Path
+    Qrename_choice = get_config()["rename_choice"]
+    if Qrename_choice:
+        a = input
+        input = matches
+        matches = a
+    
     ret = [[] for i in range(len(input))]
     Qkeep_match_ext = get_config()["keep_match_ext"]
     Qsource_w_multiple_choice = get_config()["source_w_multiple_choice"]
@@ -306,6 +314,10 @@ class MainPanel(wx.Panel):
                 self.list_ctrl.listdata[index][config.D_FILENAME], self.list_ctrl.listdata[index][config.D_MATCHNAME],
             )
         self.list_ctrl.RefreshList()
+
+    def OnRenameChoice(self, evt):
+        item = self.parent.GetMenuBar().FindItemById(evt.GetId())
+        get_config()["rename_choice"] = item.IsChecked()
 
     def OnKeepOriginal(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
@@ -583,6 +595,7 @@ class MainPanel(wx.Panel):
     def OnRename(self, evt):
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
+        Qrename_choice = get_config()["rename_choice"]
 
         rename.history.clear()
         old_pathes = []
@@ -595,7 +608,10 @@ class MainPanel(wx.Panel):
                 break
             if self.list_ctrl.IsItemChecked(row_id):
                 pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
-                old_pathes.append(self.list_ctrl.listdata[pos][config.D_FILENAME])
+                if Qrename_choice:
+                    old_pathes.append(self.list_ctrl.listdata[pos][config.D_MATCHNAME])
+                else:
+                    old_pathes.append(self.list_ctrl.listdata[pos][config.D_FILENAME])
                 preview_pathes.append(self.list_ctrl.listdata[pos][config.D_PREVIEW])
         renames = rename.get_renames(old_pathes, preview_pathes, simulate=(get_args().mode == "preview_rename"))
 
@@ -629,14 +645,24 @@ class MainPanel(wx.Panel):
                                 h["previous_data"] = copy.deepcopy(self.list_ctrl.listdata[pos])
                                 Qfirst = False
                                 previews = [y for p in self.list_ctrl.listdata[pos][config.D_PREVIEW] for y in p]
-                                self.list_ctrl.RefreshItem(
-                                    row_id,
-                                    filename_path=previews,
-                                    score=100,
-                                    status=config.MatchStatus.MATCH,
-                                    Qview_fullpath=Qview_fullpath,
-                                    Qhide_extension=Qhide_extension,
-                                )
+                                if Qrename_choice:
+                                    self.list_ctrl.RefreshItem(
+                                        row_id,
+                                        matchname=previews,
+                                        score=100,
+                                        status=config.MatchStatus.MATCH,
+                                        Qview_fullpath=Qview_fullpath,
+                                        Qhide_extension=Qhide_extension,
+                                    )
+                                else:
+                                    self.list_ctrl.RefreshItem(
+                                        row_id,
+                                        filename_path=previews,
+                                        score=100,
+                                        status=config.MatchStatus.MATCH,
+                                        Qview_fullpath=Qview_fullpath,
+                                        Qhide_extension=Qhide_extension,
+                                    )
                             else:
                                 h["pos"] = pos
                                 h["previous_data"] = None
@@ -988,11 +1014,12 @@ class MainFrame(wx.Frame):
             self.files.AppendSeparator()
         self.files.Append(self.mnu_quit)
 
+        mnu_view_fullpath = view.AppendCheckItem(wx.ID_ANY, "&View full path", "View full path")
+        self.mnu_hide_extension = view.AppendCheckItem(wx.ID_ANY, "&Hide suffix", "Hide suffix")
         self.mnu_view_bottom = view.AppendCheckItem(wx.ID_ANY, "&View Output Pane", "View Output Pane")
         self.mnu_show_log = view.AppendCheckItem(wx.ID_ANY, "&Show log", "Show log")
 
-        mnu_view_fullpath = options.AppendCheckItem(wx.ID_ANY, "&View full path", "View full path")
-        self.mnu_hide_extension = options.AppendCheckItem(wx.ID_ANY, "&Hide suffix", "Hide suffix")
+        mnu_rename_choice = options.AppendCheckItem(wx.ID_ANY, "&Rename choice instead of source", "Rename choice instead of source")
         self.mnu_keep_original = options.AppendCheckItem(wx.ID_ANY, "Keep &original on renaming", "Keep original on renaming")
         self.mnu_keep_match_ext = options.AppendCheckItem(wx.ID_ANY, "&Keep matched file suffix", "Keep matched file suffix")
         self.mnu_match_firstletter = options.AppendCheckItem(
@@ -1071,6 +1098,7 @@ class MainFrame(wx.Frame):
         mnu_view_fullpath.Check(get_config()["show_fullpath"])
         self.mnu_hide_extension.Check(get_config()["hide_extension"])
         self.mnu_hide_extension.Enable(not get_config()["show_fullpath"])
+        mnu_rename_choice.Check(get_config()["rename_choice"])
         self.mnu_keep_original.Check(get_config()["keep_original"])
         self.mnu_keep_match_ext.Check(get_config()["keep_match_ext"])
         self.mnu_match_firstletter.Check(get_config()["match_firstletter"])
@@ -1108,6 +1136,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.panel.OnMatchFirstLetter, self.mnu_match_firstletter)
         self.Bind(wx.EVT_MENU, self.panel.OnSourceWMultipleChoice, self.mnu_source_w_multiple_choice)
         self.Bind(wx.EVT_MENU, self.panel.OnKeepOriginal, self.mnu_keep_original)
+        self.Bind(wx.EVT_MENU, self.panel.OnRenameChoice, mnu_rename_choice)
         self.Bind(wx.EVT_MENU, self.OnOpen, mnu_open)
         self.Bind(wx.EVT_MENU, self.OnSaveAs, mnu_save)
         self.Bind(wx.EVT_MENU, self.OnQuit, self.mnu_quit)
