@@ -143,6 +143,29 @@ class TabDuplicates(wx.Panel):
                 first = False
 
 
+class TabMatched(wx.Panel):
+    def __init__(self, parent):
+        wx.Panel.__init__(self, parent=parent, id=wx.ID_ANY)
+
+        self.log = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_READONLY)
+
+        sizer = wx.BoxSizer()
+        sizer.Add(self.log, 1, wx.EXPAND | wx.ALL, 0)
+
+        self.SetSizer(sizer)
+
+    def SetMatched(self, matched):
+        Qview_fullpath = get_config()["show_fullpath"]
+        Qhide_extension = get_config()["hide_extension"]
+        self.log.Clear()
+        self.log.Freeze()
+        for u in matched:
+            parent, stem, suffix = utils.GetFileParentStemAndSuffix(u)
+            d = parent + stem + suffix if Qview_fullpath else (stem if Qhide_extension else stem + suffix)
+            self.log.AppendText(d + "\n")
+        self.log.Thaw()
+
+
 class TabUnmatched(wx.Panel):
     def __init__(self, parent):
         wx.Panel.__init__(self, parent=parent, id=wx.ID_ANY)

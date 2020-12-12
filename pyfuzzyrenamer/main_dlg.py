@@ -818,6 +818,35 @@ class MainPanel(wx.Panel):
                 self.bottom_notebook.DeletePage(TabIdx)
 
 
+    def OnLogMatched(self, evt):
+        with wx.lib.busy.BusyInfo("Please wait..."):
+            all_matches = {
+                match
+                for source in self.list_ctrl.listdata.values()
+                for match in source[config.D_MATCHNAME]
+            }
+        matched = sorted(all_matches)
+
+        TabIdx = -1
+        for idx in range(0, self.bottom_notebook.GetPageCount()):
+            if self.bottom_notebook.GetPageText(idx) == "Matched choices":
+                TabIdx = idx
+                break
+
+        if len(matched):
+            wx.LogMessage("Found %d matched choice(s)" % (len(matched)))
+            if TabIdx != -1:
+                self.bottom_notebook.SetSelection(TabIdx)
+            else:
+                self.tab_matched = bottom_notebook.TabMatched(parent=self.bottom_notebook)
+                self.bottom_notebook.AddPage(self.tab_matched, "Matched choices", select=True)
+            self.tab_matched.SetMatched(matched)
+        else:
+            wx.LogMessage("No match found")
+            if TabIdx != -1:
+                self.bottom_notebook.DeletePage(TabIdx)
+
+
 class aboutDialog(wx.Dialog):
     def __init__(self, parent):
         wx.Dialog.__init__(self, parent, title="About PyFuzzy-renamer")
@@ -980,6 +1009,7 @@ class MainFrame(wx.Frame):
             wx.ID_ANY, "&User-defined directory...", "Select User-defined directory"
         )
 
+        mnu_listmatched = wx.MenuItem(self.files, wx.ID_ANY, "&List matched choices", "List choices matching a source")
         mnu_listunmatched = wx.MenuItem(self.files, wx.ID_ANY, "&List unmatched choices", "List choices not matching any source")
 
         mnu_open = wx.MenuItem(self.files, wx.ID_ANY, "&Load Session...\tCtrl+O", "Open...")
@@ -995,6 +1025,7 @@ class MainFrame(wx.Frame):
         self.files.Append(choices_)
         self.files.Append(output_dir_)
         self.files.Append(mnu_swap)
+        self.files.Append(mnu_listmatched)
         self.files.Append(mnu_listunmatched)
         self.files.AppendSeparator()
         self.files.Append(mnu_open)
@@ -1126,6 +1157,7 @@ class MainFrame(wx.Frame):
         )
         self.Bind(wx.EVT_MENU, self.panel.OnSwap, mnu_swap)
         self.Bind(wx.EVT_MENU, self.panel.OnLogUnmatched, mnu_listunmatched)
+        self.Bind(wx.EVT_MENU, self.panel.OnLogMatched, mnu_listmatched)
         self.Bind(wx.EVT_MENU, self.panel.OnOutputDirectory, self.mnu_user_dir)
         self.Bind(wx.EVT_MENU, self.panel.OnSameOutputDirectory, self.mnu_same_as_input)
         self.Bind(wx.EVT_MENU, self.panel.OnToggleBottom, self.mnu_view_bottom)

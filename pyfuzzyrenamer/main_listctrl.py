@@ -1,5 +1,6 @@
 import os
 import os.path
+import sys
 import wx
 import wx.lib.mixins.listctrl as listmix
 from functools import partial
@@ -269,6 +270,13 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.Bind(wx.EVT_MENU, self.DeleteSelectionCb, mnu_delete)
         self.Bind(wx.EVT_MENU, self.NoMatchSelectionCb, mnu_nomatch)
         self.Bind(wx.EVT_MENU, self.ReMatchSelectionCb, mnu_rematch)
+        if sys.platform.startswith('win32'):
+            mnu_open_source_explorer = wx.MenuItem(menu, wx.ID_ANY, "&Select source file(s) in Explorer", "Select source file(s) in Explorer")
+            mnu_open_match_explorer = wx.MenuItem(menu, wx.ID_ANY, "Select &matched file(s) in Explorer", "Select matched file(s) in Explorer")
+            menu.Append(mnu_open_source_explorer)
+            menu.Append(mnu_open_match_explorer)
+            self.Bind(wx.EVT_MENU, self.OpenSourceExplorerCb, mnu_open_source_explorer)
+            self.Bind(wx.EVT_MENU, self.OpenMatchExplorerCb, mnu_open_match_explorer)
 
         if self.GetSelectedItemCount() == 1 and main_dlg.candidates:
             row_id = event.GetIndex()
@@ -490,6 +498,26 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         font.SetStyle(f.GetStyle())
         self.SetItemFont(row_id, font)
 
+    def OpenSourceExplorerCb(self, event):
+        pathes = []
+        selected = utils.get_selected_items(self)
+        for row_id in selected:
+            pos = self.GetItemData(row_id)  # 0-based unsorted index
+            data = self.listdata[pos]
+            pathes += data[config.D_FILENAME]
+        utils.launch_file_explorer(pathes)
+        
+        
+    def OpenMatchExplorerCb(self, event):
+        pathes = []
+        selected = utils.get_selected_items(self)
+        for row_id in selected:
+            pos = self.GetItemData(row_id)  # 0-based unsorted index
+            data = self.listdata[pos]
+            pathes += data[config.D_MATCHNAME]
+        utils.launch_file_explorer(pathes)
+        
+        
     def ActivateCb(self, event):
         start_match_col = 0
         end_match_col = 0
@@ -513,10 +541,10 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         position = self.ScreenToClient(mouse_pos)
         if position.x >= start_source_col and position.x <= end_source_col:
             filename_path = data[config.D_FILENAME]
-            os.startfile(str(filename_path[0]))
+            utils.open_file(str(filename_path[0]))
         elif position.x >= start_match_col and position.x <= end_match_col:
             matchname = data[config.D_MATCHNAME]
-            os.startfile(str(matchname[0]))
+            utils.open_file(str(matchname[0]))
 
     def OnBeginLabelEdit(self, event):
         start_match_col = 0
@@ -538,8 +566,14 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         else:
             event.Allow()
             if get_config()["show_fullpath"]:
-                d = Path(event.GetLabel())
-                (self.GetEditControl()).SetValue(d.name)
+                d = Path(event.GetLabel()).name
+            else:
+                d = event.GetLabel()
+            (self.GetEditControl()).SetValue(d)
+            if not get_config()["hide_extension"]:
+                index_of_dot = d.rfind('.')
+                if index_of_dot > 0:
+                    (self.GetEditControl()).SetSelection(0, index_of_dot)
 
     def OnEndLabelEdit(self, event):
         if event.IsEditCancelled() or not event.GetLabel():

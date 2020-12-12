@@ -4,6 +4,13 @@ import re
 import sys
 import wx
 from pathlib import Path
+import subprocess
+from collections import defaultdict
+try:
+    from win32com.shell import shell, shellcon
+except ImportError:
+    pass
+
 
 illegal_chars = r'/?<>\:*|"' if (sys.platform == "win32") else r":"
 
@@ -144,3 +151,41 @@ def ClipBoardFiles():
     except (OSError, IOError):
         pass
     return ret
+
+    
+def open_file(filename):
+    try:
+        if sys.platform.startswith('linux'):
+            subprocess.Popen(['xdg-open', filename], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        elif sys.platform.startswith('win32'):
+            os.startfile(filename)
+        elif sys.platform.startswith('cygwin'):
+            os.startfile(filename)
+        elif sys.platform.startswith('darwin'):
+            subprocess.Popen(['open', filename], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        else:
+            subprocess.Popen(['xdg-open', filename], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except:
+        wx.LogMessage("Could not open file %s" % (filename))
+
+        
+def launch_file_explorer(pathes):
+    '''Given a list of Path up one File Explorer window
+       per folder with all the child files selected'''
+    
+    folders = defaultdict(list)
+    for p in pathes:
+        folders[str(p.parent)].append(p.name)
+
+    for path, files in folders.items():
+        folder_pidl = shell.SHILCreateFromPath(path,0)[0]
+        desktop = shell.SHGetDesktopFolder()
+        shell_folder = desktop.BindToObject(folder_pidl, None, shell.IID_IShellFolder)
+        name_to_item_mapping = dict([(desktop.GetDisplayNameOf(item, 0), item) for item in shell_folder])
+        to_show = []
+        for file in files:
+            if not file in name_to_item_mapping:
+                wx.LogMessage('File: "%s" not found in "%s"' % (file, path))
+                continue
+            to_show.append(name_to_item_mapping[file])
+        shell.SHOpenFolderAndSelectItems(folder_pidl, to_show, 0)
