@@ -119,11 +119,11 @@ def get_matches(sources):
         )
     ts.run()
 
-    # [ [{"key": candidate_key_1, "files_filtered": [...], "score":score1]}, {"key": candidate_key_2, "files_filtered": [...], "score":score2}, ...], ...]
+    # [ [{"key": candidate_key_1, "candidates": [...], "score":score1]}, {"key": candidate_key_2, "candidates": [...], "score":score2}, ...], ...]
     for i in range(numtasks):
         if Results[i]:
             Results[i] = [
-                {"key": canditate_key, "files_filtered": main_dlg.candidates["all"][canditate_key], "score": score}
+                {"key": canditate_key, "candidates": [candidate.file for candidate in main_dlg.candidates["all"][canditate_key]], "score": score}
                 for canditate_key, score in Results[i]
             ]
     return Results
@@ -161,10 +161,10 @@ def get_match_standalone(source, candidates, match_firstletter):
             f_masked, candidates["all"].keys(), scorer=similarityScorers[get_config()["similarityscorer"]], processor=fuzz_processor, limit=10,
         )
 
-    # [{"key": candidate_key_1, "files_filtered": [...], "score":score1}, {"key": candidate_key_2: "files_filtered": [...], "score":score2}, ...]
+    # [{"key": candidate_key_1, "candidates": [...], "score":score1}, {"key": candidate_key_2: "candidates": [...], "score":score2}, ...]
     if ret:
         ret = [
-            {"key": canditate_key, "files_filtered": candidates["all"][canditate_key], "score": score}
+            {"key": canditate_key, "candidates": [candidate.file for candidate in candidates["all"][canditate_key]], "score": score}
             for canditate_key, score in ret
         ]
     return ret

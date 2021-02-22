@@ -240,7 +240,7 @@ def read(config_file=None):
         for i in range(1, 9):
             try:
                 f = config["recent"]["recent_choices%d" % i]
-                if Path(f).is_dir():
+                if Path(f).is_dir() or Path(f).is_file():
                     theConfig["recent_choices"].append(f)
             except KeyError:
                 pass

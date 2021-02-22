@@ -5,7 +5,7 @@ README = (pathlib.Path(__file__).parent / "README.md").read_text(encoding="utf-8
 
 setup(
     name="PyFuzzy-renamer",
-    version="0.2.1",
+    version="0.2.2",
     description="Uses a list of input strings and will rename each one with the most similar string from another list of strings",
     long_description=README,
     long_description_content_type="text/markdown",

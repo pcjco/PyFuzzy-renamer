@@ -30,12 +30,43 @@ from pyfuzzyrenamer import (
 from pyfuzzyrenamer.config import get_config
 from pyfuzzyrenamer.args import get_args
 
+# candidates =
+# {
+#    "all" :
+#    {
+#        candidate1_masked : [ candidate1_filtered1, candidate1_filtered2, ... ],
+#        candidate2_masked : [ candidate2_filtered1, candidate2_filtered2, ... ],
+#        ...
+#    },
+#    "a" :
+#    {
+#        candidate_starting_with1_masked : [ candidate1_filtered1, candidate1_filtered2, ... ],
+#        ...
+#    },
+#    "b" :
+#    {
+#        ...
+#    },
+#    ...
+# }
 candidates = {}
+aliases = {}
+
+# glob_choices =
+# {
+#    choice1 : alias1|None,
+#    choice2 : alias2|None,
+#    ...
+# }
 glob_choices = OrderedDict()
 
 def getRenamePreview(input, matches):
     # input : list of Path
     # matches : list of Path
+
+    # replace matches value by alias if any
+    matches = [match if not str(match) in aliases else Path(aliases[str(match)]) for match in matches]
+    
     Qrename_choice = get_config()["rename_choice"]
     if Qrename_choice:
         a = input
@@ -108,8 +139,9 @@ def getRenamePreview(input, matches):
 
 
 def RefreshCandidates():
-    global candidates
+    global candidates, aliases
     candidates.clear()
+    aliases.clear()
 
     if not glob_choices:
         return
@@ -131,13 +163,15 @@ def RefreshCandidates():
 
     candidates = defaultdict(lambda: defaultdict(list))
 
-    for f in glob_choices:
+    for f, alias in glob_choices.items():
         # add fake extension if non standard extension found
         if f.suffix and woSuffix > wSuffix and f.suffix != frequent_suffix:
             f = Path(str(f) + ".noext")
         key = masks.FileMasked(f, useFilter=True).masked[1]
         item = filters.FileFiltered(f)
         candidates["all"][key.lower()].append(item)
+        if alias:
+            aliases[str(f)] = alias
 
     if get_config()["match_firstletter"]:
         for key, value in candidates["all"].items():
@@ -443,6 +477,37 @@ class MainPanel(wx.Panel):
         if files:
             self.AddChoicesFromFiles(files)
 
+    def OnImportChoicesFromFile(self, evt):
+        with wx.FileDialog(
+            self, "Choose Choice file", wildcard="Excel files (*.xlsx)|*.xlsx|CSV files (*.csv)|*.csv|Text files (*.txt)|*.txt", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        ) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return
+            self.ImportChoicesFromFile(fileDialog.GetPath())
+            
+    def ImportChoicesFromFile(self, file):
+        with wx.lib.busy.BusyInfo("Please wait..."):
+            fp = Path(file)
+            if fp.suffix == ".xlsx":
+                rows = utils.read_xlsx(file)
+            elif fp.suffix == ".csv" or fp.suffix == ".txt" :
+                rows = utils.read_csv(file)
+            for row in rows:
+                f = row.get("A", None)
+                alias = row.get("B", None)
+                if not f:
+                    continue
+                try:
+                    fp = Path(f)
+                    glob_choices[fp] = alias
+                except (OSError, IOError):
+                    pass
+            RefreshCandidates()
+
+        self.parent.UpdateRecentChoices(file)
+        get_config()["folder_choices"] = str(fp.parent)
+
     def OnSwap(self, event):
         sources = []
         row_id = -1
@@ -525,12 +590,12 @@ class MainPanel(wx.Panel):
                     pos = self.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
                     source = self.list_ctrl.listdata[pos][config.D_FILENAME]
                     nb_source = len(source)
-                    matching_results = matches[count][0]["files_filtered"]
+                    matching_results = matches[count][0]["candidates"]
                     nb_match = len(matching_results)
                     self.list_ctrl.RefreshItem(
                         row_id,
                         score=matches[count][0]["score"],
-                        matchname=[result.file for result in matching_results],
+                        matchnames=matching_results,
                         nbmatch=nb_match,
                         status=config.MatchStatus.MATCH,
                         Qview_fullpath=Qview_fullpath,
@@ -540,7 +605,7 @@ class MainPanel(wx.Panel):
                     self.list_ctrl.RefreshItem(
                         row_id,
                         score=0,
-                        matchname=[],
+                        matchnames=[],
                         nbmatch=0,
                         status=config.MatchStatus.NOMATCH,
                         Qview_fullpath=Qview_fullpath,
@@ -554,6 +619,7 @@ class MainPanel(wx.Panel):
     def OnReset(self, evt):
         glob_choices.clear()
         candidates.clear()
+        aliases.clear()
         self.list_ctrl.listdata.clear()
         self.list_ctrl.listdataname.clear()
         self.list_ctrl.listdatanameinv.clear()
@@ -648,7 +714,7 @@ class MainPanel(wx.Panel):
                                 if Qrename_choice:
                                     self.list_ctrl.RefreshItem(
                                         row_id,
-                                        matchname=previews,
+                                        matchnames=previews,
                                         score=100,
                                         status=config.MatchStatus.MATCH,
                                         Qview_fullpath=Qview_fullpath,
@@ -971,17 +1037,23 @@ class MainFrame(wx.Frame):
         choices_ = wx.MenuItem(self.files, wx.ID_ANY, "&Choices", "Select choices (to match)")
         choices_.SetSubMenu(self.choices)
 
-        mnu_target_from_dir = wx.MenuItem(
+        mnu_choices_from_dir = wx.MenuItem(
             self.choices, wx.ID_ANY, "Choices from &Directory...\tCtrl+T", "Select choices from directory",
         )
-        mnu_target_from_dir.SetBitmap(icons.AddFolder_16_PNG.GetBitmap())
-        self.choices.Append(mnu_target_from_dir)
+        mnu_choices_from_dir.SetBitmap(icons.AddFolder_16_PNG.GetBitmap())
+        self.choices.Append(mnu_choices_from_dir)
 
         mnu_choices_from_clipboard = wx.MenuItem(
             self.choices, wx.ID_ANY, "Choices from &Clipboard", "Select choices from clipboard",
         )
         mnu_choices_from_clipboard.SetBitmap(icons.Clipboard_16_PNG.GetBitmap())
         self.choices.Append(mnu_choices_from_clipboard)
+
+        mnu_choices_from_file = wx.MenuItem(
+            self.choices, wx.ID_ANY, "Choices from &File", "Import choices from a file",
+        )
+        mnu_choices_from_file.SetBitmap(icons.Spreadsheet_16_PNG.GetBitmap())
+        self.choices.Append(mnu_choices_from_file)
 
         self.mnu_recents_choices = []
         if get_config()["recent_choices"]:
@@ -1151,7 +1223,8 @@ class MainFrame(wx.Frame):
 
         self.Bind(wx.EVT_MENU, self.panel.OnAddSourcesFromDir, mnu_source_from_dir)
         self.Bind(wx.EVT_MENU, self.panel.OnAddSourcesFromClipboard, mnu_source_from_clipboard)
-        self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromDir, mnu_target_from_dir)
+        self.Bind(wx.EVT_MENU, self.panel.OnAddChoicesFromDir, mnu_choices_from_dir)
+        self.Bind(wx.EVT_MENU, self.panel.OnImportChoicesFromFile, mnu_choices_from_file)
         self.Bind(
             wx.EVT_MENU, self.panel.OnAddChoicesFromClipboard, mnu_choices_from_clipboard,
         )
@@ -1324,7 +1397,14 @@ class MainFrame(wx.Frame):
         menu = event.GetEventObject()
         menuItem = menu.FindItemById(event.GetId())
         pathname = get_config()["recent_choices"][self.mnu_recents_choices.index(menuItem)]
-        self.panel.AddChoicesFromDir(pathname)
+        p = Path(pathname)
+        try:
+            if p.is_dir():
+                self.panel.AddChoicesFromDir(pathname)
+            elif p.is_file():
+                self.panel.ImportChoicesFromFile(pathname)
+        except (OSError, IOError):
+            pass
 
     def UpdateRecentChoices(self, pathname):
         if pathname in get_config()["recent_choices"]:
@@ -1361,6 +1441,7 @@ class MainFrame(wx.Frame):
                     {
                         "version": __version__,
                         "glob_choices": glob_choices,
+                        "aliases": aliases,
                         "listdata": self.panel.list_ctrl.listdata,
                         "listdataname": self.panel.list_ctrl.listdataname,
                         "listdatanameinv": self.panel.list_ctrl.listdatanameinv,
@@ -1374,18 +1455,19 @@ class MainFrame(wx.Frame):
             wx.LogError("Cannot save current data in file '%s'." % pathname)
 
     def LoadSession(self, pathname):
-        global glob_choices
+        global glob_choices, aliases
 
         self.UpdateRecentSession(pathname)
         list = self.panel.list_ctrl
         try:
             with open(pathname, "rb") as file:
                 data = pickle.load(file)
-                if data["version"] == "0.2.1":
-                    glob_choices = data["glob_choices"]
-                    list.listdata = data["listdata"]
-                    list.listdataname = data["listdataname"]
-                    list.listdatanameinv = data["listdatanameinv"]
+                glob_choices = data["glob_choices"]
+                list.listdata = data["listdata"]
+                list.listdataname = data["listdataname"]
+                list.listdatanameinv = data["listdatanameinv"]
+                if utils.versiontuple(data["version"]) >= utils.versiontuple("0.2.2"):
+                    aliases = data["aliases"]
         except IOError:
             wx.LogError("Cannot open file '%s'." % pathname)
 

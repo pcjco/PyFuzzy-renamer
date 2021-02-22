@@ -289,12 +289,12 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
             pos = self.GetItemData(row_id)  # 0-based unsorted index
             matches = match.get_match(self.listdata[pos][config.D_FILENAME])
-            # [{"key": candidate_key_1, "files_filtered": [...], "score":score1}, {"key": candidate_key_2: "files_filtered": [...], "score":score2}, ...]
+            # [{"key": candidate_key_1, "candidates": [...], "score":score1}, {"key": candidate_key_2: "candidates": [...], "score":score2}, ...]
             if matches:
                 menu.AppendSeparator()
                 for match_ in matches:
-                    for idx_file in range(len(match_["files_filtered"])):
-                        f_masked = masks.FileMasked(match_["files_filtered"][idx_file].file, useFilter=False)
+                    for idx_file in range(len(match_["candidates"])):
+                        f_masked = masks.FileMasked(match_["candidates"][idx_file], useFilter=False)
                         mnu_match = menu.Append(wx.ID_ANY, "[%d%%] %s" % (match_["score"], f_masked.masked[1]))
                         self.Bind(
                             wx.EVT_MENU, partial(self.MenuForceMatchCb, row_id, match_["key"], idx_file), mnu_match,
@@ -383,7 +383,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.RefreshItem(
                 row_id,
                 score=0,
-                matchname=[],
+                matchnames=[],
                 nbmatch=0,
                 status=config.MatchStatus.NONE,
                 Qview_fullpath=Qview_fullpath,
@@ -424,12 +424,12 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.SetItemFont(row_id, font)
 
             if matches[count]:
-                matching_results = matches[count][0]["files_filtered"]
+                matching_results = matches[count][0]["candidates"]
                 nb_match = len(matching_results)
                 self.RefreshItem(
                     row_id,
                     score=matches[count][0]["score"],
-                    matchname=[result.file for result in matching_results],
+                    matchnames=matching_results,
                     nbmatch=nb_match,
                     status=config.MatchStatus.MATCH,
                     Qview_fullpath=Qview_fullpath,
@@ -439,7 +439,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.RefreshItem(
                     row_id,
                     score=0,
-                    matchname=[],
+                    matchnames=[],
                     nbmatch=0,
                     status=config.MatchStatus.NOMATCH,
                     Qview_fullpath=Qview_fullpath,
@@ -464,7 +464,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.RefreshItem(
                     row_id,
                     score=similarity,
-                    matchname=[result.file for result in matching_results],
+                    matchnames=[result.file for result in matching_results],
                     nbmatch=nb_match,
                     status=config.MatchStatus.USRMATCH,
                     Qview_fullpath=Qview_fullpath,
@@ -474,7 +474,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.RefreshItem(
                     row_id,
                     score=similarity,
-                    matchname=[matching_results[idx_file].file],
+                    matchnames=[matching_results[idx_file].file],
                     nbmatch=1,
                     status=config.MatchStatus.USRMATCH,
                     Qview_fullpath=Qview_fullpath,
@@ -484,7 +484,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.RefreshItem(
                 row_id,
                 score=0,
-                matchname=[],
+                matchnames=[],
                 nbmatch=0,
                 status=config.MatchStatus.NOMATCH,
                 Qview_fullpath=Qview_fullpath,
@@ -605,12 +605,12 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
             new_match = match.get_match(new_path)
             if new_match:
-                matching_results = new_match[0]["files_filtered"]
+                matching_results = new_match[0]["candidates"]
                 nb_match = len(matching_results)
                 self.RefreshItem(
                     row_id,
                     score=new_match[0]["score"],
-                    matchname=[result.file for result in matching_results],
+                    matchnames=matching_results,
                     nbmatch=nb_match,
                     status=config.MatchStatus.MATCH,
                     Qview_fullpath=Qview_fullpath,
@@ -620,7 +620,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.RefreshItem(
                     row_id,
                     score=0,
-                    matchname=[],
+                    matchnames=[],
                     nbmatch=0,
                     status=config.MatchStatus.NOMATCH,
                     Qview_fullpath=Qview_fullpath,
@@ -637,7 +637,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         row_id,
         filename_path=None,
         score=None,
-        matchname=None,
+        matchnames=None,
         nbmatch=None,
         status=None,
         Qview_fullpath=False,
@@ -654,10 +654,10 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             score = data[config.D_MATCH_SCORE]
         else:
             data[config.D_MATCH_SCORE] = score
-        if matchname is None:
-            matchname = data[config.D_MATCHNAME]
+        if matchnames is None:
+            matchnames = data[config.D_MATCHNAME]
         else:
-            data[config.D_MATCHNAME] = matchname
+            data[config.D_MATCHNAME] = matchnames
         if nbmatch is None:
             nbmatch = data[config.D_NBMATCH]
         else:
@@ -667,7 +667,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         else:
             data[config.D_STATUS] = status
 
-        data[config.D_PREVIEW] = main_dlg.getRenamePreview(filename_path, matchname)
+        data[config.D_PREVIEW] = main_dlg.getRenamePreview(filename_path, matchnames)
         parent, stem, suffix = utils.GetFileParentStemAndSuffix(filename_path[0])
         if len(filename_path) > 1:
             stem = masks.getmergedprepost(filename_path)
@@ -680,9 +680,9 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.SetItem(row_id, config.D_CHECKED, str(data[config.D_CHECKED]))
         if data[config.D_NBMATCH]:
             self.SetItem(row_id, config.D_MATCH_SCORE, str(score))
-            parent, stem, suffix = utils.GetFileParentStemAndSuffix(matchname[0])
+            parent, stem, suffix = utils.GetFileParentStemAndSuffix(matchnames[0])
             if data[config.D_NBMATCH] > 1:
-                stem = masks.getmergedprepost(matchname)
+                stem = masks.getmergedprepost(matchnames)
             self.SetItem(
                 row_id,
                 config.D_MATCHNAME,
