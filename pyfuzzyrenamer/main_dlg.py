@@ -1565,6 +1565,8 @@ def getDoc():
         "<ul><li>click on the <code><b>Choices</b></code> button to add a selection of files paths to the current <b>choices</b>;</li>"
         "<li>Go to <code><b>File->Choices->Choices from Directory</b></code> menu to add files paths from a selected folder to the current <b>choices</b>;</li>"
         "<li>Go to <code><b>File->Choices->Choices from Clipboard</b></code> menu to add files paths from clipboard to the current <b>choices</b>. If clipboard contains a folder, then the file paths of the files inside this folder are added;</li>"
+        "<li>Go to <code><b>File->Choices->Choices from File</b></code> menu to import <b>choices</b> from a CSV (or XLSX, TXT) file (one choice per row). If 2 values per line (comma separated) the first value is the string used for comparison and the second one is the string used for renaming (=alias). For example, if a candidate to rename is <code>3DWorldRunner.png</code> and best choice is <code>3-D Battles of World Runner, The</code> but the rename need to be the name 3dbatworru.png, then the CSV should contain a line like <code>\"3-D Battles of World Runner, The\", 3dbatworru</code>;</li>"
+
         "<li>Go to <code><b>File->Choices</b></code> to add recently selected folders to the current <b>choices</b>;</li>"
         "<li>Drag files or folders into application panel and choose <code><b>Choices</b></code> to add file paths to the current <b>choices</b>. For folders, the file paths of the files inside folders are added;</li>"
         "<li>Paste (Ctrl+V) into application panel and choose <code><b>Choices</b></code> to add file paths of the files or folders in clipboard to the current <b>choices</b>. For folders, the file paths of the files inside folders are added</li></ul>"

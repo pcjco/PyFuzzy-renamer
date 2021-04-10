@@ -1,5 +1,3 @@
-from pyfuzzyrenamer.config import get_config
-
 import time
 import types
 import wx

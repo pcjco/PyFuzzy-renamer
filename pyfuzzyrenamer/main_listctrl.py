@@ -103,7 +103,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.Bind(wx.EVT_LIST_ITEM_UNCHECKED, self.UncheckedCb)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.SelectCb)
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.UnselectCb)
-        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.ActivateCb)
+        self.Bind(wx.EVT_LEFT_DCLICK, self.OnDoubleClick)
 
         for col in range(0, len(config.default_columns)):
             self.InsertColumn(
@@ -139,7 +139,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     not self.IsItemChecked(selected[0]) if (not selected[0] in focused) else self.IsItemChecked(selected[0])
                 )
                 for index in selected:
-                    self.Focus(index)
+                    #self.Focus(index)
                     if not index in focused:
                         self.CheckItem(index, check)
                 for index in focused:
@@ -236,6 +236,14 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.Focus(row_id + 1)
                 self.EnsureVisible(row_id + 1)
             event.Skip()
+        elif keycode == wx.WXK_RETURN:
+            selected = utils.get_selected_items(self)
+            for row_id in selected:
+                pos = self.GetItemData(row_id)  # 0-based unsorted index
+                data = self.listdata[pos]
+                filename_path = data[config.D_FILENAME]
+                utils.open_file(str(filename_path[0]))
+            event.Skip()
         elif keycode:
             event.Skip()
 
@@ -331,6 +339,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
 
     def SelectCb(self, event):
         nb = self.GetSelectedItemCount()
+        self.currentItem = event.GetIndex()
         if nb:
             self.GetParent().GetParent().GetParent().GetParent().statusbar.SetStatusText(
                 "%d item(s) selected" % self.GetSelectedItemCount(), 1
@@ -507,7 +516,6 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             pathes += data[config.D_FILENAME]
         utils.launch_file_explorer(pathes)
         
-        
     def OpenMatchExplorerCb(self, event):
         pathes = []
         selected = utils.get_selected_items(self)
@@ -516,9 +524,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             data = self.listdata[pos]
             pathes += data[config.D_MATCHNAME]
         utils.launch_file_explorer(pathes)
-        
-        
-    def ActivateCb(self, event):
+
+    def OnDoubleClick(self, event):
         start_match_col = 0
         end_match_col = 0
         for col in self.GetColumnsOrder() if self.HasColumnOrderSupport() else range(0, len(config.default_columns)):
@@ -534,7 +541,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 break
             start_source_col = end_source_col
 
-        row_id = event.GetIndex()
+        row_id = self.currentItem
         pos = self.GetItemData(row_id)  # 0-based unsorted index
         data = self.listdata[pos]
         mouse_pos = wx.GetMousePosition()
