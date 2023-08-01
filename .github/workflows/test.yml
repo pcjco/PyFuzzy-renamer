@@ -56,7 +56,7 @@ jobs:
         pip install pytest
         xvfb-run --auto-servernum pytest -W ignore::DeprecationWarning
     - name: Test with pytest (windows)
-      if: startsWith(matrix.os, 'windows') || startsWith(matrix.os, 'macos')
+      if: startsWith(matrix.os, 'windows')
       run: |
         pip install pytest
         pytest -W ignore::DeprecationWarning
