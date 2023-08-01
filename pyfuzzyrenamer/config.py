@@ -147,10 +147,12 @@ def default():
     theConfig["keep_match_ext"] = False
     theConfig["rename_choice"] = False
     theConfig["keep_original"] = False
+    theConfig["best_auto"] = False
     theConfig["source_w_multiple_choice"] = True
     theConfig["folder_sources"] = os.getcwd()
     theConfig["folder_choices"] = os.getcwd()
     theConfig["folder_output"] = ""
+    theConfig["paste_forced"] = 0
     theConfig["filters"] = default_filters
     theConfig["masks"] = default_masks
     theConfig["masks_test"] = default_masks_teststring
@@ -204,6 +206,10 @@ def read(config_file=None):
         except KeyError:
             pass
         try:
+            theConfig["best_auto"] = True if config["global"]["best_auto"] == "True" else False
+        except KeyError:
+            pass
+        try:
             theConfig["match_firstletter"] = True if config["matching"]["match_firstletter"] == "True" else False
         except KeyError:
             pass
@@ -221,6 +227,10 @@ def read(config_file=None):
             pass
         try:
             theConfig["folder_output"] = config["recent"]["folder_output"]
+        except KeyError:
+            pass
+        try:
+            theConfig["paste_forced"] = int(config["global"]["paste_forced"])
         except KeyError:
             pass
         for i in range(1, 9):
@@ -297,7 +307,9 @@ def write(config_file=None):
                 "hide_extension": theConfig["hide_extension"],
                 "keep_match_ext": theConfig["keep_match_ext"],
                 "keep_original": theConfig["keep_original"],
+                "best_auto": theConfig["best_auto"],
                 "rename_choice": theConfig["rename_choice"],
+                "paste_forced": theConfig["paste_forced"],
             },
             "matching": {
                 "masks": theConfig["masks"],
