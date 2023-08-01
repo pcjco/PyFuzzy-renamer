@@ -1,5 +1,5 @@
-import fuzzywuzzy.fuzz
-import fuzzywuzzy.process
+import thefuzz.fuzz
+import thefuzz.process
 from pathlib import Path
 
 from pyfuzzyrenamer import main_dlg, masks, taskserver, utils
@@ -8,25 +8,25 @@ from pyfuzzyrenamer.args import get_args
 
 
 def mySimilarityScorer1(s1, s2):
-    return fuzzywuzzy.fuzz.WRatio(s1, s2, force_ascii=False, full_process=True)
+    return thefuzz.fuzz.WRatio(s1, s2, force_ascii=False, full_process=True)
 
 def mySimilarityScorer2(s1, s2):
-    return fuzzywuzzy.fuzz.QRatio(s1, s2, force_ascii=False, full_process=True)
+    return thefuzz.fuzz.QRatio(s1, s2, force_ascii=False, full_process=True)
 
 def mySimilarityScorer3(s1, s2):
-    return fuzzywuzzy.fuzz.partial_ratio(s1, s2)
+    return thefuzz.fuzz.partial_ratio(s1, s2)
 
 def mySimilarityScorer4(s1, s2):
-    return fuzzywuzzy.fuzz.token_sort_ratio(s1, s2, force_ascii=False, full_process=True)
+    return thefuzz.fuzz.token_sort_ratio(s1, s2, force_ascii=False, full_process=True)
 
 def mySimilarityScorer5(s1, s2):
-    return fuzzywuzzy.fuzz.partial_token_sort_ratio(s1, s2, force_ascii=False, full_process=True)
+    return thefuzz.fuzz.partial_token_sort_ratio(s1, s2, force_ascii=False, full_process=True)
 
 def mySimilarityScorer6(s1, s2):
-    return fuzzywuzzy.fuzz.token_set_ratio(s1, s2, force_ascii=False, full_process=True)
+    return thefuzz.fuzz.token_set_ratio(s1, s2, force_ascii=False, full_process=True)
 
 def mySimilarityScorer7(s1, s2):
-    return fuzzywuzzy.fuzz.partial_token_set_ratio(s1, s2, force_ascii=False, full_process=True)
+    return thefuzz.fuzz.partial_token_set_ratio(s1, s2, force_ascii=False, full_process=True)
 
 similarityScorers = [
     mySimilarityScorer1,
@@ -57,7 +57,7 @@ class TaskMatch:
         if not args:
             return []
         f_masked, sources, f_candidates, similarityscorer = args
-        match_results = fuzzywuzzy.process.extract(
+        match_results = thefuzz.process.extract(
             f_masked, f_candidates, scorer=similarityScorers[similarityscorer], processor=fuzz_processor, limit=10,
         )
         # [(candidate_key_1, score1), (candidate_key_2, score2), ...]
@@ -153,11 +153,11 @@ def get_match_standalone(source, candidates, match_firstletter):
     if match_firstletter:
         first_letter = f_masked.masked[1][0]
         if first_letter in candidates.keys():
-            ret = fuzzywuzzy.process.extract(
+            ret = thefuzz.process.extract(
                 f_masked, candidates[first_letter].keys(), scorer=similarityScorers[get_config()["similarityscorer"]], processor=fuzz_processor, limit=10,
             )
     else:
-        ret = fuzzywuzzy.process.extract(
+        ret = thefuzz.process.extract(
             f_masked, candidates["all"].keys(), scorer=similarityScorers[get_config()["similarityscorer"]], processor=fuzz_processor, limit=10,
         )
 
