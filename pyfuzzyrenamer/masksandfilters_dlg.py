@@ -78,10 +78,10 @@ class masksandfiltersPanel(wx.Panel):
 
         sizer_filters = wx.BoxSizer(wx.VERTICAL)
         sizer_filters.Add(self.filters_list, 2, wx.ALL | wx.EXPAND, 1)
-        sizer_filters.Add(wx.StaticLine(self, -1), 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 0)
+        sizer_filters.Add(wx.StaticLine(page_filters, -1), 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 0)
         sizer_filters.Add(sizer2, 0, wx.ALL | wx.EXPAND, 1)
         sizer_filters.Add(sizer3, 0, wx.ALL | wx.EXPAND, 1)
-        sizer_filters.Add(wx.StaticLine(self, -1), 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 0)
+        sizer_filters.Add(wx.StaticLine(page_filters, -1), 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 0)
         sizer_filters.Add(html_desc_filters, 0, wx.EXPAND | wx.ALL)
         page_filters.SetSizer(sizer_filters)
 
@@ -125,10 +125,10 @@ class masksandfiltersPanel(wx.Panel):
 
         sizer_masks = wx.BoxSizer(wx.VERTICAL)
         sizer_masks.Add(self.masks_list, 1, wx.ALL | wx.EXPAND, 1)
-        sizer_masks.Add(wx.StaticLine(self, -1), 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 0)
+        sizer_masks.Add(wx.StaticLine(page_masks, -1), 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 0)
         sizer_masks.Add(sizer22, 0, wx.ALL | wx.EXPAND, 1)
         sizer_masks.Add(sizer32, 0, wx.ALL | wx.EXPAND, 1)
-        sizer_masks.Add(wx.StaticLine(self, -1), 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 0)
+        sizer_masks.Add(wx.StaticLine(page_masks, -1), 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 0)
         sizer_masks.Add(html_desc_masks, 0, wx.EXPAND | wx.ALL)
         page_masks.SetSizer(sizer_masks)
 
