@@ -16,13 +16,14 @@ setup(
     classifiers=[
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
     ],
     packages=["pyfuzzyrenamer"],
     include_package_data=False,
-    python_requires=">=3.6",
-    install_requires=["wxPython>=4.1.0", "python-Levenshtein-wheels>=0.13.1", "fuzzywuzzy>=0.17.0",],
+    python_requires=">=3.8",
+    install_requires=["wxPython>=4.2.1", "python-Levenshtein-wheels>=0.13.1", "thefuzz>=0.19.0",],
     entry_points={"gui_scripts": ["pyfuzzyrenamer = pyfuzzyrenamer.__main__:main"]},
 )

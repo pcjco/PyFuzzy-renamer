@@ -43,7 +43,8 @@ def group(L):
 
 
 def shorten_path(filename, length):
-    if len(filename) < length:
+    l = len(filename)
+    if l < length:
         return filename
     fp = Path(filename)
     parts = fp.parts
