@@ -42,15 +42,8 @@ class add_choices_Tests(pfr.PyFuzzyRenamerTestCase):
                     pass
             if not singles:
                 if drop:
-
-                    def clickNO():
-                        dlg = wx.GetActiveWindow()
-                        clickEvent = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_NO)
-                        dlg.ProcessEvent(clickEvent)
-
                     droptarget = self.frame.panel.GetDropTarget()
-                    wx.CallAfter(clickNO)
-                    droptarget.OnDropFiles(0, 0, [str(f) for f in choices])
+                    droptarget.OnDropFiles(0, 0, [str(f) for f in choices], mode=2)
                 elif clipboard:
                     clipdata = wx.TextDataObject()
                     clipdata.SetText("\n".join([str(f) for f in choices]))

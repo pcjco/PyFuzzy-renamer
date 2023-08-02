@@ -189,15 +189,24 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         elif keycode == wx.WXK_CONTROL_V:
             files = utils.ClipBoardFiles()
             if files:
-                dlg = wx.GenericMessageDialog(
-                    self.GetParent().GetParent(),
-                    "Add the files to source or choice list?",
-                    "Paste question",
-                    wx.YES_NO | wx.ICON_QUESTION,
-                )
-                dlg.SetYesNoLabels("Sources", "Choices")
-                Qsources = dlg.ShowModal() == wx.ID_YES
-                dlg.Destroy()
+                paste_default = get_config()["paste_forced"]
+                if not paste_default:
+                    dlg = wx.RichMessageDialog(
+                        self.GetParent().GetParent(),
+                        "Add the files to source or choice list?",
+                        "Paste question",
+                        wx.YES_NO | wx.ICON_QUESTION,
+                    )
+                    dlg.SetYesNoLabels("Sources", "Choices")
+                    dlg.ShowCheckBox("Remember my choice")
+                    Qsources = dlg.ShowModal() == wx.ID_YES
+                    if dlg.IsCheckBoxChecked():
+                        get_config()["paste_forced"] = 1 if Qsources else 2
+                        self.GetParent().GetParent().GetParent().GetParent().mnu_source_from_clipboard_default.Check(Qsources)
+                        self.GetParent().GetParent().GetParent().GetParent().mnu_choices_from_clipboard_default.Check(not Qsources)
+                    dlg.Destroy()
+                else:
+                    Qsources = (paste_default == 1)                
                 if Qsources:
                     self.GetParent().GetParent().GetParent().AddSourcesFromFiles(files)
                 else:
@@ -738,10 +747,12 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
     def AddToList(self, newdata):
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
+        Qbest_auto = get_config()["best_auto"]
 
         index = 0 if not self.listdata else sorted(self.listdata.keys())[-1] + 1  # start indexing after max index
         row_id = self.GetItemCount()
-
+        row_ids_to_match = set()
+        
         self.Freeze()
         for f in newdata:
 
@@ -753,6 +764,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                     if not f in self.listdata[pos][config.D_FILENAME]:
                         self.listdata[pos][config.D_FILENAME].append(f)
                         self.RefreshItem(row_id0, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)
+                        row_ids_to_match.add(row_id0)
             else:
                 # Treat duplicate file
                 stem, suffix = utils.GetFileStemAndSuffix(f)
@@ -768,9 +780,62 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.SetItemData(row_id, index)
                 self.RefreshItem(row_id, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)
                 self.CheckItem(row_id, True)
+                row_ids_to_match.add(row_id)
                 row_id += 1
                 index += 1
+
+        # Automatically find best match
+        if Qbest_auto:
+
+            sources = []
+            for row_id in row_ids_to_match:  # loop all the added items
+                pos = self.GetItemData(row_id)  # 0-based unsorted index
+                sources.append(self.listdata[pos][config.D_FILENAME])
+
+            matches = match.get_matches(sources)
+
+            count = 0
+            for row_id in row_ids_to_match:  # loop all the added items
+                if len(matches) < count + 1:
+                    break
+                f = self.GetItemFont(row_id)
+                if not f.IsOk():
+                    f = self.GetFont()
+                font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+                font.SetWeight(wx.FONTWEIGHT_NORMAL)
+                font.SetStyle(f.GetStyle())
+                self.SetItemFont(row_id, font)
+
+                if matches[count]:
+                    pos = self.GetItemData(row_id)  # 0-based unsorted index
+                    source = self.listdata[pos][config.D_FILENAME]
+                    nb_source = len(source)
+                    matching_results = matches[count][0]["candidates"]
+                    nb_match = len(matching_results)
+                    self.RefreshItem(
+                        row_id,
+                        score=matches[count][0]["score"],
+                        matchnames=matching_results,
+                        nbmatch=nb_match,
+                        status=config.MatchStatus.MATCH,
+                        Qview_fullpath=Qview_fullpath,
+                        Qhide_extension=Qhide_extension,
+                    )
+                elif matches[count] is not None:
+                    self.RefreshItem(
+                        row_id,
+                        score=0,
+                        matchnames=[],
+                        nbmatch=0,
+                        status=config.MatchStatus.NOMATCH,
+                        Qview_fullpath=Qview_fullpath,
+                        Qhide_extension=Qhide_extension,
+                    )
+                else:
+                    break
+                count += 1
         self.Thaw()
+        wx.LogMessage("Sources : %d" % self.GetItemCount())
 
     def OnSortOrderChanged(self):
         row_id = self.GetFirstSelected()

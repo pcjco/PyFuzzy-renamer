@@ -177,14 +177,19 @@ def RefreshCandidates():
         for key, value in candidates["all"].items():
             candidates[key[0].lower()][key] = value
 
+    wx.LogMessage("Choices : %d" % len(candidates["all"]))
+
 
 class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
     def __init__(self, window):
         wx.FileDropTarget.__init__(self)
         self.window = window
 
-    def OnDropFiles(self, x, y, filenames):
-        Qsources = self.SourcesOrChoices(self.window)
+    def OnDropFiles(self, x, y, filenames, mode = 0):
+        if not mode:
+            Qsources = self.SourcesOrChoices(self.window)
+        else:
+            Qsources = (mode == 1)
         files = []
         for f in filenames:
             try:
@@ -206,11 +211,20 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
     def SourcesOrChoices(
         self, parent, question="Add the files to source or choice list?", caption="Drag&Drop question",
     ):
-        dlg = wx.GenericMessageDialog(parent, question, caption, wx.YES_NO | wx.ICON_QUESTION)
-        dlg.SetYesNoLabels("Sources", "Choices")
-        result = dlg.ShowModal() == wx.ID_YES
-        dlg.Destroy()
-        return result
+        paste_default = get_config()["paste_forced"]
+        if not paste_default:
+            dlg = wx.RichMessageDialog(parent, question, caption, wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION)
+            dlg.SetYesNoLabels("Sources", "Choices")
+            dlg.ShowCheckBox("Remember my choice")
+            Qsources = (dlg.ShowModal() == wx.ID_YES)
+            if dlg.IsCheckBoxChecked():
+                get_config()["paste_forced"] = 1 if Qsources else 2
+                self.parent.mnu_source_from_clipboard_default.Check(Qsources)
+                self.GetParent().GetParent().GetParent().mnu_choices_from_clipboard_default.Check(not Qsources)
+            dlg.Destroy()
+        else:
+            Qsources = (paste_default == 1)
+        return Qsources
 
 
 class MainPanel(wx.Panel):
@@ -356,6 +370,26 @@ class MainPanel(wx.Panel):
     def OnKeepOriginal(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
         get_config()["keep_original"] = item.IsChecked()
+        
+    def OnFindBestAuto(self, evt):
+        item = self.parent.GetMenuBar().FindItemById(evt.GetId())
+        get_config()["best_auto"] = item.IsChecked()
+        
+    def OnDefaultPasteChoices(self, evt):
+        item = self.parent.GetMenuBar().FindItemById(evt.GetId())
+        if item.IsChecked():
+            get_config()["paste_forced"] = 2            
+            self.parent.mnu_source_from_clipboard_default.Check(False)
+        else:
+            get_config()["paste_forced"] = 0
+            
+    def OnDefaultPasteSource(self, evt):
+        item = self.parent.GetMenuBar().FindItemById(evt.GetId())
+        if item.IsChecked():
+            get_config()["paste_forced"] = 1            
+            self.parent.mnu_choices_from_clipboard_default.Check(False)
+        else:
+            get_config()["paste_forced"] = 0            
 
     def OnMatchFirstLetter(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
@@ -508,6 +542,42 @@ class MainPanel(wx.Panel):
         self.parent.UpdateRecentChoices(file)
         get_config()["folder_choices"] = str(fp.parent)
 
+    def OnClearSource(self, event):
+        self.list_ctrl.listdata.clear()
+        self.list_ctrl.listdataname.clear()
+        self.list_ctrl.listdatanameinv.clear()
+        self.list_ctrl.DeleteAllItems()
+    
+    def OnClearChoices(self, event):
+        glob_choices.clear()
+        candidates.clear()
+        aliases.clear()
+        Qview_fullpath = get_config()["show_fullpath"]
+        Qhide_extension = get_config()["hide_extension"]
+        self.Freeze()
+        row_id = -1
+        while True:
+            row_id = self.list_ctrl.GetNextItem(row_id)
+            if row_id == -1:
+                break
+            self.list_ctrl.RefreshItem(
+                row_id,
+                score=0,
+                matchnames=[],
+                nbmatch=0,
+                status=config.MatchStatus.NONE,
+                Qview_fullpath=Qview_fullpath,
+                Qhide_extension=Qhide_extension,
+            )
+            f = self.list_ctrl.GetItemFont(row_id)
+            if not f.IsOk():
+                f = self.list_ctrl.GetFont()
+            font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+            font.SetWeight(wx.FONTWEIGHT_NORMAL)
+            font.SetStyle(f.GetStyle())
+            self.list_ctrl.SetItemFont(row_id, font)
+        self.Thaw()
+ 
     def OnSwap(self, event):
         sources = []
         row_id = -1
@@ -883,7 +953,6 @@ class MainPanel(wx.Panel):
             if TabIdx != -1:
                 self.bottom_notebook.DeletePage(TabIdx)
 
-
     def OnLogMatched(self, evt):
         with wx.lib.busy.BusyInfo("Please wait..."):
             all_matches = {
@@ -1020,6 +1089,14 @@ class MainFrame(wx.Frame):
         mnu_source_from_clipboard.SetBitmap(icons.Clipboard_16_PNG.GetBitmap())
         self.sources.Append(mnu_source_from_clipboard)
 
+        self.mnu_source_from_clipboard_default = self.sources.AppendCheckItem(wx.ID_ANY, "Default Target for Drag&Drop and Pasting")
+        
+        mnu_source_clear = wx.MenuItem(
+            self.sources, wx.ID_ANY, "Clear &All", "Clear All",
+        )
+        mnu_source_clear.SetBitmap(icons.Trash_16_PNG.GetBitmap())
+        self.sources.Append(mnu_source_clear)
+ 
         self.mnu_recents_sources = []
         if get_config()["recent_sources"]:
             self.sources.AppendSeparator()
@@ -1048,12 +1125,20 @@ class MainFrame(wx.Frame):
         )
         mnu_choices_from_clipboard.SetBitmap(icons.Clipboard_16_PNG.GetBitmap())
         self.choices.Append(mnu_choices_from_clipboard)
-
+ 
         mnu_choices_from_file = wx.MenuItem(
             self.choices, wx.ID_ANY, "Choices from &File", "Import choices from a file",
         )
         mnu_choices_from_file.SetBitmap(icons.Spreadsheet_16_PNG.GetBitmap())
         self.choices.Append(mnu_choices_from_file)
+
+        self.mnu_choices_from_clipboard_default = self.choices.AppendCheckItem(wx.ID_ANY, "Default Target for Drag&Drop and Pasting")
+
+        mnu_choices_clear = wx.MenuItem(
+            self.choices, wx.ID_ANY, "Clear &All", "Clear All",
+        )
+        mnu_choices_clear.SetBitmap(icons.Trash_16_PNG.GetBitmap())
+        self.choices.Append(mnu_choices_clear)
 
         self.mnu_recents_choices = []
         if get_config()["recent_choices"]:
@@ -1124,6 +1209,7 @@ class MainFrame(wx.Frame):
 
         mnu_rename_choice = options.AppendCheckItem(wx.ID_ANY, "&Rename choice instead of source", "Rename choice instead of source")
         self.mnu_keep_original = options.AppendCheckItem(wx.ID_ANY, "Keep &original on renaming", "Keep original on renaming")
+        self.mnu_best_auto = options.AppendCheckItem(wx.ID_ANY, "Automatically find best match", "Automatically find best match")
         self.mnu_keep_match_ext = options.AppendCheckItem(wx.ID_ANY, "&Keep matched file suffix", "Keep matched file suffix")
         self.mnu_match_firstletter = options.AppendCheckItem(
             wx.ID_ANY, "&Always match first letter", "Enforce choices that match the first letter of the source",
@@ -1190,6 +1276,9 @@ class MainFrame(wx.Frame):
         menubar.Append(help, "&Help")
         self.SetMenuBar(menubar)
 
+        self.mnu_choices_from_clipboard_default.Check(get_config()["paste_forced"] == 2)
+        self.mnu_source_from_clipboard_default.Check(get_config()["paste_forced"] == 1)
+
         if get_config()["folder_output"]:
             self.mnu_user_dir.Check(True)
         else:
@@ -1203,6 +1292,7 @@ class MainFrame(wx.Frame):
         self.mnu_hide_extension.Enable(not get_config()["show_fullpath"])
         mnu_rename_choice.Check(get_config()["rename_choice"])
         self.mnu_keep_original.Check(get_config()["keep_original"])
+        self.mnu_best_auto.Check(get_config()["best_auto"])
         self.mnu_keep_match_ext.Check(get_config()["keep_match_ext"])
         self.mnu_match_firstletter.Check(get_config()["match_firstletter"])
         self.mnu_source_w_multiple_choice.Check(get_config()["source_w_multiple_choice"])
@@ -1228,6 +1318,8 @@ class MainFrame(wx.Frame):
         self.Bind(
             wx.EVT_MENU, self.panel.OnAddChoicesFromClipboard, mnu_choices_from_clipboard,
         )
+        self.Bind(wx.EVT_MENU, self.panel.OnClearSource, mnu_source_clear)
+        self.Bind(wx.EVT_MENU, self.panel.OnClearChoices, mnu_choices_clear)
         self.Bind(wx.EVT_MENU, self.panel.OnSwap, mnu_swap)
         self.Bind(wx.EVT_MENU, self.panel.OnLogUnmatched, mnu_listunmatched)
         self.Bind(wx.EVT_MENU, self.panel.OnLogMatched, mnu_listmatched)
@@ -1241,7 +1333,10 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.panel.OnMatchFirstLetter, self.mnu_match_firstletter)
         self.Bind(wx.EVT_MENU, self.panel.OnSourceWMultipleChoice, self.mnu_source_w_multiple_choice)
         self.Bind(wx.EVT_MENU, self.panel.OnKeepOriginal, self.mnu_keep_original)
+        self.Bind(wx.EVT_MENU, self.panel.OnFindBestAuto, self.mnu_best_auto)
         self.Bind(wx.EVT_MENU, self.panel.OnRenameChoice, mnu_rename_choice)
+        self.Bind(wx.EVT_MENU, self.panel.OnDefaultPasteChoices, self.mnu_choices_from_clipboard_default)
+        self.Bind(wx.EVT_MENU, self.panel.OnDefaultPasteSource, self.mnu_source_from_clipboard_default)
         self.Bind(wx.EVT_MENU, self.OnOpen, mnu_open)
         self.Bind(wx.EVT_MENU, self.OnSaveAs, mnu_save)
         self.Bind(wx.EVT_MENU, self.OnQuit, self.mnu_quit)
