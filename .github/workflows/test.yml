@@ -61,8 +61,8 @@ jobs:
       run: |
         pip install pytest
         pytest -W ignore::DeprecationWarning
-    - name: build with pyinstaller
-      if: startsWith(matrix.os, 'windows')
+    - name: Build with pyinstaller
+      if: ${{ startsWith(github.ref, 'refs/tags/') && startsWith(matrix.os, 'windows') && matrix.python-version == '3.11' }}
       run: |
         pip install pyinstaller
         pyinstaller --name PyFuzzy-renamer --windowed --icon pyfuzzyrenamer.ico pyfuzzyrenamer\__main__.py
