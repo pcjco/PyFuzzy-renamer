@@ -8,7 +8,7 @@ from unittests import pfr
 
 
 class filter_Tests(pfr.PyFuzzyRenamerTestCase):
-    def test_filter(self):
+    def test_filter1(self):
         for each in self.button_panel.GetChildren():
             if each.GetLabel() == "Masks && Filters...":
                 btn = each
