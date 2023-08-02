@@ -74,6 +74,8 @@ def progress_msg(j, numtasks, output):
 def get_matches(sources):
 
     numtasks = len(sources)
+    if numtasks == 1:
+        return [get_match(sources[0])]
 
     # Create the task list
     Tasks = [((), ()) for i in range(numtasks)]
