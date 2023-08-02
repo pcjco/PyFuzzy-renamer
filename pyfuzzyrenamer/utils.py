@@ -235,8 +235,10 @@ def read_xlsx(fname, sheet = None):
 def read_csv(fname):
     rows = []
     try:
-        with open(fname, 'r') as csvfile:
+        with open(fname, 'r', encoding="utf8") as csvfile:
             reader = csv.DictReader(csvfile, fieldnames=['A', 'B'])
+            for row in reader:
+                rows.append(row)
     except:
         wx.LogMessage("Could not open file %s" % (fname))
     return rows
