@@ -42,15 +42,8 @@ class add_sources_Tests(pfr.PyFuzzyRenamerTestCase):
                     pass
             if not singles:
                 if drop:
-
-                    def clickYES():
-                        dlg = wx.GetActiveWindow()
-                        clickEvent = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_YES)
-                        dlg.ProcessEvent(clickEvent)
-
                     droptarget = self.frame.panel.GetDropTarget()
-                    wx.CallAfter(clickYES)
-                    droptarget.OnDropFiles(0, 0, [str(f) for f in sources])
+                    droptarget.OnDropFiles(0, 0, [str(f) for f in sources], mode=1)
                 elif clipboard:
                     clipdata = wx.TextDataObject()
                     clipdata.SetText("\n".join([str(f) for f in sources]))
