@@ -185,8 +185,11 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
         wx.FileDropTarget.__init__(self)
         self.window = window
 
-    def OnDropFiles(self, x, y, filenames):
-        Qsources = self.SourcesOrChoices(self.window)
+    def OnDropFiles(self, x, y, filenames, mode = 0):
+        if not mode:
+            Qsources = self.SourcesOrChoices(self.window)
+        else:
+            Qsources = (mode == 1)
         files = []
         for f in filenames:
             try:
@@ -210,13 +213,18 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
     ):
         paste_default = get_config()["paste_forced"]
         if not paste_default:
-            dlg = wx.RichMessageDialog(parent, question, caption, wx.YES_NO | wx.ICON_QUESTION)
+            dlg = wx.RichMessageDialog(parent, question, caption, wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION)
             dlg.SetYesNoLabels("Sources", "Choices")
-            result = dlg.ShowModal() == wx.ID_YES
+            dlg.ShowCheckBox("Remember my choice")
+            Qsources = (dlg.ShowModal() == wx.ID_YES)
+            if dlg.IsCheckBoxChecked():
+                get_config()["paste_forced"] = 1 if Qsources else 2
+                self.parent.mnu_source_from_clipboard_default.Check(Qsources)
+                self.GetParent().GetParent().GetParent().mnu_choices_from_clipboard_default.Check(not Qsources)
             dlg.Destroy()
         else:
-            result = (paste_default == 1)
-        return result
+            Qsources = (paste_default == 1)
+        return Qsources
 
 
 class MainPanel(wx.Panel):
