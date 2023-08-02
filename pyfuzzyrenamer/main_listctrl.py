@@ -784,6 +784,9 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 row_id += 1
                 index += 1
 
+        if row_ids_to_match:
+            self.EnsureVisible(max(row_ids_to_match))
+
         # Automatically find best match
         if Qbest_auto:
 
