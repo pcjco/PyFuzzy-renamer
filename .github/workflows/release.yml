@@ -45,6 +45,5 @@ jobs:
         with:
           artifacts: "pyfuzzyrenamer-${{ steps.version.outputs.version }}.windows-amd64.zip"
           replacesArtifacts: false
-          token: ${{ secrets.TOKEN }}
           allowUpdates: true
           bodyFile: CHANGELOG-${{ steps.version.outputs.version }}.md
