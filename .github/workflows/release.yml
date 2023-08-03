@@ -40,22 +40,11 @@ jobs:
           awk -v ver=$(echo ${{ steps.version.outputs.version }} | sed -E 's/^.*v([0-9.]*).*$/\1/') '/^## Version / { if (p) { exit }; if ($3 == ver) { p=1; next } } p && NF' CHANGELOG.md > CHANGELOG-${{ steps.version.outputs.version }}.md
         shell: bash
       - name: release
-        uses: actions/create-release@v1
+        uses: ncipollo/release-action@v1
         id: create_release
         with:
-          draft: false
-          prerelease: false
-          release_name: ${{ steps.version.outputs.version }}
-          tag_name: ${{ github.ref }}
-          body_path: CHANGELOG-${{ steps.version.outputs.version }}.md
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: upload windows artifact
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./pyfuzzyrenamer-${{ steps.version.outputs.version }}.windows-amd64.zip
-          asset_name: pyfuzzyrenamer-${{ steps.version.outputs.version }}.windows-amd64.zip
-          asset_content_type: application/zip
+          artifacts: "pyfuzzyrenamer-${{ steps.version.outputs.version }}.windows-amd64.zip"
+          replacesArtifacts: false
+          token: ${{ secrets.TOKEN }}
+          allowUpdates: true
+          bodyFile: CHANGELOG-${{ steps.version.outputs.version }}.md
