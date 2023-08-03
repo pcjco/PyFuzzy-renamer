@@ -31,6 +31,7 @@ jobs:
         with:
           command: c
           cwd: .
+          files: .
           outPath: pyfuzzyrenamer-${{ steps.version.outputs.version }}.tar.gz
       - name: Build artifact with pyinstaller
         run: |
