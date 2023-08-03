@@ -1,4 +1,4 @@
-## Version 0.23
+## Version 0.2.3
 
 * Adding Clear Sources/Choices commands
 * Allow to remember Paste and Drag&Drop target (Source or Choices)
@@ -7,6 +7,6 @@
 * Fixing read Sources/Choices from CSV/TXT file
 * Fixing issue with wxpython 4.2.x
 
-## Version 0.22
+## Version 0.2.2
 
 * First release
