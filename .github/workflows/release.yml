@@ -23,7 +23,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip' # caching pip dependencies
       - name: version
-        run: echo "::set-output name=${{ github.ref_name }}"
+        run: echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"      
         id: version
       - name: Compress action step
         uses: a7ul/tar-action@v1.1.0
@@ -38,6 +38,10 @@ jobs:
           pyinstaller --name PyFuzzy-renamer --windowed --icon pyfuzzyrenamer.ico pyfuzzyrenamer\__main__.py
       - name: Zip artifact
         run: zip pyfuzzyrenamer-${{ steps.version.outputs.version }}.windows-amd64.zip dist/* -r
+      - name: Release Notes
+        run: |
+          awk -v ver=$(echo ${{ steps.version.outputs.version }} | sed -E 's/^.*v([0-9.]*).*$/\1/') '/^## Version / { if (p) { exit }; if ($3 == ver) { p=1; next } } p && NF' CHANGELOG.md > CHANGELOG-${{ steps.version.outputs.version }}.md
+        shell: bash
       - name: release
         uses: actions/create-release@v1
         id: create_release
@@ -46,7 +50,7 @@ jobs:
           prerelease: false
           release_name: ${{ steps.version.outputs.version }}
           tag_name: ${{ github.ref }}
-          body_path: CHANGELOG.md
+          body_path: CHANGELOG-${{ steps.version.outputs.version }}.md
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: upload windows artifact
