@@ -25,14 +25,6 @@ jobs:
       - name: version
         run: echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"      
         id: version
-      - name: Compress action step
-        uses: a7ul/tar-action@v1.1.0
-        id: compress
-        with:
-          command: c
-          cwd: .
-          files: .
-          outPath: pyfuzzyrenamer-${{ steps.version.outputs.version }}.tar.gz
       - name: Build artifact with pyinstaller
         run: |
           pip install pyinstaller
@@ -63,12 +55,3 @@ jobs:
           asset_path: ./pyfuzzyrenamer-${{ steps.version.outputs.version }}.windows-amd64.zip
           asset_name: pyfuzzyrenamer-${{ steps.version.outputs.version }}.windows-amd64.zip
           asset_content_type: application/zip
-      - name: upload source artifact
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./pyfuzzyrenamer-${{ steps.version.outputs.version }}.tar.gz
-          asset_name: pyfuzzyrenamer-${{ steps.version.outputs.version }}.tar.gz
-          asset_content_type: application/gzip
