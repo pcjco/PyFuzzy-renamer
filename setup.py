@@ -31,9 +31,9 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
     ],
-    packages=["pyfuzzyrenamer"],
+    packages=["pyfuzzyrenamer", "wxautocompletectrl"],
     include_package_data=False,
     python_requires=">=3.8",
     install_requires=["wxPython>=4.1.0", "python-Levenshtein-wheels>=0.13.1", "thefuzz>=0.19.0",],
-    entry_points={"gui_scripts": ["pyfuzzyrenamer = pyfuzzyrenamer.__main__:main"]},
+    entry_points={"console_scripts": ["pyfuzzyrenamer = pyfuzzyrenamer.__main__:main"]},
 )

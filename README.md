@@ -220,7 +220,7 @@ The list of the 8 most recent saved session files can be loaded directly from th
 ### Command line options
 
 <pre>
-usage: pyfuzzyrenamer [-h] [--sources SOURCES] [--choices CHOICES] {rename,report_match,preview_rename} ...
+usage: pyfuzzyrenamer [-h] [--version] [--sources SOURCES] [--choices CHOICES] {rename,report_match,preview_rename} ...
 
 positional arguments:
   {rename,report_match,preview_rename}
@@ -231,6 +231,23 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+  --version             show program's version number and exit
   --sources SOURCES     directory for sources
   --choices CHOICES     directory for choices
 </pre>
+
+### Installation
+
+Build and install from project source root directory (Python required):
+<pre>
+# To install directly
+pip install .
+# To launch
+pyfuzzyrenamer -h
+# To uninstall
+pip uninstall pyfuzzy-renamer
+</pre>
+
+Installation from pyfuzzyrenamer-vX.Y.Z.windows-amd64.zip (Windows 64bits only):
+* Unzip file
+* Launch PyFuzzy-renamer.exe

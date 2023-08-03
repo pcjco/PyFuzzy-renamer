@@ -32,7 +32,7 @@ jobs:
       - name: Build artifact with pyinstaller
         run: |
           pip install pyinstaller
-          pyinstaller --name PyFuzzy-renamer --windowed --icon pyfuzzyrenamer.ico pyfuzzyrenamer\__main__.py
+          pyinstaller --name PyFuzzy-renamer --icon pyfuzzyrenamer.ico pyfuzzyrenamer\__main__.py
       - name: Zip artifact
         run: Compress-Archive -Path dist/PyFuzzy-renamer/* -Destination pyfuzzyrenamer-${{ steps.version.outputs.version }}.windows-amd64.zip
       - name: Release Notes
