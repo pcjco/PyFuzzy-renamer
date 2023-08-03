@@ -1,0 +1,73 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build_release:
+    name: build_release
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: [3.11]
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip' # caching pip dependencies
+      - name: version
+        run: echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"      
+        id: version
+      - name: Compress action step
+        uses: a7ul/tar-action@v1.1.0
+        id: compress
+        with:
+          command: c
+          cwd: .
+          outPath: pyfuzzyrenamer-${{ steps.version.outputs.version }}.tar.gz
+      - name: Build artifact with pyinstaller
+        run: |
+          pip install pyinstaller
+          pyinstaller --name PyFuzzy-renamer --windowed --icon pyfuzzyrenamer.ico pyfuzzyrenamer\__main__.py
+      - name: Zip artifact
+        run: zip pyfuzzyrenamer-${{ steps.version.outputs.version }}.windows-amd64.zip dist/* -r
+      - name: Release Notes
+        run: |
+          awk -v ver=$(echo ${{ steps.version.outputs.version }} | sed -E 's/^.*v([0-9.]*).*$/\1/') '/^## Version / { if (p) { exit }; if ($3 == ver) { p=1; next } } p && NF' CHANGELOG.md > CHANGELOG-${{ steps.version.outputs.version }}.md
+        shell: bash
+      - name: release
+        uses: actions/create-release@v1
+        id: create_release
+        with:
+          draft: false
+          prerelease: false
+          release_name: ${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref }}
+          body_path: CHANGELOG-${{ steps.version.outputs.version }}.md
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: upload windows artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./pyfuzzyrenamer-${{ steps.version.outputs.version }}.windows-amd64.zip
+          asset_name: pyfuzzyrenamer-${{ steps.version.outputs.version }}.windows-amd64.zip
+          asset_content_type: application/zip
+      - name: upload source artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./pyfuzzyrenamer-${{ steps.version.outputs.version }}.tar.gz
+          asset_name: pyfuzzyrenamer-${{ steps.version.outputs.version }}.tar.gz
+          asset_content_type: application/gzip

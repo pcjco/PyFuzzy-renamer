@@ -1,7 +1,9 @@
 import argparse
+from pyfuzzyrenamer._version import __version__
 
 theArgs = argparse.Namespace
 theArgsParser = argparse.ArgumentParser(prog="pyfuzzyrenamer")
+theArgsParser.add_argument('--version', action='version', version='%(prog)s {version}'.format(version=__version__))
 theArgsParser.add_argument("--sources", help="directory for sources")
 theArgsParser.add_argument("--choices", help="directory for choices")
 subparsers = theArgsParser.add_subparsers(dest="mode", help="sub-command help")
