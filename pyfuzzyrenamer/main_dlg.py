@@ -179,13 +179,19 @@ def RefreshCandidates():
 
     wx.LogMessage("Choices : %d" % len(candidates["all"]))
 
-
-class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
+class FuzzyRenamerDropTarget(wx.DropTarget):
     def __init__(self, window):
-        wx.FileDropTarget.__init__(self)
+        wx.DropTarget.__init__(self)
         self.window = window
+        self.data = wx.DataObjectComposite()
+        self.data.Add(wx.FileDataObject(), True)
+        self.data.Add(wx.TextDataObject())
+        self.SetDataObject(self.data)
+        
+    def OnDrop(self, x, y):
+        return True
 
-    def OnDropFiles(self, x, y, filenames, mode = 0):
+    def OnDropFiles(self, filenames, mode = 0):
         if not mode:
             Qsources = self.SourcesOrChoices(self.window)
         else:
@@ -194,22 +200,39 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
         for f in filenames:
             try:
                 fp = Path(f)
-                if fp.is_file():
-                    files.append(f)
-                elif fp.is_dir():
-                    for fp2 in sorted(fp.resolve().glob("*"), key=os.path.basename):
+                if fp.is_dir():
+                    for fp2 in fp.resolve().glob("*"):
                         if fp2.is_file():
                             files.append(str(fp2))
+                else:
+                    files.append(f)
             except (OSError, IOError):
                 pass
-        if Qsources:
-            self.window.AddSourcesFromFiles(files)
-        else:
-            self.window.AddChoicesFromFiles(files)
+        if files:
+            if Qsources:
+                self.window.AddSourcesFromFiles(files)
+            else:
+                self.window.AddChoicesFromFiles(files)
         return True
 
+    def OnData(self, x, y, d):
+        if not self.GetData():
+            return wx.DragNone
+
+        dataobjComp = self.GetDataObject()
+        format = dataobjComp.GetReceivedFormat()
+        dataobj = dataobjComp.GetObject(format)
+        
+        filenames = []
+        if format.GetType() == wx.DF_TEXT or format.GetType() == wx.DF_UNICODETEXT:
+            filenames = dataobj.GetText().splitlines()
+        elif format.GetType() == wx.DF_FILENAME:
+            filenames = dataobj.GetFilenames()
+        self.OnDropFiles(filenames)
+        return wx.DragCopy
+        
     def SourcesOrChoices(
-        self, parent, question="Add the files to source or choice list?", caption="Drag&Drop question",
+        self, parent, question="Add content to source or choice list?", caption="Drag&Drop question",
     ):
         paste_default = get_config()["paste_forced"]
         if not paste_default:
@@ -219,13 +242,12 @@ class FuzzyRenamerFileDropTarget(wx.FileDropTarget):
             Qsources = (dlg.ShowModal() == wx.ID_YES)
             if dlg.IsCheckBoxChecked():
                 get_config()["paste_forced"] = 1 if Qsources else 2
-                self.parent.mnu_source_from_clipboard_default.Check(Qsources)
+                self.GetParent().GetParent().GetParent().mnu_source_from_clipboard_default.Check(Qsources)
                 self.GetParent().GetParent().GetParent().mnu_choices_from_clipboard_default.Check(not Qsources)
             dlg.Destroy()
         else:
             Qsources = (paste_default == 1)
         return Qsources
-
 
 class MainPanel(wx.Panel):
     def __init__(self, parent):
@@ -291,8 +313,8 @@ class MainPanel(wx.Panel):
             panel_list, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN | wx.LC_EDIT_LABELS,
         )
 
-        file_drop_target = FuzzyRenamerFileDropTarget(self)
-        self.SetDropTarget(file_drop_target)
+        drop_target = FuzzyRenamerDropTarget(self)
+        self.SetDropTarget(drop_target)
 
         panel_list_sizer = wx.BoxSizer(wx.VERTICAL)
         panel_list_sizer.Add(panel_listbutton, 0, wx.EXPAND | wx.ALL, 0)
