@@ -43,7 +43,7 @@ class add_choices_Tests(pfr.PyFuzzyRenamerTestCase):
             if not singles:
                 if drop:
                     droptarget = self.frame.panel.GetDropTarget()
-                    droptarget.OnDropFiles(0, 0, [str(f) for f in choices], mode=2)
+                    droptarget.OnDropFiles([str(f) for f in choices], mode=2)
                 elif clipboard:
                     clipdata = wx.TextDataObject()
                     clipdata.SetText("\n".join([str(f) for f in choices]))
