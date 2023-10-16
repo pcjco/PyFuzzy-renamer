@@ -433,7 +433,7 @@ class MainPanel(wx.Panel):
             self.AddSourcesFromDir(dirDialog.GetPath())
 
     def AddSourcesFromDir(self, directory):
-        with wx.lib.busy.BusyInfo("Please wait..."):
+        with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             get_config()["folder_sources"] = directory
             newdata = []
             for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
@@ -458,7 +458,7 @@ class MainPanel(wx.Panel):
             self.AddSourcesFromFiles(self.fileDialog.GetPaths())
 
     def AddSourcesFromFiles(self, files):
-        with wx.lib.busy.BusyInfo("Please wait..."):
+        with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             newdata = []
             first = True
             for f in files:
@@ -489,7 +489,7 @@ class MainPanel(wx.Panel):
             self.AddChoicesFromDir(dirDialog.GetPath())
 
     def AddChoicesFromDir(self, directory):
-        with wx.lib.busy.BusyInfo("Please wait..."):
+        with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             get_config()["folder_choices"] = directory
             for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
                 try:
@@ -513,7 +513,7 @@ class MainPanel(wx.Panel):
             self.AddChoicesFromFiles(fileDialog.GetPaths())
 
     def AddChoicesFromFiles(self, files):
-        with wx.lib.busy.BusyInfo("Please wait..."):
+        with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             first = True
             for f in files:
                 if not f:
@@ -543,7 +543,7 @@ class MainPanel(wx.Panel):
             self.ImportChoicesFromFile(fileDialog.GetPath())
             
     def ImportChoicesFromFile(self, file):
-        with wx.lib.busy.BusyInfo("Please wait..."):
+        with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             fp = Path(file)
             if fp.suffix == ".xlsx":
                 rows = utils.read_xlsx(file)
@@ -904,7 +904,7 @@ class MainPanel(wx.Panel):
         rename.history.clear()
 
     def OnLogDuplicate(self, evt):
-        with wx.lib.busy.BusyInfo("Please wait..."):
+        with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             previews = [x[config.D_PREVIEW] for x in self.list_ctrl.listdata.values() if x[config.D_CHECKED]]
             # [[...], [...], ...] -> [...]
             all_previews = [
@@ -948,7 +948,7 @@ class MainPanel(wx.Panel):
                 self.bottom_notebook.DeletePage(duplicateTabIdx)
 
     def OnLogUnmatched(self, evt):
-        with wx.lib.busy.BusyInfo("Please wait..."):
+        with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             all_matches = {
                 match
                 for source in self.list_ctrl.listdata.values()
@@ -976,7 +976,7 @@ class MainPanel(wx.Panel):
                 self.bottom_notebook.DeletePage(TabIdx)
 
     def OnLogMatched(self, evt):
-        with wx.lib.busy.BusyInfo("Please wait..."):
+        with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             all_matches = {
                 match
                 for source in self.list_ctrl.listdata.values()
@@ -1111,7 +1111,7 @@ class MainFrame(wx.Frame):
         mnu_source_from_clipboard.SetBitmap(icons.Clipboard_16_PNG.GetBitmap())
         self.sources.Append(mnu_source_from_clipboard)
 
-        self.mnu_source_from_clipboard_default = self.sources.AppendCheckItem(wx.ID_ANY, "Default Target for Drag&Drop and Pasting")
+        self.mnu_source_from_clipboard_default = self.sources.AppendCheckItem(wx.ID_ANY, "Default Target for Drag && Drop and Pasting")
         
         mnu_source_clear = wx.MenuItem(
             self.sources, wx.ID_ANY, "Clear &All", "Clear All",
@@ -1154,7 +1154,7 @@ class MainFrame(wx.Frame):
         mnu_choices_from_file.SetBitmap(icons.Spreadsheet_16_PNG.GetBitmap())
         self.choices.Append(mnu_choices_from_file)
 
-        self.mnu_choices_from_clipboard_default = self.choices.AppendCheckItem(wx.ID_ANY, "Default Target for Drag&Drop and Pasting")
+        self.mnu_choices_from_clipboard_default = self.choices.AppendCheckItem(wx.ID_ANY, "Default Target for Drag && Drop and Pasting")
 
         mnu_choices_clear = wx.MenuItem(
             self.choices, wx.ID_ANY, "Clear &All", "Clear All",
@@ -1593,7 +1593,7 @@ class MainFrame(wx.Frame):
         row_id = 0
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
-        with wx.lib.busy.BusyInfo("Please wait..."):
+        with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             list.Freeze()
             for key, data in list.listdata.items():
                 list.InsertItem(row_id, "", -1)

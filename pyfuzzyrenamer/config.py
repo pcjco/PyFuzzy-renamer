@@ -344,5 +344,5 @@ def write(config_file=None):
     for key, value in get_persistent_config().dict.items():
         config["window"][key] = value
 
-    with open(CONFIG_FILE or config_file, "w") as configfile:
+    with open(CONFIG_FILE or config_file, "w", encoding='utf-8') as configfile:
         config.write(configfile)
