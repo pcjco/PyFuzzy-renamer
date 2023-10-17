@@ -61,11 +61,16 @@ aliases = {}
 glob_choices = OrderedDict()
 
 def getRenamePreview(input, matches):
-    # input : list of Path
-    # matches : list of Path
+    # input : list of Path or Strings
+    # matches : list of Path or Strings
+
+    Qinput_as_path = get_config()["input_as_path"]
 
     # replace matches value by alias if any
-    matches = [match if not str(match) in aliases else Path(aliases[str(match)]) for match in matches]
+    if Qinput_as_path:
+        matches = [match if not str(match) in aliases else Path(aliases[str(match)]) for match in matches]
+    else:
+        matches = [match if not match in aliases else aliases[match] for match in matches]
     
     Qrename_choice = get_config()["rename_choice"]
     if Qrename_choice:
@@ -79,7 +84,10 @@ def getRenamePreview(input, matches):
     if matches:
         f_masked = masks.FileMasked(matches[0], useFilter=False)
         stem, suffix = utils.GetFileStemAndSuffix(matches[0])
-        match_clean = utils.strip_extra_whitespace(utils.strip_illegal_chars(f_masked.masked[1]))
+        if Qinput_as_path:
+            match_clean = utils.strip_extra_whitespace(utils.strip_illegal_chars(f_masked.masked[1]))
+        else:
+            match_clean = utils.strip_extra_whitespace(f_masked.masked[1])
 
     done_in_last = -1
     already_used = set()
@@ -91,15 +99,18 @@ def getRenamePreview(input, matches):
             inp_has_masked = inp_masked.masked[0] or inp_masked.masked[2]
             if inp_has_masked:
                 preview_name = inp_masked.masked[0] + match_clean + inp_masked.masked[2]
-                ret[i] = [
-                    Path(
-                        os.path.join(
-                            get_config()["folder_output"] if get_config()["folder_output"] else inp.parent,
-                            preview_name + (suffix if Qkeep_match_ext else ""),
+                if Qinput_as_path:
+                    ret[i] = [
+                        Path(
+                            os.path.join(
+                                get_config()["folder_output"] if get_config()["folder_output"] else inp.parent,
+                                preview_name + (suffix if Qkeep_match_ext else ""),
+                            )
+                            + suffix_masked
                         )
-                        + suffix_masked
-                    )
-                ]
+                    ]
+                else:
+                    ret[i] = [preview_name]
                 already_used.add(preview_name)
             else:
                 done_in_last = i
@@ -112,28 +123,37 @@ def getRenamePreview(input, matches):
             for f in matches:
                 f_masked = masks.FileMasked(f, useFilter=False)
                 stem, suffix = utils.GetFileStemAndSuffix(f)
-                match_clean = utils.strip_extra_whitespace(utils.strip_illegal_chars(f_masked.masked[1]))
+                if Qinput_as_path:
+                    match_clean = utils.strip_extra_whitespace(utils.strip_illegal_chars(f_masked.masked[1]))
+                else:
+                    match_clean = utils.strip_extra_whitespace(f_masked.masked[1])
                 preview_name = f_masked.masked[0] + match_clean + f_masked.masked[2]
                 if not preview_name in already_used:
-                    ret2.append(
-                        Path(
-                            os.path.join(
-                                get_config()["folder_output"] if get_config()["folder_output"] else inp.parent,
-                                preview_name + (suffix if Qkeep_match_ext else ""),
+                    if Qinput_as_path:
+                        ret2.append(
+                            Path(
+                                os.path.join(
+                                    get_config()["folder_output"] if get_config()["folder_output"] else inp.parent,
+                                    preview_name + (suffix if Qkeep_match_ext else ""),
+                                )
+                                + suffix_masked
                             )
-                            + suffix_masked
                         )
-                    )
+                    else:
+                        ret2.append(preview_name)
         else:
-            ret2.append(
-                Path(
-                    os.path.join(
-                        get_config()["folder_output"] if get_config()["folder_output"] else inp.parent,
-                        match_clean + (suffix if Qkeep_match_ext else ""),
+            if Qinput_as_path:
+                ret2.append(
+                    Path(
+                        os.path.join(
+                            get_config()["folder_output"] if get_config()["folder_output"] else inp.parent,
+                            match_clean + (suffix if Qkeep_match_ext else ""),
+                        )
+                        + suffix_masked
                     )
-                    + suffix_masked
                 )
-            )
+            else:
+                ret2.append(match_clean)
         ret[done_in_last] = ret2
     return ret
 
@@ -146,32 +166,41 @@ def RefreshCandidates():
     if not glob_choices:
         return
 
-    # get suffix counters
-    suffix_counts = dict()
-
-    wSuffix = 0
-    woSuffix = 0
-    for f in glob_choices:
-        suffix_counts[f.suffix] = suffix_counts.get(f.suffix, 0) + 1
-        if f.suffix:
-            wSuffix += 1
-        else:
-            woSuffix += 1
-    if woSuffix > wSuffix:
-        # get most common suffix
-        frequent_suffix = max(suffix_counts.items(), key=operator.itemgetter(1))[0]
-
     candidates = defaultdict(lambda: defaultdict(list))
 
-    for f, alias in glob_choices.items():
-        # add fake extension if non standard extension found
-        if f.suffix and woSuffix > wSuffix and f.suffix != frequent_suffix:
-            f = Path(str(f) + ".noext")
-        key = masks.FileMasked(f, useFilter=True).masked[1]
-        item = filters.FileFiltered(f)
-        candidates["all"][key.lower()].append(item)
-        if alias:
-            aliases[str(f)] = alias
+    if get_config()["input_as_path"]:
+        # get suffix counters
+        suffix_counts = dict()
+
+        wSuffix = 0
+        woSuffix = 0
+        for f in glob_choices:
+            suffix_counts[f.suffix] = suffix_counts.get(f.suffix, 0) + 1
+            if f.suffix:
+                wSuffix += 1
+            else:
+                woSuffix += 1
+        if woSuffix > wSuffix:
+            # get most common suffix
+            frequent_suffix = max(suffix_counts.items(), key=operator.itemgetter(1))[0]
+
+        for f, alias in glob_choices.items():
+            # add fake extension if non standard extension found
+            if f.suffix and woSuffix > wSuffix and f.suffix != frequent_suffix:
+                f = Path(str(f) + ".noext")
+            key = masks.FileMasked(f, useFilter=True).masked[1]
+            item = filters.FileFiltered(f)
+            candidates["all"][key.lower()].append(item)
+            if alias:
+                aliases[str(f)] = alias
+    else:
+        # glob_choices are strings
+        for f, alias in glob_choices.items():
+            key = masks.FileMasked(f, useFilter=True).masked[1]
+            item = filters.FileFiltered(f)
+            candidates["all"][key.lower()].append(item)
+            if alias:
+                aliases[f] = alias
 
     if get_config()["match_firstletter"]:
         for key, value in candidates["all"].items():
@@ -192,22 +221,27 @@ class FuzzyRenamerDropTarget(wx.DropTarget):
         return True
 
     def OnDropFiles(self, filenames, mode = 0):
+        Qinput_as_path = get_config()["input_as_path"]
         if not mode:
             Qsources = self.SourcesOrChoices(self.window)
         else:
             Qsources = (mode == 1)
         files = []
-        for f in filenames:
-            try:
-                fp = Path(f)
-                if fp.is_dir():
-                    for fp2 in fp.resolve().glob("*"):
-                        if fp2.is_file():
-                            files.append(str(fp2))
-                else:
-                    files.append(f)
-            except (OSError, IOError):
-                pass
+        if Qinput_as_path:
+            for f in filenames:
+                try:
+                    fp = Path(f)
+                    if fp.is_dir():
+                        for fp2 in fp.resolve().glob("*"):
+                            if fp2.is_file():
+                                files.append(str(fp2))
+                    else:
+                        files.append(f)
+                except (OSError, IOError):
+                    pass
+        else:
+            files = filenames
+        
         if files:
             if Qsources:
                 self.window.AddSourcesFromFiles(files)
@@ -259,11 +293,11 @@ class MainPanel(wx.Panel):
         self.mgr.SetManagedWindow(self)
 
         panel_top = wx.Panel(parent=self)
-        panel_list = wx.Panel(parent=panel_top)
-        panel_listbutton = wx.Panel(parent=panel_list)
+        self.panel_list = wx.Panel(parent=panel_top)
+        panel_listbutton = wx.Panel(parent=self.panel_list)
 
         top_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        top_sizer.Add(panel_list, 1, wx.EXPAND)
+        top_sizer.Add(self.panel_list, 1, wx.EXPAND)
         panel_top.SetSizer(top_sizer)
 
         btn_add_source_from_files = wx.Button(panel_listbutton, label="Sources...")
@@ -286,13 +320,13 @@ class MainPanel(wx.Panel):
         btn_filters.SetBitmap(icons.Filters_16_PNG.GetBitmap(), wx.LEFT)
         btn_filters.SetToolTip("Edit list of masks and filters")
 
-        btn_ren = wx.Button(panel_listbutton, label="Rename")
-        btn_ren.SetBitmap(icons.Rename_16_PNG.GetBitmap(), wx.LEFT)
-        btn_ren.SetToolTip("Rename sources")
+        self.btn_ren = wx.Button(panel_listbutton, label="Rename")
+        self.btn_ren.SetBitmap(icons.Rename_16_PNG.GetBitmap(), wx.LEFT)
+        self.btn_ren.SetToolTip("Rename sources")
 
-        btn_undo = wx.Button(panel_listbutton, label="Undo Rename")
-        btn_undo.SetBitmap(icons.Undo_16_PNG.GetBitmap(), wx.LEFT)
-        btn_undo.SetToolTip("Undo last rename")
+        self.btn_undo = wx.Button(panel_listbutton, label="Undo Rename")
+        self.btn_undo.SetBitmap(icons.Undo_16_PNG.GetBitmap(), wx.LEFT)
+        self.btn_undo.SetToolTip("Undo last rename")
 
         btn_duplicate = wx.Button(panel_listbutton, label="Duplicate")
         btn_duplicate.SetBitmap(icons.Exclamation_16_PNG.GetBitmap(), wx.LEFT)
@@ -305,12 +339,12 @@ class MainPanel(wx.Panel):
         panel_listbutton_sizer.Add(btn_run, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_reset, 0, wx.ALL, 1)
         panel_listbutton_sizer.Add(btn_duplicate, 0, wx.ALL, 1)
-        panel_listbutton_sizer.Add(btn_ren, 0, wx.ALL, 1)
-        panel_listbutton_sizer.Add(btn_undo, 0, wx.ALL, 1)
+        panel_listbutton_sizer.Add(self.btn_ren, 0, wx.ALL, 1)
+        panel_listbutton_sizer.Add(self.btn_undo, 0, wx.ALL, 1)
         panel_listbutton.SetSizer(panel_listbutton_sizer)
 
         self.list_ctrl = main_listctrl.FuzzyRenamerListCtrl(
-            panel_list, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN | wx.LC_EDIT_LABELS,
+            self.panel_list, size=(-1, -1), style=wx.LC_REPORT | wx.BORDER_SUNKEN | wx.LC_EDIT_LABELS,
         )
 
         drop_target = FuzzyRenamerDropTarget(self)
@@ -319,7 +353,7 @@ class MainPanel(wx.Panel):
         panel_list_sizer = wx.BoxSizer(wx.VERTICAL)
         panel_list_sizer.Add(panel_listbutton, 0, wx.EXPAND | wx.ALL, 0)
         panel_list_sizer.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 0)
-        panel_list.SetSizer(panel_list_sizer)
+        self.panel_list.SetSizer(panel_list_sizer)
 
         self.bottom_notebook = bottom_notebook.bottomNotebook(self)
         self.bottom_notebook.AddPage(bottom_notebook.TabLog(parent=self.bottom_notebook), "Log")
@@ -334,13 +368,29 @@ class MainPanel(wx.Panel):
         self.mgr.Bind(aui.EVT_AUI_PANE_CLOSE, self.OnClosePane)
         btn_run.Bind(wx.EVT_BUTTON, self.OnRun)
         btn_duplicate.Bind(wx.EVT_BUTTON, self.OnLogDuplicate)
-        btn_ren.Bind(wx.EVT_BUTTON, self.OnRename)
+        self.btn_ren.Bind(wx.EVT_BUTTON, self.OnRename)
         btn_reset.Bind(wx.EVT_BUTTON, self.OnReset)
         btn_filters.Bind(wx.EVT_BUTTON, self.OnFilters)
-        btn_undo.Bind(wx.EVT_BUTTON, self.OnUndo)
+        self.btn_undo.Bind(wx.EVT_BUTTON, self.OnUndo)
         btn_add_source_from_files.Bind(wx.EVT_BUTTON, self.OnAddSourcesFromFiles)
         btn_add_choice_from_file.Bind(wx.EVT_BUTTON, self.OnAddChoicesFromFiles)
+        
+        self.UpdateButtons()
+    
+    def UpdateButtons(self):
+        Qinput_as_path = get_config()["input_as_path"]
+        
+        self.btn_undo.Show(Qinput_as_path)
+        self.btn_ren.Show(Qinput_as_path)
+        
+        self.parent.mnu_rename_choice.Enable(Qinput_as_path)
+        self.parent.mnu_view_fullpath.Enable(Qinput_as_path)
+        self.parent.mnu_hide_extension.Enable(Qinput_as_path and not get_config()["show_fullpath"])
+        self.parent.mnu_keep_match_ext.Enable(Qinput_as_path)
+        self.parent.mnu_keep_original.Enable(Qinput_as_path)
 
+        self.Layout()
+    
     def OnToggleBottom(self, evt):
         item = self.parent.GetMenuBar().FindItemById(evt.GetId())
         get_config()["view_bottom"] = item.IsChecked()
@@ -435,13 +485,18 @@ class MainPanel(wx.Panel):
     def AddSourcesFromDir(self, directory):
         with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             get_config()["folder_sources"] = directory
+            Qinput_as_path = get_config()["input_as_path"]
             newdata = []
-            for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
-                try:
-                    if f.is_file():
-                        newdata.append(f)
-                except (OSError, IOError):
-                    pass
+            if Qinput_as_path:
+                for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
+                    try:
+                        if f.is_file():
+                            newdata.append(f)
+                    except (OSError, IOError):
+                        pass
+            else:
+                for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
+                    newdata.append(f)
             self.list_ctrl.AddToList(newdata)
             self.parent.UpdateRecentSources(directory)
 
@@ -460,22 +515,29 @@ class MainPanel(wx.Panel):
     def AddSourcesFromFiles(self, files):
         with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             newdata = []
-            first = True
-            for f in files:
-                if not f:
-                    continue
-                try:
-                    fp = Path(f)
-                    if first:
-                        first = False
-                        get_config()["folder_sources"] = str(fp.parent)
-                    newdata.append(fp)
-                except (OSError, IOError):
-                    pass
+            Qinput_as_path = get_config()["input_as_path"]
+            if Qinput_as_path:
+                first = True
+                for f in files:
+                    if not f:
+                        continue
+                    try:
+                        fp = Path(f)
+                        if first:
+                            first = False
+                            get_config()["folder_sources"] = str(fp.parent)
+                        newdata.append(fp)
+                    except (OSError, IOError):
+                        pass
+            else:
+                for f in files:
+                    if not f:
+                        continue
+                    newdata.append(f)
             self.list_ctrl.AddToList(newdata)
 
     def OnAddSourcesFromClipboard(self, evt):
-        files = utils.ClipBoardFiles()
+        files = utils.ClipBoardFiles(get_config()["input_as_path"])
         if files:
             self.AddSourcesFromFiles(files)
 
@@ -491,12 +553,17 @@ class MainPanel(wx.Panel):
     def AddChoicesFromDir(self, directory):
         with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
             get_config()["folder_choices"] = directory
-            for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
-                try:
-                    if f.is_file():
-                        glob_choices[f] = None
-                except (OSError, IOError):
-                    pass
+            Qinput_as_path = get_config()["input_as_path"]
+            if Qinput_as_path:
+                for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
+                    try:
+                        if f.is_file():
+                            glob_choices[f] = None
+                    except (OSError, IOError):
+                        pass
+            else:
+                for f in sorted(Path(directory).resolve().glob("*"), key=os.path.basename):
+                    newdata.append(f)
             RefreshCandidates()
             self.parent.UpdateRecentChoices(directory)
 
@@ -514,22 +581,29 @@ class MainPanel(wx.Panel):
 
     def AddChoicesFromFiles(self, files):
         with wx.lib.busy.BusyInfo("Please wait...", wx.PyApp.GetMainTopWindow()):
-            first = True
-            for f in files:
-                if not f:
-                    continue
-                try:
-                    fp = Path(f)
-                    if first:
-                        first = False
-                        get_config()["folder_choices"] = str(fp.parent)
-                    glob_choices[fp] = None
-                except (OSError, IOError):
-                    pass
+            Qinput_as_path = get_config()["input_as_path"]
+            if Qinput_as_path:
+                first = True
+                for f in files:
+                    if not f:
+                        continue
+                    try:
+                        fp = Path(f)
+                        if first:
+                            first = False
+                            get_config()["folder_choices"] = str(fp.parent)
+                        glob_choices[fp] = None
+                    except (OSError, IOError):
+                        pass
+            else:
+                for f in files:
+                    if not f:
+                        continue
+                    glob_choices[f] = None
             RefreshCandidates()
 
     def OnAddChoicesFromClipboard(self, evt):
-        files = utils.ClipBoardFiles()
+        files = utils.ClipBoardFiles(get_config()["input_as_path"])
         if files:
             self.AddChoicesFromFiles(files)
 
@@ -549,16 +623,20 @@ class MainPanel(wx.Panel):
                 rows = utils.read_xlsx(file)
             elif fp.suffix == ".csv" or fp.suffix == ".txt" :
                 rows = utils.read_csv(file)
+            Qinput_as_path = get_config()["input_as_path"]
             for row in rows:
                 f = row.get("A", None)
                 alias = row.get("B", None)
                 if not f:
                     continue
-                try:
-                    fp = Path(f)
-                    glob_choices[fp] = alias
-                except (OSError, IOError):
-                    pass
+                if Qinput_as_path:
+                    try:
+                        fp2 = Path(f)
+                        glob_choices[fp2] = alias
+                    except (OSError, IOError):
+                        pass
+                else:
+                    glob_choices[f] = alias
             RefreshCandidates()
 
         self.parent.UpdateRecentChoices(file)
@@ -751,6 +829,10 @@ class MainPanel(wx.Panel):
         dia.Destroy()
 
     def OnRename(self, evt):
+        # renaming is not applicable if inputs are not path
+        if not get_config()["input_as_path"]:
+            return
+            
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
         Qrename_choice = get_config()["rename_choice"]
@@ -913,14 +995,20 @@ class MainPanel(wx.Panel):
                 for previews_per_singlesource in previews_per_source
                 for p in previews_per_singlesource
             ]
+            Qinput_as_path = get_config()["input_as_path"]
             duplicates = defaultdict(list)
             for (key, source) in self.list_ctrl.listdata.items():
                 all_previews_for_key = [
                     p for previews_per_singlesource in source[config.D_PREVIEW] for p in previews_per_singlesource
                 ]
-                for v in all_previews_for_key:
-                    if v and v.stem and all_previews.count(v) > 1:
-                        duplicates[v].append(key)
+                if Qinput_as_path:
+                    for v in all_previews_for_key:
+                        if v and v.stem and all_previews.count(v) > 1:
+                            duplicates[v].append(key)
+                else:
+                    for v in all_previews_for_key:
+                        if v and all_previews.count(v) > 1:
+                            duplicates[v].append(key)
             duplicates_key = [duplicates[sorted_key] for sorted_key in sorted(duplicates.keys())]
             a = []
             for d in duplicates_key:
@@ -1086,9 +1174,6 @@ class MainFrame(wx.Frame):
         self.help = None
         self.statusbar = self.CreateStatusBar(2)
 
-        # Add a panel so it looks the correct on all platforms
-        self.panel = MainPanel(self)
-
         menubar = wx.MenuBar()
         self.files = wx.Menu()
         view = wx.Menu()
@@ -1224,22 +1309,40 @@ class MainFrame(wx.Frame):
             self.files.AppendSeparator()
         self.files.Append(self.mnu_quit)
 
-        mnu_view_fullpath = view.AppendCheckItem(wx.ID_ANY, "&View full path", "View full path")
+        self.mnu_view_fullpath = view.AppendCheckItem(wx.ID_ANY, "&View full path", "View full path")
         self.mnu_hide_extension = view.AppendCheckItem(wx.ID_ANY, "&Hide suffix", "Hide suffix")
-        self.mnu_view_bottom = view.AppendCheckItem(wx.ID_ANY, "&View Output Pane", "View Output Pane")
+        self.mnu_view_bottom = view.AppendCheckItem(wx.ID_ANY, "View Output &Pane", "View Output Pane")
         self.mnu_show_log = view.AppendCheckItem(wx.ID_ANY, "&Show log", "Show log")
 
-        mnu_rename_choice = options.AppendCheckItem(wx.ID_ANY, "&Rename choice instead of source", "Rename choice instead of source")
+        # Input type
+        input_type_menu = wx.Menu()
+        input_type_menu_ = wx.MenuItem(
+            options,
+            wx.ID_ANY,
+            "&Type of inputs",
+            "Select the type of inputs",
+        )
+        self.mnu_types = []
+        input_type_menu_.SetSubMenu(input_type_menu)
+        new_mnu_type_file = input_type_menu.AppendRadioItem(wx.ID_ANY, "&1    Files", "")
+        new_mnu_type_string = input_type_menu.AppendRadioItem(wx.ID_ANY, "&2    Strings", "")
+        self.mnu_types.append(new_mnu_type_file)
+        self.mnu_types.append(new_mnu_type_string)
+        options.Append(input_type_menu_)
+        self.mnu_types[0 if get_config()["input_as_path"] else 1].Check(True)
+
+        self.mnu_rename_choice = options.AppendCheckItem(wx.ID_ANY, "&Rename choice instead of source", "Rename choice instead of source")
         self.mnu_keep_original = options.AppendCheckItem(wx.ID_ANY, "Keep &original on renaming", "Keep original on renaming")
-        self.mnu_best_auto = options.AppendCheckItem(wx.ID_ANY, "Automatically find best match", "Automatically find best match")
+        self.mnu_best_auto = options.AppendCheckItem(wx.ID_ANY, "Automatically find &best match", "Automatically find best match")
         self.mnu_keep_match_ext = options.AppendCheckItem(wx.ID_ANY, "&Keep matched file suffix", "Keep matched file suffix")
         self.mnu_match_firstletter = options.AppendCheckItem(
             wx.ID_ANY, "&Always match first letter", "Enforce choices that match the first letter of the source",
         )
         self.mnu_source_w_multiple_choice = options.AppendCheckItem(
-            wx.ID_ANY, "&Source can match multiple choices", "Source can match multiple choices"
+            wx.ID_ANY, "Source can match &multiple choices", "Source can match multiple choices"
         )
 
+        # Number of parallel workers
         workers = wx.Menu()
         workers_ = wx.MenuItem(
             options,
@@ -1263,6 +1366,7 @@ class MainFrame(wx.Frame):
         if get_config()["workers"] <= len(self.mnu_procs) and get_config()["workers"] > 0:
             self.mnu_procs[get_config()["workers"] - 1].Check(True)
 
+        # Similarity Engine
         similarityscorers = wx.Menu()
         similarityscorers_ = wx.MenuItem(
             options,
@@ -1309,15 +1413,18 @@ class MainFrame(wx.Frame):
         self.mnu_view_bottom.Check(get_config()["view_bottom"])
         self.mnu_show_log.Check(get_config()["show_log"])
 
-        mnu_view_fullpath.Check(get_config()["show_fullpath"])
+        self.mnu_view_fullpath.Check(get_config()["show_fullpath"])
         self.mnu_hide_extension.Check(get_config()["hide_extension"])
         self.mnu_hide_extension.Enable(not get_config()["show_fullpath"])
-        mnu_rename_choice.Check(get_config()["rename_choice"])
+        self.mnu_rename_choice.Check(get_config()["rename_choice"])
         self.mnu_keep_original.Check(get_config()["keep_original"])
         self.mnu_best_auto.Check(get_config()["best_auto"])
         self.mnu_keep_match_ext.Check(get_config()["keep_match_ext"])
         self.mnu_match_firstletter.Check(get_config()["match_firstletter"])
         self.mnu_source_w_multiple_choice.Check(get_config()["source_w_multiple_choice"])
+
+        # Add a panel so it looks the correct on all platforms
+        self.panel = MainPanel(self)
 
         # Show/Hide the bottom pane according to config
         self.panel.ToggleBottom()
@@ -1349,14 +1456,14 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.panel.OnSameOutputDirectory, self.mnu_same_as_input)
         self.Bind(wx.EVT_MENU, self.panel.OnToggleBottom, self.mnu_view_bottom)
         self.Bind(wx.EVT_MENU, self.panel.OnToggleLog, self.mnu_show_log)
-        self.Bind(wx.EVT_MENU, self.panel.OnViewFullPath, mnu_view_fullpath)
+        self.Bind(wx.EVT_MENU, self.panel.OnViewFullPath, self.mnu_view_fullpath)
         self.Bind(wx.EVT_MENU, self.panel.OnHideExtension, self.mnu_hide_extension)
         self.Bind(wx.EVT_MENU, self.panel.OnKeepMatchExtension, self.mnu_keep_match_ext)
         self.Bind(wx.EVT_MENU, self.panel.OnMatchFirstLetter, self.mnu_match_firstletter)
         self.Bind(wx.EVT_MENU, self.panel.OnSourceWMultipleChoice, self.mnu_source_w_multiple_choice)
         self.Bind(wx.EVT_MENU, self.panel.OnKeepOriginal, self.mnu_keep_original)
         self.Bind(wx.EVT_MENU, self.panel.OnFindBestAuto, self.mnu_best_auto)
-        self.Bind(wx.EVT_MENU, self.panel.OnRenameChoice, mnu_rename_choice)
+        self.Bind(wx.EVT_MENU, self.panel.OnRenameChoice, self.mnu_rename_choice)
         self.Bind(wx.EVT_MENU, self.panel.OnDefaultPasteChoices, self.mnu_choices_from_clipboard_default)
         self.Bind(wx.EVT_MENU, self.panel.OnDefaultPasteSource, self.mnu_source_from_clipboard_default)
         self.Bind(wx.EVT_MENU, self.OnOpen, mnu_open)
@@ -1376,6 +1483,8 @@ class MainFrame(wx.Frame):
             self.Bind(wx.EVT_MENU, self.OnNumProc, mnu_proc)
         for mnu_scorer in self.mnu_scorers:
             self.Bind(wx.EVT_MENU, self.OnSimilarityScorer, mnu_scorer)
+        for mnu_type_input in self.mnu_types:
+            self.Bind(wx.EVT_MENU, self.OnChangeInputType, mnu_type_input)
 
         # arguments
         if get_args().sources:
@@ -1428,6 +1537,29 @@ class MainFrame(wx.Frame):
         menu = event.GetEventObject()
         menuItem = menu.FindItemById(event.GetId())
         get_config()["similarityscorer"] = self.mnu_scorers.index(menuItem)
+
+    def OnChangeInputType(self, event):
+        menu = event.GetEventObject()
+        menuItem = menu.FindItemById(event.GetId())
+
+        get_config()["input_as_path"] = (self.mnu_types.index(menuItem) == 0)
+
+        # Update Menus
+        self.panel.UpdateButtons()
+        
+        # Update Inputs
+        sources = []
+        row_id = -1
+        while True:
+            row_id = self.panel.list_ctrl.GetNextItem(row_id)
+            if row_id == -1:
+                break
+            pos = self.panel.list_ctrl.GetItemData(row_id)  # 0-based unsorted index
+            sources += self.panel.list_ctrl.listdata[pos][config.D_FILENAME]
+        choices = [str(key) for key in glob_choices]
+        self.panel.OnReset(None)
+        self.panel.AddSourcesFromFiles(sources)
+        self.panel.AddChoicesFromFiles(choices)
 
     def OnOpenRecent(self, event):
         menu = event.GetEventObject()
@@ -1562,6 +1694,7 @@ class MainFrame(wx.Frame):
                         "listdata": self.panel.list_ctrl.listdata,
                         "listdataname": self.panel.list_ctrl.listdataname,
                         "listdatanameinv": self.panel.list_ctrl.listdatanameinv,
+                        "input_as_path": get_config()["input_as_path"],
                     },
                     file,
                 )
@@ -1576,6 +1709,7 @@ class MainFrame(wx.Frame):
 
         self.UpdateRecentSession(pathname)
         list = self.panel.list_ctrl
+        need_refresh_button = False
         try:
             with open(pathname, "rb") as file:
                 data = pickle.load(file)
@@ -1585,11 +1719,26 @@ class MainFrame(wx.Frame):
                 list.listdatanameinv = data["listdatanameinv"]
                 if utils.versiontuple(data["version"]) >= utils.versiontuple("0.2.2"):
                     aliases = data["aliases"]
+                if utils.versiontuple(data["version"]) <= utils.versiontuple("0.2.3"):
+                    # forcing setting to only choice known until 0.2.3 
+                    if not get_config()["input_as_path"]:
+                        get_config()["input_as_path"] = True
+                        need_refresh_button = True
+                else:
+                    input_as_path = data["input_as_path"]
+                    if input_as_path != get_config()["input_as_path"]:
+                        get_config()["input_as_path"] = input_as_path
+                        need_refresh_button = True
+                    
         except IOError:
             wx.LogError("Cannot open file '%s'." % pathname)
 
         RefreshCandidates()
         list.DeleteAllItems()
+        
+        if need_refresh_button:
+            self.panel.UpdateButtons()
+            
         row_id = 0
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
@@ -1745,7 +1894,12 @@ def getDoc():
         "</ol>"
         "<h3>Options</h3>"
         "<ul>"
-        "<li><b>View full path</b><br><br>"
+        "<li><b>Type of inputs</b><br><br>"
+        "<ol>"
+        '<li><b>Files</b>: Choices and Sources are representing files (Default mode, renaming is applicable)</li>'
+        '<li><b>Strings</b>: Choices and Sources are representing strings. Every options or actions related to files (renaming, deleting, full path, suffix) are not applicable.</li>'
+        "</ol>"
+        "<br><li><b>View full path</b><br><br>"
         "When <b>source</b> strings are coming from file paths, the full path of files are shown in the <code><b>Source Name</b></code> and <code><b>Renaming Preview</b></code> columns.<br>"
         "When <b>choices</b> strings are coming from file paths, the full path of files are shown in the <code><b>Closest Match</b></code> columns.</li>"
         "<br><li><b>Hide suffix</b><br><br>"
@@ -1764,6 +1918,8 @@ def getDoc():
         '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If option is unchecked <b>renamed source</b> is only <code><font color="red">Amaryllidinae</font><font color="blue">.png</font></code>.'
         "<br><li><b>Number of processes</b><br><br>"
         "Number of parallel processes used when launching matching/renaming/undoing tasks (=1 to not use parallel tasks)"
+        "<br><li><b>Similarity scorer</b><br><br>"
+        "Type of algorithm used for matching (see https://github.com/seatgeek/thefuzz)"
         "</ul>"
         "<h3>Available actions on <b>source</b> items</h3>"
         "<p>From the context menu on each <b>source</b> item in the main list, the following actions are available:"

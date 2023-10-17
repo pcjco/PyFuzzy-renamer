@@ -136,8 +136,6 @@ def get_matches(sources):
 def update_console(output, msgfunc=None):
     if not output["args"] or not output["result"]:
         return
-    Qview_fullpath = get_config()["show_fullpath"]
-    Qhide_extension = get_config()["hide_extension"]
     f_masked = output["args"][0].masked[1]
     print_source = f_masked
 

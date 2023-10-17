@@ -69,14 +69,17 @@ class PickCandidate(wx.MiniFrame):
             event.Skip()
 
     def OnEnter(self, event):
+        Qinput_as_path = get_config()["input_as_path"]
         forced_match = self.text.GetLineText(0).strip()
-        item = filters.FileFiltered(Path(forced_match), alreadyStem=True)
+        input_filter = Path(forced_match) if Qinput_as_path else forced_match
+        item = filters.FileFiltered(input_filter, alreadyStem=True)
         matching_results = main_dlg.candidates["all"][item.filtered]
         idx_file = -1
         for i in range(len(matching_results)):
-            if matching_results[i].file.stem == forced_match:
-                idx_file = i
-                break
+            matched_file = matching_results[i].file.stem if Qinput_as_path else matching_results[i].file
+            if matched_file == forced_match:
+                    idx_file = i
+                    break
         
         list_ctrl = self.GetParent()
         list_ctrl.MenuForceMatchCb(self.row_id, item.filtered, idx_file, None)
@@ -187,7 +190,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.Thaw()
             event.Skip()
         elif keycode == wx.WXK_CONTROL_V:
-            files = utils.ClipBoardFiles()
+            files = utils.ClipBoardFiles(get_config()["input_as_path"])
             if files:
                 paste_default = get_config()["paste_forced"]
                 if not paste_default:
@@ -206,7 +209,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                         self.GetParent().GetParent().GetParent().GetParent().mnu_choices_from_clipboard_default.Check(not Qsources)
                     dlg.Destroy()
                 else:
-                    Qsources = (paste_default == 1)                
+                    Qsources = (paste_default == 1)
                 if Qsources:
                     self.GetParent().GetParent().GetParent().AddSourcesFromFiles(files)
                 else:
@@ -275,19 +278,26 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         if not self.GetSelectedItemCount():
             return
         menu = wx.Menu()
-        mnu_delete = wx.MenuItem(menu, wx.ID_ANY, "&Delete source file(s)\tShift+Del", "Delete source file(s)")
-        mnu_delete.SetBitmap(icons.Delete_16_PNG.GetBitmap())
         mnu_nomatch = wx.MenuItem(menu, wx.ID_ANY, "&Reset choice\tCtrl+R", "Reset choice")
         mnu_nomatch.SetBitmap(icons.NoMatch_16_PNG.GetBitmap())
         mnu_rematch = wx.MenuItem(menu, wx.ID_ANY, "&Best choice\tCtrl+B", "Best choice")
         mnu_rematch.SetBitmap(icons.ProcessMatch_16_PNG.GetBitmap())
-        menu.Append(mnu_delete)
+        
+        # Add access to file deletion if applicable
+        if get_config()["input_as_path"]: 
+            mnu_delete = wx.MenuItem(menu, wx.ID_ANY, "&Delete source file(s)\tShift+Del", "Delete source file(s)")
+            mnu_delete.SetBitmap(icons.Delete_16_PNG.GetBitmap())
+            menu.Append(mnu_delete)
+            self.Bind(wx.EVT_MENU, self.DeleteSelectionCb, mnu_delete)
+
         menu.Append(mnu_nomatch)
         menu.Append(mnu_rematch)
-        self.Bind(wx.EVT_MENU, self.DeleteSelectionCb, mnu_delete)
+
         self.Bind(wx.EVT_MENU, self.NoMatchSelectionCb, mnu_nomatch)
         self.Bind(wx.EVT_MENU, self.ReMatchSelectionCb, mnu_rematch)
-        if sys.platform.startswith('win32'):
+
+        # Add access to file launch/explorer if applicable
+        if get_config()["input_as_path"] and sys.platform.startswith('win32'):
             mnu_open_source_explorer = wx.MenuItem(menu, wx.ID_ANY, "&Select source file(s) in Explorer", "Select source file(s) in Explorer")
             mnu_open_match_explorer = wx.MenuItem(menu, wx.ID_ANY, "Select &matched file(s) in Explorer", "Select matched file(s) in Explorer")
             menu.Append(mnu_open_source_explorer)
@@ -371,8 +381,11 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         dia.text.SetFocus()
 
     def DeleteSelectionCb(self, event):
+        # File deletion not applicable if inputs are not path
+        if not get_config()["input_as_path"]:
+            return
+            
         selected = utils.get_selected_items(self)
-
         selected.reverse()  # Delete all the items + source file, starting with the last item
         self.Freeze()
         for row_id in selected:
@@ -517,6 +530,11 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.SetItemFont(row_id, font)
 
     def OpenSourceExplorerCb(self, event):
+        # not relevant if not dealing with file path
+        Qinput_as_path = get_config()["input_as_path"]
+        if not Qinput_as_path:
+            return
+        
         pathes = []
         selected = utils.get_selected_items(self)
         for row_id in selected:
@@ -526,6 +544,11 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         utils.launch_file_explorer(pathes)
         
     def OpenMatchExplorerCb(self, event):
+        # not relevant if not dealing with file path
+        Qinput_as_path = get_config()["input_as_path"]
+        if not Qinput_as_path:
+            return
+
         pathes = []
         selected = utils.get_selected_items(self)
         for row_id in selected:
@@ -535,6 +558,11 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         utils.launch_file_explorer(pathes)
 
     def OnDoubleClick(self, event):
+        # not relevant if not dealing with file path
+        Qinput_as_path = get_config()["input_as_path"]
+        if not Qinput_as_path:
+            return
+
         start_match_col = 0
         end_match_col = 0
         for col in self.GetColumnsOrder() if self.HasColumnOrderSupport() else range(0, len(config.default_columns)):
@@ -581,40 +609,52 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             dia.text.SetFocus()
         else:
             event.Allow()
-            if get_config()["show_fullpath"]:
-                d = Path(event.GetLabel()).name
-            else:
-                d = event.GetLabel()
-            (self.GetEditControl()).SetValue(d)
-            if not get_config()["hide_extension"]:
-                index_of_dot = d.rfind('.')
-                if index_of_dot > 0:
-                    (self.GetEditControl()).SetSelection(0, index_of_dot)
+            Qinput_as_path = get_config()["input_as_path"]
+            if Qinput_as_path:
+                if get_config()["show_fullpath"]:
+                    d = Path(event.GetLabel()).name
+                else:
+                    d = event.GetLabel()
+                (self.GetEditControl()).SetValue(d)
+                if not get_config()["hide_extension"]:
+                    index_of_dot = d.rfind('.')
+                    if index_of_dot > 0:
+                        (self.GetEditControl()).SetSelection(0, index_of_dot)
 
     def OnEndLabelEdit(self, event):
         if event.IsEditCancelled() or not event.GetLabel():
             event.Veto()
             return
+        Qinput_as_path = get_config()["input_as_path"]
         row_id = event.GetIndex()
         pos = self.GetItemData(row_id)  # 0-based unsorted index
         new_name = event.GetLabel()
         old_path = self.listdata[pos][config.D_FILENAME]
-        old_name = old_path.name
-        new_name_clean = utils.strip_extra_whitespace(utils.strip_illegal_chars(new_name))
+        if Qinput_as_path:
+            old_name = old_path.name
+            new_name_clean = utils.strip_extra_whitespace(utils.strip_illegal_chars(new_name))
+        else:
+            old_name = old_path
+            new_name_clean = utils.strip_extra_whitespace(new_name)
 
         event.Veto()  # do not allow further process as we will edit ourself the item label
 
         if new_name_clean == old_name:
             return
         old_file = str(old_path)
-        new_file = os.path.join(str(old_path.parent), new_name_clean)
-        new_path = Path(new_file)
+        if Qinput_as_path:
+            new_file = os.path.join(str(old_path.parent), new_name_clean)
+            new_path = Path(new_file)
+        else:
+            new_file = new_name_clean
+            new_path = new_file
 
         try:
-            if not old_path.is_file():
-                return
-            os.rename(old_file, new_file)
-            wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
+            if Qinput_as_path:
+                if not old_path.is_file():
+                    return
+                os.rename(old_file, new_file)
+                wx.LogMessage("Renaming : %s --> %s" % (old_file, new_file))
 
             Qview_fullpath = get_config()["show_fullpath"]
             Qhide_extension = get_config()["hide_extension"]
@@ -748,6 +788,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
         Qbest_auto = get_config()["best_auto"]
+        Qinput_as_path = get_config()["input_as_path"]
 
         index = 0 if not self.listdata else sorted(self.listdata.keys())[-1] + 1  # start indexing after max index
         row_id = self.GetItemCount()
@@ -768,7 +809,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             else:
                 # Treat duplicate file
                 stem, suffix = utils.GetFileStemAndSuffix(f)
-                item_name = str(f) if Qview_fullpath else (stem if Qhide_extension else f.name)
+                item_name = str(f) if (Qview_fullpath or not Qinput_as_path) else (stem if Qhide_extension else f.name)
                 found = self.FindItem(-1, item_name)
                 if found != -1:
                     continue

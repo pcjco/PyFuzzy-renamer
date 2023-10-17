@@ -163,9 +163,8 @@ class FilterListCtrl(wx.ListCtrl, listmix.TextEditMixin):
                     s_filters += '"' + self.GetItemText(row_id0, 3) + '"\n'
 
             re_filters = filters.CompileFilters(s_filters)
-            self.panel.result_preview_filters.SetValue(
-                filters.filter_processed(Path(self.panel.preview_filters.GetValue() + ".noext"), re_filters)
-            )
+            filter_input = Path(self.panel.preview_filters.GetValue() + ".noext") if get_config()["input_as_path"] else self.panel.preview_filters.GetValue()
+            self.panel.result_preview_filters.SetValue(filters.filter_processed(filter_input, re_filters))
 
     def getItemInfo(self, idx):
         """Collect all relevant data of a listitem, and put it in a list"""

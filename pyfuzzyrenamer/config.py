@@ -149,6 +149,7 @@ def default():
     theConfig["keep_original"] = False
     theConfig["best_auto"] = False
     theConfig["source_w_multiple_choice"] = True
+    theConfig["input_as_path"] = True
     theConfig["folder_sources"] = os.getcwd()
     theConfig["folder_choices"] = os.getcwd()
     theConfig["folder_output"] = ""
@@ -207,6 +208,10 @@ def read(config_file=None):
             pass
         try:
             theConfig["best_auto"] = True if config["global"]["best_auto"] == "True" else False
+        except KeyError:
+            pass
+        try:
+            theConfig["input_as_path"] = True if config["global"]["input_as_path"] == "True" else False
         except KeyError:
             pass
         try:
@@ -310,6 +315,7 @@ def write(config_file=None):
                 "best_auto": theConfig["best_auto"],
                 "rename_choice": theConfig["rename_choice"],
                 "paste_forced": theConfig["paste_forced"],
+                "input_as_path": theConfig["input_as_path"],
             },
             "matching": {
                 "masks": theConfig["masks"],
