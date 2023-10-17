@@ -1896,7 +1896,7 @@ def getDoc():
         "<ul>"
         "<li><b>Type of inputs</b><br><br>"
         "<ol>"
-        '<li><b>Files</b>: Choices and Sources are representing files (Default mode, renaming is applicable)</li>'
+        '<li><b>Files</b>: Choices and Sources are representing files. This is the standard mode where renaming is applicable.</li>'
         '<li><b>Strings</b>: Choices and Sources are representing strings. Every options or actions related to files (renaming, deleting, full path, suffix) are not applicable.</li>'
         "</ol>"
         "<br><li><b>View full path</b><br><br>"

@@ -1,3 +1,7 @@
+## Version 0.2.4
+
+* Adding a mode to consider choices and sources as simple strings and not files. Renaming, deleting, ... become not applicable in this mode.
+
 ## Version 0.2.3
 
 * Adding Clear Sources/Choices commands

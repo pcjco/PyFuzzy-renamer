@@ -151,6 +151,11 @@ There are two options available:
 
 ### Options
 
+*   **Type of inputs**
+
+    1. Files : Choices and Sources are representing files. This is the standard mode where renaming is applicable.
+    2. Strings : Choices and Sources are representing strings. Every options or actions related to files (renaming, deleting, full path, suffix) are not applicable.
+
 *   **View full path**
 
     When **source** strings are coming from file paths, the full path of files are shown in the **`Source Name`** and **`Renaming Preview`** columns.  
