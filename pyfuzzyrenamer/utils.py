@@ -19,12 +19,16 @@ illegal_chars = r'/?<>\:*|"' if (sys.platform == "win32") else r":"
 
 
 def GetFileStemAndSuffix(file):
+    if type(file).__name__ == "str":
+        return file, ""
     stem = file.stem
     suffix = file.suffix if file.suffix != ".noext" else ""
     return stem, suffix
 
 
 def GetFileParentStemAndSuffix(file):
+    if type(file).__name__ == "str":
+        return "", file, ""
     p = str(file.parent)
     parent = (p + os.sep) if p != "." else ""
     return (parent,) + GetFileStemAndSuffix(file)
@@ -117,7 +121,7 @@ def GetNextFocused(list_control, item):
     return list_control.GetNextItem(item, wx.LIST_NEXT_ALL, wx.LIST_STATE_FOCUSED)
 
 
-def ClipBoardFiles():
+def ClipBoardFiles(as_path):
     ret = []
     try:
         if wx.TheClipboard.Open():
@@ -125,32 +129,38 @@ def ClipBoardFiles():
                 do = wx.TextDataObject()
                 wx.TheClipboard.GetData(do)
                 filenames = do.GetText().splitlines()
-                for f in filenames:
-                    try:
-                        fp = Path(f)
-                        if fp.is_dir():
-                            for fp2 in fp.resolve().glob("*"):
-                                if fp2.is_file():
-                                    ret.append(str(fp2))
-                        else:
-                            ret.append(f)
-                    except (OSError, IOError):
-                        pass
+                if not as_path:
+                    ret = filenames
+                else:
+                    for f in filenames:
+                        try:
+                            fp = Path(f)
+                            if fp.is_dir():
+                                for fp2 in fp.resolve().glob("*"):
+                                    if fp2.is_file():
+                                        ret.append(str(fp2))
+                            else:
+                                ret.append(f)
+                        except (OSError, IOError):
+                            pass
             elif wx.TheClipboard.IsSupported(wx.DataFormat(wx.DF_FILENAME)):
                 do = wx.FileDataObject()
                 wx.TheClipboard.GetData(do)
                 filenames = do.GetFilenames()
-                for f in filenames:
-                    try:
-                        fp = Path(f)
-                        if fp.is_dir():
-                            for fp2 in fp.resolve().glob("*"):
-                                if fp2.is_file():
-                                    ret.append(str(fp2))
-                        else:
-                            ret.append(f)
-                    except (OSError, IOError):
-                        pass
+                if not as_path:
+                    ret = filenames
+                else:
+                    for f in filenames:
+                        try:
+                            fp = Path(f)
+                            if fp.is_dir():
+                                for fp2 in fp.resolve().glob("*"):
+                                    if fp2.is_file():
+                                        ret.append(str(fp2))
+                            else:
+                                ret.append(f)
+                        except (OSError, IOError):
+                            pass
             wx.TheClipboard.Close()
     except (OSError, IOError):
         pass
@@ -247,4 +257,4 @@ def versiontuple(v):
    filled = []
    for point in v.split("."):
       filled.append(point.zfill(8))
-   return tuple(filled)    
+   return tuple(filled)

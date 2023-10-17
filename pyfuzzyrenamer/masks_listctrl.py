@@ -155,9 +155,8 @@ class MaskListCtrl(wx.ListCtrl, listmix.TextEditMixin):
 
             re_masks = masks.CompileMasks(s_masks)
             re_filters = []
-            pre, middle, post = masks.mask_processed(
-                Path(self.panel.preview_masks.GetValue() + ".noext"), re_masks, re_filters, applyFilters=False,
-            )
+            mask_input = Path(self.panel.preview_masks.GetValue() + ".noext") if get_config()["input_as_path"] else self.panel.preview_masks.GetValue()
+            pre, middle, post = masks.mask_processed(mask_input, re_masks, re_filters, applyFilters=False)
             self.panel.result_preview_masks_lead.SetValue(pre)
             self.panel.result_preview_masks_mid.SetValue(middle)
             self.panel.result_preview_masks_trail.SetValue(post)

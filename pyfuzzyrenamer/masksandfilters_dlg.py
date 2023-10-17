@@ -154,16 +154,14 @@ class masksandfiltersPanel(wx.Panel):
 
     def UpdateFilterPreview(self):
         re_filters = filters.CompileFilters(self.filters_list.GetFilters())
-        self.result_preview_filters.SetValue(
-            filters.filter_processed(Path(self.preview_filters.GetValue() + ".noext"), re_filters)
-        )
+        filter_input = Path(self.preview_filters.GetValue() + ".noext") if get_config()["input_as_path"] else self.preview_filters.GetValue()
+        self.result_preview_filters.SetValue(filters.filter_processed(filter_input, re_filters))
 
     def UpdateMaskPreview(self):
         re_masks = masks.CompileMasks(self.masks_list.GetMasks())
         re_filters = []
-        pre, middle, post = masks.mask_processed(
-            Path(self.preview_masks.GetValue() + ".noext"), re_masks, re_filters, applyFilters=False,
-        )
+        mask_input = Path(self.preview_masks.GetValue() + ".noext") if get_config()["input_as_path"] else self.preview_masks.GetValue()
+        pre, middle, post = masks.mask_processed(mask_input, re_masks, re_filters, applyFilters=False)
         self.result_preview_masks_lead.SetValue(pre)
         self.result_preview_masks_mid.SetValue(middle)
         self.result_preview_masks_trail.SetValue(post)
