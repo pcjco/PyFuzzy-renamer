@@ -31,6 +31,7 @@ class bottomNotebook(aui.AuiNotebook):
     def OnAuiNotebookPageClose(self, event):
         # prevent Log to be closed , hide it instead
         page_idx = event.GetSelection()
+        print(page_idx)
         if self.GetPageText(page_idx) == "Log":
             event.Veto()
             self.HidePage(page_idx, hidden=True)
@@ -70,6 +71,7 @@ class bottomNotebook(aui.AuiNotebook):
         # Show log tab if hidden
         if get_config()["show_log"] and logTabIdx != -1 and self.GetHidden(logTabIdx):
             self.HidePage(logTabIdx, hidden=False)
+            self.SetSelection(logTabIdx)
         # Hide log tab if shown
         elif not get_config()["show_log"] and logTabIdx != -1 and not self.GetHidden(logTabIdx):
             self.HidePage(logTabIdx, hidden=True)

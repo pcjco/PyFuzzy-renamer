@@ -928,6 +928,8 @@ class MainPanel(wx.Panel):
             else:
                 self.tab_errors = bottom_notebook.TabListItemError(parent=self.bottom_notebook, mlist=self.list_ctrl)
                 self.bottom_notebook.AddPage(self.tab_errors, "Errors", select=True)
+                errorTabIdx = self.bottom_notebook.GetPageIndex(self.tab_errors)
+                self.bottom_notebook.HidePage(errorTabIdx, hidden=False)
             self.tab_errors.SetItemsWithError(errors)
         else:
             if errorTabIdx != -1:
@@ -979,6 +981,8 @@ class MainPanel(wx.Panel):
             else:
                 self.tab_errors = bottom_notebook.TabListItemError(parent=self.bottom_notebook, mlist=self.list_ctrl)
                 self.bottom_notebook.AddPage(self.tab_errors, "Errors", select=True)
+                errorTabIdx = self.bottom_notebook.GetPageIndex(self.tab_errors)
+                self.bottom_notebook.HidePage(errorTabIdx, hidden=False)
             self.tab_errors.SetItemsWithError(errors)
         else:
             if errorTabIdx != -1:
@@ -1029,6 +1033,8 @@ class MainPanel(wx.Panel):
             else:
                 self.tab_duplicates = bottom_notebook.TabDuplicates(parent=self.bottom_notebook, mlist=self.list_ctrl)
                 self.bottom_notebook.AddPage(self.tab_duplicates, "Duplicates", select=True)
+                duplicateTabIdx = self.bottom_notebook.GetPageIndex(self.tab_duplicates)
+                self.bottom_notebook.HidePage(duplicateTabIdx, hidden=False)
             self.tab_duplicates.SetDuplicates(duplicates_key)
         else:
             wx.LogMessage("No duplicate found")
@@ -1057,6 +1063,8 @@ class MainPanel(wx.Panel):
             else:
                 self.tab_unmatched = bottom_notebook.TabUnmatched(parent=self.bottom_notebook)
                 self.bottom_notebook.AddPage(self.tab_unmatched, "Unmatched choices", select=True)
+                TabIdx = self.bottom_notebook.GetPageIndex(self.tab_unmatched)
+                self.bottom_notebook.HidePage(TabIdx, hidden=False)
             self.tab_unmatched.SetUnmatched(unmatched)
         else:
             wx.LogMessage("No unmatched found")
@@ -1085,6 +1093,8 @@ class MainPanel(wx.Panel):
             else:
                 self.tab_matched = bottom_notebook.TabMatched(parent=self.bottom_notebook)
                 self.bottom_notebook.AddPage(self.tab_matched, "Matched choices", select=True)
+                TabIdx = self.bottom_notebook.GetPageIndex(self.tab_matched)
+                self.bottom_notebook.HidePage(TabIdx, hidden=False)
             self.tab_matched.SetMatched(matched)
         else:
             wx.LogMessage("No match found")
