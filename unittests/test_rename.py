@@ -55,7 +55,6 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
                 "Acanthus spinosus.txt",
                 "Aconitum anthora.txt",
                 "Viola cornuta.txt",
-                "Volutaria tubuliflora.txt",
             ],
             renamed,
         )
@@ -104,7 +103,6 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
                 "Acanthus spinosus.txt.txt",
                 "Aconitum anthora.txt.txt",
                 "Viola cornuta.txt.txt",
-                "Volutaria tubuliflora.txt.txt",
             ],
             renamed,
         )
@@ -151,7 +149,7 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
                 "Acanthus spinosus.txt",
                 "Aconitum anthora.txt",
                 "Viola cornuta.txt",
-                "Volutaria tubuliflora.txt",
+                "Volutaire à fleurs tubulées.txt",
             ],
             renamed,
         )
@@ -218,7 +216,7 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
                 "Aconitum anthora.txt",
                 "Viola cornuta.txt",
                 "Violette cornue.txt",
-                "Volutaria tubuliflora.txt",
+                "Volutaire à fleurs tubulées.txt",
             ],
             renamed,
         )
@@ -346,15 +344,7 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
         )
         item = lst.GetNextItem(item)
         self.assertEqual(
-            [
-                "Volutaire à fleurs tubulées_disk1.txt",
-                "54",
-                "Volutaria tubuliflora_disk2.txt",
-                "Volutaria tubuliflora_disk1.txt",
-                "1",
-                "Matched",
-                "True",
-            ],
+            ["Volutaire à fleurs tubulées_disk1.txt", "57", "Viola cornuta.txt", "Viola cornuta_disk1.txt", "1", "Matched", "True",],
             [lst.GetItemText(item, col) for col in range(0, len(config.default_columns))],
         )
 
@@ -384,7 +374,7 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
                 "Aconitum anthora_disk2.txt",
                 "Aconitum anthora_disk3.txt",
                 "Viola cornuta_disk1.txt",
-                "Volutaria tubuliflora_disk1.txt",
+                "Volutaire à fleurs tubulées_disk1.txt",
             ],
             renamed,
         )
@@ -437,10 +427,10 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
         item = lst.GetNextItem(item)
         self.assertEqual(
             [
-                "Volutaria tubuliflora_disk1.txt",
-                "100",
-                "Volutaria tubuliflora_disk2.txt",
-                "Volutaria tubuliflora_disk1.txt",
+                "Volutaire à fleurs tubulées_disk1.txt",
+                "57",
+                "Viola cornuta.txt",
+                "Viola cornuta_disk1.txt",
                 "1",
                 "Matched",
                 "True",
@@ -527,9 +517,9 @@ class rename_Tests(pfr.PyFuzzyRenamerTestCase):
         self.assertEqual(
             [
                 "Volutaire à fleurs tubulées_disk1.txt",
-                "54",
-                "Volutaria tubuliflora_disk2.txt",
-                "Volutaria tubuliflora_disk1.txt",
+                "57",
+                "Viola cornuta.txt",
+                "Viola cornuta_disk1.txt",
                 "1",
                 "Matched",
                 "True",

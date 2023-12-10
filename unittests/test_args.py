@@ -40,7 +40,7 @@ class args_Tests(pfr.PyFuzzyRenamerTestCaseCLI):
                 "acanthe épineuse --> acanthus spinosus (73.00)\n"
                 "aconit vénéneux --> aconitum anthora (52.00)\n"
                 "violette cornue --> viola cornuta (71.00)\n"
-                "volutaire à fleurs tubulées --> volutaria tubuliflora (54.00)\n",
+                "volutaire à fleurs tubulées --> viola cornuta (57.00)\n",
                 output,
             )
 
@@ -97,7 +97,7 @@ class args_Tests(pfr.PyFuzzyRenamerTestCaseCLI):
                 + "Renaming : "
                 + os.path.join(sourcesDir, "Volutaire à fleurs tubulées_disk1.txt")
                 + " --> "
-                + os.path.join(sourcesDir, "Volutaria tubuliflora_disk1.txt\n"),
+                + os.path.join(sourcesDir, "Viola cornuta_disk1.txt\n"),
                 output,
             )
 
@@ -148,7 +148,7 @@ class args_Tests(pfr.PyFuzzyRenamerTestCaseCLI):
                 + "Renaming : "
                 + os.path.join(sourcesDir, "Volutaire à fleurs tubulées_disk1.txt")
                 + " --> "
-                + os.path.join(sourcesDir, "Volutaria tubuliflora_disk1.txt\n"),
+                + os.path.join(sourcesDir, "Viola cornuta_disk1.txt\n"),
                 output,
             )
 
@@ -187,7 +187,7 @@ class args_Tests(pfr.PyFuzzyRenamerTestCaseCLI):
                     "Aconitum anthora_disk2.txt",
                     "Aconitum anthora_disk3.txt",
                     "Viola cornuta_disk1.txt",
-                    "Volutaria tubuliflora_disk1.txt",
+                    "Volutaire à fleurs tubulées_disk1.txt",
                 ],
                 renamed,
             )

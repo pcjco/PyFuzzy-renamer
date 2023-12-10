@@ -114,9 +114,9 @@ class loadsave_Tests(pfr.PyFuzzyRenamerTestCase):
         self.assertEqual(
             [
                 "Volutaire à fleurs tubulées.txt",
-                "54",
-                "Volutaria tubuliflora.txt",
-                "Volutaria tubuliflora.txt",
+                "57",
+                "Viola cornuta.txt",
+                "Viola cornuta.txt",
                 "1",
                 "Matched",
                 "True",
