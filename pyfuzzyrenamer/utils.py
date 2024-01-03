@@ -232,7 +232,7 @@ def read_xlsx(fname, sheet = None):
                 if element.attrib.get('t') == 's':
                     value = strings[int(value)]
                 # split the row/col information so that the row leter(s) can be separate
-                letter = re.sub('\d','',element.attrib['r'])
+                letter = re.sub(r'\d','',element.attrib['r'])
                 row[letter] = value
                 value = ''
             if element.tag.endswith('}row'):

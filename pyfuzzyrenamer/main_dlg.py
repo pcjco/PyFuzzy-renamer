@@ -534,7 +534,16 @@ class MainPanel(wx.Panel):
                     if not f:
                         continue
                     newdata.append(f)
-            self.list_ctrl.AddToList(newdata)
+            rowIds = self.list_ctrl.AddToList(newdata)
+
+            # Special treatment for single source added : we focus on the item
+            if len(rowIds) == 1:
+                selected = utils.get_selected_items(self.list_ctrl)
+                for row_id in selected:
+                    self.list_ctrl.Select(row_id, on=False)
+                self.list_ctrl.Select(max(rowIds), on=True)
+                self.list_ctrl.Focus(max(rowIds))
+                self.list_ctrl.EnsureVisible(max(rowIds))
 
     def OnAddSourcesFromClipboard(self, evt):
         files = utils.ClipBoardFiles(get_config()["input_as_path"])

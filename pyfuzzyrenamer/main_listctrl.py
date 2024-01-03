@@ -784,6 +784,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.RefreshItem(row_id, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)
         self.Thaw()
 
+    # Add source to the list,
+    # Return Row Ids for new items
     def AddToList(self, newdata):
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
@@ -793,6 +795,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         index = 0 if not self.listdata else sorted(self.listdata.keys())[-1] + 1  # start indexing after max index
         row_id = self.GetItemCount()
         row_ids_to_match = set()
+        row_ids_to_return = set()
         
         self.Freeze()
         for f in newdata:
@@ -802,6 +805,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 pos = self.listdataname[key]
                 row_id0 = self.FindItem(-1, pos)
                 if row_id0 != -1:
+                    row_ids_to_return.add(row_id0)
                     if not f in self.listdata[pos][config.D_FILENAME]:
                         self.listdata[pos][config.D_FILENAME].append(f)
                         self.RefreshItem(row_id0, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)
@@ -812,6 +816,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 item_name = str(f) if (Qview_fullpath or not Qinput_as_path) else (stem if Qhide_extension else f.name)
                 found = self.FindItem(-1, item_name)
                 if found != -1:
+                    row_ids_to_return.add(found)
                     continue
 
                 self.listdataname[key] = index
@@ -822,6 +827,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.RefreshItem(row_id, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)
                 self.CheckItem(row_id, True)
                 row_ids_to_match.add(row_id)
+                row_ids_to_return.add(row_id)
                 row_id += 1
                 index += 1
 
@@ -880,6 +886,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 count += 1
         self.Thaw()
         wx.LogMessage("Sources : %d" % self.GetItemCount())
+        return row_ids_to_return
 
     def OnSortOrderChanged(self):
         row_id = self.GetFirstSelected()
