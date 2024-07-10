@@ -1,5 +1,6 @@
 import os
 import os.path
+import math
 import sys
 import wx
 import wx.lib.mixins.listctrl as listmix
@@ -10,6 +11,106 @@ from pyfuzzyrenamer import config, filters, main_dlg, icons, masks, match, utils
 from pyfuzzyrenamer.config import get_config
 from wxautocompletectrl.wxautocompletectrl import AutocompleteTextCtrl
 
+class TooltipManager:
+    def __init__(self, list_ctrl, tooltip_nb_rows=40, tooltip_nb_cols=2):
+        self.list_ctrl = list_ctrl
+        self.tooltip_nb_rows = tooltip_nb_rows
+        self.tooltip_nb_cols = tooltip_nb_cols
+        self.nb_per_tooltip_page = tooltip_nb_rows * tooltip_nb_cols
+        self.lastMousePos = (-1, -1)  # Initialize the last mouse position
+        self.lastItemSelected = -1  # Initialize the last selected item
+        self.lastPageShown = 0  # Initialize the last tooltip page shown
+        tip = list_ctrl.GetToolTip()
+        if not tip:
+            tip = wx.ToolTip('')
+            tip.SetMaxWidth(-1)
+            tip.SetAutoPop(30000)
+            list_ctrl.SetToolTip(tip)
+
+    def GetTooltipText(self, itemIndex, direction=0):
+        pos = self.list_ctrl.GetItemData(itemIndex)  # 0-based unsorted index
+        data = self.list_ctrl.listdata[pos]
+        if data[config.D_NBMATCH]:
+            matchnames = data[config.D_MATCHNAME]
+            parent, stem, suffix = utils.GetFileParentStemAndSuffix(matchnames[0])
+            if data[config.D_NBMATCH] > 1:
+                stem = masks.getmergedprepost(matchnames)
+            # Strip extra comments if any
+            stem, comments = utils.StripComments(stem)
+            
+            if comments:
+                # Replace "\n" by newline in comments
+                lines_of_comment = comments.split("\\n")
+                nb_lines_of_comments = len(lines_of_comment)
+                nb_pages = math.ceil(nb_lines_of_comments / self.nb_per_tooltip_page)
+            
+                if direction > 0:
+                    if self.lastPageShown >= nb_pages - 1:
+                        self.lastPageShown = 0
+                    else:
+                        self.lastPageShown += 1
+                elif direction < 0:
+                    if self.lastPageShown <= 0:
+                        self.lastPageShown = nb_pages - 2
+                    else:
+                        self.lastPageShown -= 1
+                else:
+                    self.lastPageShown = 0
+                return utils.arrange_strings(lines_of_comment[self.nb_per_tooltip_page * self.lastPageShown:self.nb_per_tooltip_page * (self.lastPageShown + 1)], self.tooltip_nb_rows, self.tooltip_nb_cols)
+            else:
+                return stem
+            
+        return ""
+
+    def OnMouseMotion(self, event):
+        # Get the current mouse position
+        currentPos = event.GetPosition()
+
+        # Check if the mouse position has changed
+        if currentPos == self.lastMousePos:
+            event.Skip()
+            return
+        
+        # Get the horizontal direction of the movement
+        direction = 0
+        if currentPos.x > self.lastMousePos[0] + 10:
+            direction = 1
+        elif currentPos.x < self.lastMousePos[0] - 10:
+            direction = -1
+            
+        tip = self.list_ctrl.GetToolTip()
+                
+        pos = self.list_ctrl.ScreenToClient(wx.GetMousePosition())
+        row_id, flag = self.list_ctrl.HitTest(pos)
+
+        if flag == wx.LIST_HITTEST_ONITEMLABEL:
+            if self.list_ctrl.GetSelectedItemCount() == 1 and main_dlg.candidates:
+                # Check if selected item is same and mouse has not moved (to change page)
+                if row_id == self.lastItemSelected and direction == 0:
+                    event.Skip()
+                    return
+
+                # Update the last mouse position
+                self.lastMousePos = currentPos
+                # Update the last selected item
+                self.lastItemSelected = row_id
+                
+                newTip = self.GetTooltipText(row_id, direction)
+                if newTip:
+                    oldTip = tip.GetTip()
+                    if oldTip != newTip:
+                        tip.SetTip(newTip)
+                else:
+                    tip.SetTip('')
+                    self.lastItemSelected = -1
+            else:
+                tip.SetTip('')
+                self.lastItemSelected = -1
+        else:
+            tip.SetTip('')
+            self.lastItemSelected = -1
+
+        event.Skip()
 
 def list_completer(a_list):
     def completer(query):
@@ -23,7 +124,6 @@ def list_completer(a_list):
         return formatted, unformatted
 
     return completer
-
 
 class PickCandidate(wx.MiniFrame):
     def __init__(self, parent, row_id, position, selectNextOnClose = False):
@@ -91,12 +191,12 @@ class PickCandidate(wx.MiniFrame):
             list_ctrl.EnsureVisible(self.row_id + 1)
         self.Close(True)
 
-
 class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
     def __init__(self, parent, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
         wx.ListCtrl.__init__(self, parent, pos=pos, size=size, style=style)
         listmix.ColumnSorterMixin.__init__(self, len(config.default_columns))
         self.EnableCheckBoxes()
+        self.tooltipManager = TooltipManager(self)
         self.Bind(wx.EVT_CHAR, self.onKeyPress)
         self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.OnBeginLabelEdit)
         self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.OnEndLabelEdit)
@@ -107,6 +207,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.SelectCb)
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.UnselectCb)
         self.Bind(wx.EVT_LEFT_DCLICK, self.OnDoubleClick)
+        self.Bind(wx.EVT_MOTION, self.tooltipManager.OnMouseMotion)
 
         for col in range(0, len(config.default_columns)):
             self.InsertColumn(
@@ -322,7 +423,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 for match_ in matches:
                     for idx_file in range(len(match_["candidates"])):
                         f_masked = masks.FileMasked(match_["candidates"][idx_file], useFilter=False)
-                        mnu_match = menu.Append(wx.ID_ANY, "[%d%%] %s" % (match_["score"], f_masked.masked[1]))
+                        f_match, _ = utils.StripComments(f_masked.masked[1]) # Strip extra comments
+                        mnu_match = menu.Append(wx.ID_ANY, "[%d%%] %s" % (match_["score"], f_match))
                         self.Bind(
                             wx.EVT_MENU, partial(self.MenuForceMatchCb, row_id, match_["key"], idx_file), mnu_match,
                         )
@@ -739,6 +841,10 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             parent, stem, suffix = utils.GetFileParentStemAndSuffix(matchnames[0])
             if data[config.D_NBMATCH] > 1:
                 stem = masks.getmergedprepost(matchnames)
+
+            # Strip extra comments
+            stem, _ = utils.StripComments(stem)
+
             self.SetItem(
                 row_id,
                 config.D_MATCHNAME,
@@ -749,6 +855,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 parent, stem, suffix = utils.GetFileParentStemAndSuffix(previews[0])
                 if len(previews) > 1:
                     stem = masks.getmergedprepost(previews)
+                # Strip extra comments
+                stem, _ = utils.StripComments(stem)
                 self.SetItem(
                     row_id,
                     config.D_PREVIEW,
@@ -784,6 +892,8 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
             self.RefreshItem(row_id, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)
         self.Thaw()
 
+    # Add source to the list,
+    # Return Row Ids for new items
     def AddToList(self, newdata):
         Qview_fullpath = get_config()["show_fullpath"]
         Qhide_extension = get_config()["hide_extension"]
@@ -793,6 +903,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
         index = 0 if not self.listdata else sorted(self.listdata.keys())[-1] + 1  # start indexing after max index
         row_id = self.GetItemCount()
         row_ids_to_match = set()
+        row_ids_to_return = set()
         
         self.Freeze()
         for f in newdata:
@@ -802,6 +913,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 pos = self.listdataname[key]
                 row_id0 = self.FindItem(-1, pos)
                 if row_id0 != -1:
+                    row_ids_to_return.add(row_id0)
                     if not f in self.listdata[pos][config.D_FILENAME]:
                         self.listdata[pos][config.D_FILENAME].append(f)
                         self.RefreshItem(row_id0, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)
@@ -812,6 +924,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 item_name = str(f) if (Qview_fullpath or not Qinput_as_path) else (stem if Qhide_extension else f.name)
                 found = self.FindItem(-1, item_name)
                 if found != -1:
+                    row_ids_to_return.add(found)
                     continue
 
                 self.listdataname[key] = index
@@ -822,6 +935,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 self.RefreshItem(row_id, Qview_fullpath=Qview_fullpath, Qhide_extension=Qhide_extension)
                 self.CheckItem(row_id, True)
                 row_ids_to_match.add(row_id)
+                row_ids_to_return.add(row_id)
                 row_id += 1
                 index += 1
 
@@ -880,6 +994,7 @@ class FuzzyRenamerListCtrl(wx.ListCtrl, listmix.ColumnSorterMixin):
                 count += 1
         self.Thaw()
         wx.LogMessage("Sources : %d" % self.GetItemCount())
+        return row_ids_to_return
 
     def OnSortOrderChanged(self):
         row_id = self.GetFirstSelected()
