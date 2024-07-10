@@ -376,7 +376,7 @@ class MainPanel(wx.Panel):
         btn_add_choice_from_file.Bind(wx.EVT_BUTTON, self.OnAddChoicesFromFiles)
         
         self.UpdateButtons()
-    
+
     def UpdateButtons(self):
         Qinput_as_path = get_config()["input_as_path"]
         
@@ -1804,14 +1804,15 @@ def getDoc():
         "<ul>"
         "<li>The input strings to rename are called the <b>sources</b>;</li>"
         "<li>The strings used to search for similarity are called the <b>choices</b>;</li>"
+        "<li>A <b>choice alias</b> is an alternative name that can be assigned to a <b>choice</b>. It is an optional string that will be used instead of the original <b>choice</b> when renaming a <b>source</b>;</b></li>"
         "<li>The process to search the most similar <b>choice</b> for a given <b>source</b> is referred here as <b>matching</b> process;</li>"
         "<li>When strings are coming from file paths, the following terminology is used:"
         "<ul>"
-        "<li>A <b>file path</b> is composed of a <b>parent directory</b> and a <b>file name</b>;<br>e.g. <b>file path</b>=<code>c:/foo/bar/setup.tar.gz</code>, <b>parent directory</b>=<code>c:/foo/bar</code>, <b>file name</b>=<code>setup.tar.gz</code></li>"
+        "<li>A <b>file path</b> is composed of a <b>parent directory</b> and a <b>file name</b>;<br>for example, <b>file path</b>=<code>c:/foo/bar/setup.tar.gz</code>, <b>parent directory</b>=<code>c:/foo/bar</code>, <b>file name</b>=<code>setup.tar.gz</code></li>"
         "<li>A <b>file name</b> is composed of a <b>stem</b> and a <b>suffix</b>;<br>"
-        "e.g. <b>file name</b>=<code>setup.tar</code>, <b>stem</b>=<code>setup</code>, <b>suffix</b>=<code>.tar</code><br>"
+        "for example, <b>file name</b>=<code>setup.tar</code>, <b>stem</b>=<code>setup</code>, <b>suffix</b>=<code>.tar</code><br>"
         "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>file name</b>=<code>setup.tar.gz</code>, <b>stem</b>=<code>setup.tar</code>, <b>suffix</b>=<code>.gz</code></li>"
-        "<li>A <b>suffix</b> can only contain alphanumeric characters after the dot, if it contains non-alphanumeric characters, the suffix is considered as part of the <b>stem</b>;<br>e.g. <b>file name</b>=<code>A.Train III</code>, <b>stem</b>=<code>A.Train III</code>, <b>suffix</b>=<code>None</code></li>"
+        "<li>A <b>suffix</b> can only contain alphanumeric characters after the dot, if it contains non-alphanumeric characters, the suffix is considered as part of the <b>stem</b>;<br>for example, <b>file name</b>=<code>A.Train III</code>, <b>stem</b>=<code>A.Train III</code>, <b>suffix</b>=<code>None</code></li>"
         "</ul></li>"
         "</ul>"
         "<h3>Principles</h3>"
@@ -1825,7 +1826,9 @@ def getDoc():
         "</pre>"
         "<p>When searching for the most similar <b>choice</b>, only the <b>stems</b> of <b>choices</b> and <b>stem</b> of <b>source</b> are compared.</p>"
         "<p>When renaming a <b>source</b> file path, only the <b>stem</b> is renamed with the most similar <b>stem</b> among <b>choices</b> file paths.</p>"
-        '<p>E.g. if <b>source</b> is <code><font color="blue">c:/foo/Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color="red">d:/bar/Amaryllidinae.jpg</font></code>, <b>renamed source</b> is <code><font color="blue">c:/foo/</font><font color="red">Amaryllidinae</font><font color="blue">.png</font></code></p>'
+        '<p>For example, if <b>source</b> is <code><font color="blue">c:/foo/Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color="red">d:/bar/Amaryllidinae.jpg</font></code>, <b>renamed source</b> is <code><font color="blue">c:/foo/</font><font color="red">Amaryllidinae</font><font color="blue">.png</font></code></p>'
+        "<p>If <b>choices</b> have <b>choice aliases</b> assigned, then, the <b>choices</b> are used to search the most similar, but the <b>choice alias</b> of best <b>choice</b> is used for renaming.</p>"
+        '<p>For example, if <b>source</b> is <code><font color="blue">Amaryllis</font></code>, and <b>most similar choice</b> is <code><font color="red">Amaryllidinae</font></code>, which has been assigned the <b>choice alias</b> <code><font color="orange">amary</font></code>, <b>renamed source</b> is <code><font color="orange">amary</font></code> and not <code><font color="red">Amaryllidinae</font></code></p>'
         "<p>If <b>masks</b> and <b>filters</b> are applied, the process applied to match and rename each <b>source</b> is the following:</p>"
         "<pre>"
         "        ┌───────┐               ┌─────────┐<br>"
@@ -1850,14 +1853,23 @@ def getDoc():
         "<ul><li>click on the <code><b>Choices</b></code> button to add a selection of files paths to the current <b>choices</b>;</li>"
         "<li>Go to <code><b>File->Choices->Choices from Directory</b></code> menu to add files paths from a selected folder to the current <b>choices</b>;</li>"
         "<li>Go to <code><b>File->Choices->Choices from Clipboard</b></code> menu to add files paths from clipboard to the current <b>choices</b>. If clipboard contains a folder, then the file paths of the files inside this folder are added;</li>"
-        "<li>Go to <code><b>File->Choices->Choices from File</b></code> menu to import <b>choices</b> from a CSV (or XLSX, TXT) file (one choice per row). If 2 values per line (comma separated) the first value is the string used for comparison and the second one is the string used for renaming (=alias). For example, if a candidate to rename is <code>3DWorldRunner.png</code> and best choice is <code>3-D Battles of World Runner, The</code> but the rename need to be the name 3dbatworru.png, then the CSV should contain a line like <code>\"3-D Battles of World Runner, The\", 3dbatworru</code>;</li>"
+        "<li>Go to <code><b>File->Choices->Choices from File</b></code> menu to import <b>choices</b> from a CSV (or XLSX, TXT) file."
+        "<ul>"
+        "<li>Each row or line of the file defined one <b>choice</b>;</li>"
+        "<li>A <b>choice</b> containing space characters must be surrounded by double-quotes;</li>"
+        "<li>If a line contains a single value, this value is the <b>choice</b>;</li>"
+        "<li>If a line contains two values separated by a comma, the first value is the <b>choice</b> (=string used for comparison) and the second one is the <b>choice alias</b> (=string used for renaming);<br>"
+        "for example, if a candidate to rename is <code>3DWorldRunner.png</code> and best <b>choice</b> is <code>3-D Battles of World Runner, The</code> but one wants to rename the file as <code>3dbatworru.png</code>, then the CSV should contain a line like <code>\"3-D Battles of World Runner, The\", 3dbatworru</code>;</li>"
+        "<li>It is possible to define the text of the tooltip shown when hovering over a matched <b>choice</b>. Just include the specific text between /* */ in the <b>choice</b> name;<br>"
+        "for example, if the choice name is <code>\"Choice Name/*Tooltip text line 1\nTooltip text line 2*/\"</code>, the tooltip will show the lines <code>\"Tooltip text line 1\"</code> and <code>\"Tooltip text line 2\"</code> when hovering over this matched choice.</li>"
+        "</ul>"
 
         "<li>Go to <code><b>File->Choices</b></code> to add recently selected folders to the current <b>choices</b>;</li>"
         "<li>Drag files or folders into application panel and choose <code><b>Choices</b></code> to add file paths to the current <b>choices</b>. For folders, the file paths of the files inside folders are added;</li>"
         "<li>Paste (Ctrl+V) into application panel and choose <code><b>Choices</b></code> to add file paths of the files or folders in clipboard to the current <b>choices</b>. For folders, the file paths of the files inside folders are added</li></ul>"
         "<h3>Filters</h3>"
         "<p>To ease the <b>matching</b> process, filters can be applied to <b>sources</b> and <b>choices</b> before they are compared.</p>"
-        '<p>E.g. <b>source</b> is <code><font color="blue">c:/foo/The Amaryllis.png</font></code> and <b>choice</b> is <code><font color="red">d:/bar/Amaryllidinae, The.txt</font></code>. It would be smart to clean the <b>sources</b> and <b>choices</b> by ignoring all articles before trying to find the <b>most similar choice</b>.</p>'
+        '<p>For example, <b>source</b> is <code><font color="blue">c:/foo/The Amaryllis.png</font></code> and <b>choice</b> is <code><font color="red">d:/bar/Amaryllidinae, The.txt</font></code>. It would be smart to clean the <b>sources</b> and <b>choices</b> by ignoring all articles before trying to find the <b>most similar choice</b>.</p>'
         "<p>To achieve this, the application uses <b>filters</b>.</p>"
         "<p>The filters are using Python regular expression patterns with capture groups (). The captured groups are replaced by a given expression (usually empty to clean a string). This is applied to both <b>sources</b> and <b>choices</b> when <b>matching</b> occurs.</p>"
         "<p>Filters are only applied for the <b>matching</b> process, original unfiltered files are used otherwise.</p>"
@@ -1877,7 +1889,7 @@ def getDoc():
         "</ul>"
         "<h3>Masks</h3>"
         "<p>Sometimes, it can be interesting to ignore some leading and/or trailing parts from <b>sources</b> or <b>choices</b> in the <b>matching</b> process and restore them after the <b>renaming</b> process.</p>"
-        '<p>E.g. <b>source</b> is <code><font color="blue">c:/foo/(1983-06-22) Amaryllis [Russia].png</font></code>, and we want to ignore the date <code><font color="blue">(1983-06-22)</font></code> and the country <code><font color="blue">[Russia]</font></code> during <b>matching</b> but we need to restore them when <b>renaming</b>, '
+        '<p>For example, <b>source</b> is <code><font color="blue">c:/foo/(1983-06-22) Amaryllis [Russia].png</font></code>, and we want to ignore the date <code><font color="blue">(1983-06-22)</font></code> and the country <code><font color="blue">[Russia]</font></code> during <b>matching</b> but we need to restore them when <b>renaming</b>, '
         ' then if <b>most similar choice</b> is <code><font color="red">d:/bar/Amaryllidinae.jpg</font></code>, the <b>renamed source</b> should be <code><font color="blue">c:/foo/(1983-06-22) </font><font color="red">Amaryllidinae</font><font color="blue"> [Russia].png</font></code></p>'
         "<p>To achieve this, the application uses <b>masks</b>.</p>"
         "<p>The masks are using Python regular expression patterns. They are removed from <b>sources</b> and <b>choices</b> strings before <b>filtering</b> and <b>matching</b> occur."
@@ -1928,12 +1940,12 @@ def getDoc():
         "During <b>renaming</b>, the original file is kept."
         "<br><li><b>Keep matched file suffix</b><br><br>"
         "During <b>renaming</b>, the suffix of the <b>most similar choice</b> is used before suffix of the <b>source</b>.<br>"
-        'E.g. if <b>source</b> is <code><font color="blue">Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color="red">Amaryllidinae.rom</font></code>, <b>renamed source</b> is <code><font color="red">Amaryllidinae.rom</font></code><code><font color="blue">.png</font></code>'
+        'For example, if <b>source</b> is <code><font color="blue">Amaryllis.png</font></code>, and <b>most similar choice</b> is <code><font color="red">Amaryllidinae.rom</font></code>, <b>renamed source</b> is <code><font color="red">Amaryllidinae.rom</font></code><code><font color="blue">.png</font></code>'
         "<br><li><b>Always match first letter</b><br><br>"
         "During <b>matching</b>, each <b>source</b> will search for the <b>most similar choice</b> among <b>choices</b> that start with the same letter only. This decreases greatly the processing time during <b>matching</b>."
         "<br><li><b>Source can match multiple choices</b><br><br>"
         "If a <b>source</b> matches a group of <b>choices</b> with different <b>masks</b>, then the renaming will create copies of this <b>source</b> for each <b>mask</b>.<br>"
-        'E.g. if <b>source</b> is <code><font color="blue">Amaryllis.png</font></code>, and <b>most similar choices</b> are <code><font color="red">Amaryllidinae[_disk1, disk2].rom</font></code>, <b>renamed sources</b> are <code><font color="red">Amaryllidinae_disk1</font><font color="blue">.png</font></code> and <code><font color="red">Amaryllidinae_disk2</font><font color="blue">.png</font></code>.<br>'
+        'For example, if <b>source</b> is <code><font color="blue">Amaryllis.png</font></code>, and <b>most similar choices</b> are <code><font color="red">Amaryllidinae[_disk1, disk2].rom</font></code>, <b>renamed sources</b> are <code><font color="red">Amaryllidinae_disk1</font><font color="blue">.png</font></code> and <code><font color="red">Amaryllidinae_disk2</font><font color="blue">.png</font></code>.<br>'
         '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If option is unchecked <b>renamed source</b> is only <code><font color="red">Amaryllidinae</font><font color="blue">.png</font></code>.'
         "<br><li><b>Number of processes</b><br><br>"
         "Number of parallel processes used when launching matching/renaming/undoing tasks (=1 to not use parallel tasks)"

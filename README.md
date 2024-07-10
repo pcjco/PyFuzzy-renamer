@@ -11,18 +11,19 @@ The following terminology is used in the application, and in this document:
 
 *   The input strings to rename are called the **sources**;
 *   The strings used to search for similarity are called the **choices**;
+*   A **choice alias** is an alternative name that can be assigned to a **choice**. It is an optional string that will be used instead of the original **choice** when renaming a **source**;
 *   The process to search the most similar **choice** for a given **source** is referred here as **matching** process;
 *   When strings are coming from file paths, the following terminology is used:
     *   A **file path** is composed of a **parent directory** and a **file name**;
 
-        e.g. **file path**=`c:/foo/bar/setup.tar.gz`, **parent directory**=`c:/foo/bar`, **file name**=`setup.tar.gz`
+        for example, **file path**=`c:/foo/bar/setup.tar.gz`, **parent directory**=`c:/foo/bar`, **file name**=`setup.tar.gz`
     *   A **file name** is composed of a **stem** and a **suffix**;
 
-        e.g. **file name**=`setup.tar`, **stem**=`setup`, **suffix**=`.tar`  
-        e.g. **file name**=`setup.tar.gz`, **stem**=`setup.tar`, **suffix**=`.gz`
+        for example, **file name**=`setup.tar`, **stem**=`setup`, **suffix**=`.tar`  
+        for example, **file name**=`setup.tar.gz`, **stem**=`setup.tar`, **suffix**=`.gz`
     * A **suffix** can only contain alphanumeric characters after the dot, if it contains non-alphanumeric characters, the **suffix** is considered as part of the **stem**
 
-        e.g. **file name**=`A.Train III`, **stem**=`A.Train III`, **suffix**=`None`
+        for example, **file name**=`A.Train III`, **stem**=`A.Train III`, **suffix**=`None`
 
 
 ### Principles
@@ -41,7 +42,11 @@ When searching for the most similar **choice**, only the **stems** of **choices*
 
 When renaming a **source** file path, only the **stem** is renamed with the most similar **stem** among **choices** file paths.
 
-E.g. if **source** is `c:/foo/Amaryllis.png`, and **most similar choice** is `d:/bar/Amaryllidinae.jpg`, **renamed source** is `c:/foo/Amaryllidinae.png`
+For example, if **source** is `c:/foo/Amaryllis.png`, and **most similar choice** is `d:/bar/Amaryllidinae.jpg`, **renamed source** is `c:/foo/Amaryllidinae.png`
+
+If **choices** have **choice aliases** assigned, then, the **choices** are used to search the most similar, but the **choice alias** of best **choice** is used for renaming.
+
+For example, if **source** is `Amaryllis`, and most similar **choice** is `Amaryllidinae`, which has been assigned the **choice alias** `amary`, renamed **source** is `amary` and not `Amaryllidinae`
 
 If **masks** and **filters** are applied, the process applied to match and rename each **source** is the following:
 
@@ -83,7 +88,7 @@ Choices are entered in the following ways:
 
 To ease the **matching** process, filters can be applied to **sources** and **choices** before they are compared.
 
-E.g. **source** is `c:/foo/The Amaryllis.png` and **choice** is `d:/bar/Amaryllidinae, The.txt`. It would be smart to clean the **sources** and **choices** by ignoring all articles before trying to find the **most similar choice**.
+For example, **source** is `c:/foo/The Amaryllis.png` and **choice** is `d:/bar/Amaryllidinae, The.txt`. It would be smart to clean the **sources** and **choices** by ignoring all articles before trying to find the **most similar choice**.
 
 To achieve this, the application uses **filters**.
 
@@ -109,7 +114,7 @@ Filters creation, addition, deletion, re-ordering is available from **`Masks & F
 
 Sometimes, it can be interesting to ignore some leading and/or trailing parts from **sources** or **choices** in the **matching** process and restore them after the **renaming** process.
 
-E.g. **source** is `c:/foo/(1983-06-22) Amaryllis [Russia].png`, and we want to ignore the date `(1983-06-22)` and the country `[Russia]` during **matching** but we need to restore them when **renaming**, then if **most similar choice** is `d:/bar/Amaryllidinae.jpg`, the **renamed source** should be `c:/foo/(1983-06-22) Amaryllidinae [Russia].png`
+For example, **source** is `c:/foo/(1983-06-22) Amaryllis [Russia].png`, and we want to ignore the date `(1983-06-22)` and the country `[Russia]` during **matching** but we need to restore them when **renaming**, then if **most similar choice** is `d:/bar/Amaryllidinae.jpg`, the **renamed source** should be `c:/foo/(1983-06-22) Amaryllidinae [Russia].png`
 
 To achieve this, the application uses **masks**.
 
@@ -173,7 +178,7 @@ There are two options available:
 *   **Keep matched file suffix**
 
     During **renaming**, the suffix of the **most similar choice** is used before suffix of the **source**.  
-    E.g. if **source** is `Amaryllis.png`, and **most similar choice** is `Amaryllidinae.rom`, **renamed source** is `Amaryllidinae.rom.png`
+    For example, if **source** is `Amaryllis.png`, and **most similar choice** is `Amaryllidinae.rom`, **renamed source** is `Amaryllidinae.rom.png`
 
 *   **Always match first letter**
     
@@ -183,7 +188,7 @@ There are two options available:
 *   **Source can match multiple choices**
 
     If a **source** matches a group of **choices** with different **masks**, then the renaming will create copies of this **source** for each **mask**.  
-    E.g. if **source** is `Amaryllis.png`, and **most similar choices** are `Amaryllidinae[_disk1, disk2].rom`, **renamed sources** are `Amaryllidinae_disk1.png` and `Amaryllidinae_disk2.png`.  
+    For example, if **source** is `Amaryllis.png`, and **most similar choices** are `Amaryllidinae[_disk1, disk2].rom`, **renamed sources** are `Amaryllidinae_disk1.png` and `Amaryllidinae_disk2.png`.  
     If option is unchecked **renamed source** is only `Amaryllidinae.png`.
 
 *   **Number of processes**

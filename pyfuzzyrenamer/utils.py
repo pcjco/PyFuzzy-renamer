@@ -5,6 +5,7 @@ import sys
 import wx
 import zipfile
 import csv
+import ctypes
 from xml.etree.ElementTree import iterparse
 from pathlib import Path
 import subprocess
@@ -258,3 +259,62 @@ def versiontuple(v):
    for point in v.split("."):
       filled.append(point.zfill(8))
    return tuple(filled)
+
+# Remove everything between /* ... */
+def StripComments(str):
+    new_str = ""
+    comments = []
+    start_comment_pos = 0
+    end_comment_pos = 0
+    while start_comment_pos != -1 and end_comment_pos != -1:
+        start_comment_pos = str.find('/*')
+        if start_comment_pos != -1:
+            end_comment_pos = str.find('*/', start_comment_pos + 2)
+            if end_comment_pos != -1:
+                comments.append(str[start_comment_pos+2:end_comment_pos])
+                str = str[:start_comment_pos] + str[end_comment_pos+2:]
+            
+    return str, "\n".join(comments)
+
+# Arrange a list of string into a single string where the strings are arranged in ROWSxCOLUMNS
+def arrange_strings(strings, rows, columns):
+
+    nb_strings = len(strings)
+    font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+    dc = wx.ScreenDC()
+    dc.SetFont(font)
+
+    # Find the maximum length for each column
+    max_length_per_col = [max(len(s) for s in strings[col_id * rows:col_id * rows + rows]) for col_id in range(columns) if col_id * rows < nb_strings]
+    max_textextent_per_col = [dc.GetMultiLineTextExtent('\n'.join(s for s in strings[col_id * rows:col_id * rows + rows]))[0] for col_id in range(columns-1) if col_id * rows < nb_strings]
+
+    # Create a list to store the strings arranged in rows and columns
+    arranged_strings = []
+
+    # Iterate over the rows
+    for i in range(rows):
+        # Create a sublist to hold strings for the current row
+        row_strings = []
+        # Iterate over the columns
+        for j in range(columns):
+            # Calculate the index of the string in the original list
+            index = i + j * rows
+            if index >= nb_strings:
+                break
+            # Calculate the number of space needed to pad the string to the desired length
+            space_needed = 0
+            if j < columns - 1:
+                while dc.GetMultiLineTextExtent(strings[index] + '\u200A'*space_needed)[0] < max_textextent_per_col[j]:
+                    space_needed += 1
+                
+            # Pad the string with spaces to adjust the length
+            padded_string = strings[index].ljust(len(strings[index]) + space_needed, '\u200A')
+            # Append the string to the current row
+            row_strings.append(padded_string)
+        # Join the strings in the row with tabs and add to the arranged_strings list
+        arranged_strings.append("\t".join(row_strings))
+
+    # Join the rows with newline characters to create the final output
+    final_output = "\n".join(arranged_strings)
+    
+    return final_output    
